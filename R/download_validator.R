@@ -137,4 +137,6 @@ list_validator_versions <- function() {
     data.table::rbindlist()
 
   versions <- versions[!is.na(versions$cli_download_url), ]
+
+  return(versions)
 }

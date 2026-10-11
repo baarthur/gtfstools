@@ -13,7 +13,9 @@
 #'   definition of each function). Defaults to [`sf::st_intersects`], which
 #'   tests if the shapes and trips have ANY intersection with the object
 #'   specified in `geom`. Please note that `geom` is passed as the `x` argument
-#'   of these functions.
+#'   of these functions. [sf::st_equals_exact()] and
+#'   [sf::st_is_within_distance()] are not supported, since they require
+#'   additional arguments.
 #' @param keep A logical. Whether the entries related to the shapes and trips
 #'   selected by the given spatial operation should be kept or dropped (defaults
 #'   to `TRUE`, which keeps the entries).
@@ -139,9 +141,7 @@ assert_spatial_operation <- function(spatial_operation) {
     overlaps = sf::st_overlaps,
     equals = sf::st_equals,
     covers = sf::st_covers,
-    covered_by = sf::st_covered_by,
-    equals_exact = sf::st_equals_exact,
-    is_within_distance = sf::st_is_within_distance
+    covered_by = sf::st_covered_by
   )
 
   checkmate::assert_class(spatial_operation, "function")

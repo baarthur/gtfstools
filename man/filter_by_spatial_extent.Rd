@@ -23,7 +23,9 @@ options listed in \link[sf:geos_binary_pred]{geos_binary_pred} (check the
 definition of each function). Defaults to \code{\link[sf:st_intersects]{sf::st_intersects}}, which
 tests if the shapes and trips have ANY intersection with the object
 specified in \code{geom}. Please note that \code{geom} is passed as the \code{x} argument
-of these functions.}
+of these functions. \code{\link[sf:st_equals_exact]{sf::st_equals_exact()}} and
+\code{\link[sf:st_is_within_distance]{sf::st_is_within_distance()}} are not supported, since they require
+additional arguments.}
 
 \item{keep}{A logical. Whether the entries related to the shapes and trips
 selected by the given spatial operation should be kept or dropped (defaults

@@ -57,6 +57,30 @@ filter_fare_attr_from_agency_id <- function(gtfs,
 }
 
 filter_fare_attr_from_fare_id <- function(gtfs, relevant_fares, `%ffilter%`) {
+  # fares of feeds without a 'fare_rules' table apply to every route of their
+  # agency, so they are kept if their agency still has routes (or if they
+  # have no agency). the callers filter 'fare_rules' before calling this
+  # function, but never remove the table, so an absent table means that the
+  # feed had none (unlike remove_unused_ids(), an empty table doesn't count,
+  # since it may have been emptied by the filtering). 'routes' is already
+  # filtered by the callers, while 'agency' isn't yet
+
+  if (is.null(gtfs$fare_rules)) {
+    if (NROW(gtfs$agency) <= 1L) {
+      return(gtfs)
+    }
+
+    # multi-agency feeds must list the agency_id of each route
+
+    gtfs <- filter_fare_attr_from_agency_id(
+      gtfs,
+      c(NA_character_, "", unique(gtfs$routes$agency_id)),
+      `%chin%`
+    )
+
+    return(gtfs)
+  }
+
   if (gtfsio::check_field_exists(gtfs, "fare_attributes", "fare_id")) {
     gtfsio::assert_field_class(gtfs, "fare_attributes", "fare_id", "character")
     gtfs$fare_attributes <- gtfs$fare_attributes[

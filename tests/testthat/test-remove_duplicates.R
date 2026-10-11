@@ -35,3 +35,20 @@ test_that("doesn't change original gtfs object", {
   unique_gtfs <- remove_duplicates(gtfs)
   expect_identical(original_gtfs, gtfs)
 })
+
+test_that("keeps elements that are not tables as they are", {
+  locations <- list(
+    type = "FeatureCollection",
+    features = list(list(type = "Feature"), list(type = "Feature"))
+  )
+  tidy_element <- list(a = gtfs$agency, b = gtfs$agency)
+
+  list_gtfs <- read_gtfs(data_path)
+  list_gtfs$locations <- locations
+  list_gtfs$. <- tidy_element
+
+  result <- remove_duplicates(list_gtfs)
+  expect_identical(result$locations, locations)
+  expect_identical(result$., tidy_element)
+  expect_identical(result$agency, unique(gtfs$agency))
+})
