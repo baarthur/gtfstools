@@ -50,10 +50,12 @@ those of the functions above, so some warnings (e.g. about a missing
 }
 
 \examples{
+\dontshow{if (requireNamespace("dplyr", quietly = TRUE)) withAutoprint(\{ # examplesIf}
 \dontshow{
   old_dt_threads <- data.table::setDTthreads(1)
-  on.exit(data.table::setDTthreads(old_dt_threads), add = TRUE)
 }
+library(dplyr)
+
 data_path <- system.file("extdata/spo_gtfs.zip", package = "gtfstools")
 
 gtfs <- read_gtfs(data_path)
@@ -64,9 +66,15 @@ fixed_gtfs <- fix_gtfs(gtfs, max_speed = 40)
 gtfs$agency
 fixed_gtfs$agency
 
-gtfs$stop_times[trip_id == "CPTM L07-0"][.N]
-fixed_gtfs$stop_times[trip_id == "CPTM L07-0"][.N]
+gtfs$stop_times |>
+  filter(trip_id == "CPTM L07-0") |>
+  slice_tail(n = 1)
 
+fixed_gtfs$stop_times |>
+  filter(trip_id == "CPTM L07-0") |>
+  slice_tail(n = 1)
+\dontshow{data.table::setDTthreads(old_dt_threads)}
+\dontshow{\}) # examplesIf}
 }
 \seealso{
 \code{\link[=remove_duplicates]{remove_duplicates()}}, \code{\link[=remove_unused_ids]{remove_unused_ids()}}, \code{\link[=set_max_speed]{set_max_speed()}},

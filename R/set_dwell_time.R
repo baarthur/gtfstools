@@ -89,11 +89,12 @@
 #'
 #' @seealso [get_dwell_time()], [set_trip_speed()]
 #'
-#' @examples
+#' @examplesIf requireNamespace("dplyr", quietly = TRUE)
 #' \dontshow{
 #'   old_dt_threads <- data.table::setDTthreads(1)
-#'   on.exit(data.table::setDTthreads(old_dt_threads), add = TRUE)
 #' }
+#' library(dplyr)
+#'
 #' data_path <- system.file("extdata/spo_gtfs.zip", package = "gtfstools")
 #' gtfs <- read_gtfs(data_path)
 #'
@@ -105,7 +106,9 @@
 #'   stop_id = "18920",
 #'   dwell_time = 30
 #' )
-#' head(new_gtfs$stop_times[trip_id == "CPTM L07-0"])
+#' new_gtfs$stop_times |>
+#'   filter(trip_id == "CPTM L07-0") |>
+#'   head()
 #'
 #' # set the dwell time at a stop in every trip that visits it. use the unit
 #' # argument to give the dwell time in another unit
@@ -138,7 +141,10 @@
 #'   dwell_time = 30,
 #'   by_reference = TRUE
 #' )
-#' head(gtfs$stop_times[trip_id == "CPTM L07-0"])
+#' gtfs$stop_times |>
+#'   filter(trip_id == "CPTM L07-0") |>
+#'   head()
+#' \dontshow{data.table::setDTthreads(old_dt_threads)}
 #'
 #' @export
 set_dwell_time <- function(gtfs,

@@ -8,9 +8,13 @@ vignette: >
 ---
 
 ```{r, include = FALSE}
+# the queries in this vignette use {dplyr}, which gtfstools only suggests
+has_dplyr <- requireNamespace("dplyr", quietly = TRUE)
+
 knitr::opts_chunk$set(
   collapse = TRUE,
-  comment = "#>"
+  comment = "#>",
+  eval = has_dplyr
 )
 
 Sys.setenv(OMP_THREAD_LIMIT = 2)
@@ -44,6 +48,10 @@ library(gtfstools)
 library(ggplot2)
 ```
 
+```{r, message = FALSE}
+library(dplyr)
+```
+
 # Filtering by `agency_id`, `route_id`, `service_id`, `shape_id`, `stop_id`, `trip_id` or `route_type`:
 
 The first seven work in a very similar fashion. You specify a vector of identifiers, and the function keeps (or drops, as we'll see soon) all the entries that are in any way related to this id. Let's see how that works using `filter_by_trip_id()`:
@@ -53,13 +61,17 @@ path <- system.file("extdata/spo_gtfs.zip", package = "gtfstools")
 gtfs <- read_gtfs(path)
 utils::object.size(gtfs)
 
-head(gtfs$trips[, .(trip_id, trip_headsign, shape_id)])
+gtfs$trips |>
+  select(trip_id, trip_headsign, shape_id) |>
+  head()
 
 # keeping trips CPTM L07-0 and CPTM L07-1
 smaller_gtfs <- filter_by_trip_id(gtfs, c("CPTM L07-0", "CPTM L07-1"))
 utils::object.size(smaller_gtfs)
 
-head(smaller_gtfs$trips[, .(trip_id, trip_headsign, shape_id)])
+smaller_gtfs$trips |>
+  select(trip_id, trip_headsign, shape_id) |>
+  head()
 
 unique(smaller_gtfs$shapes$shape_id)
 ```
@@ -77,7 +89,9 @@ smaller_gtfs <- filter_by_trip_id(
 )
 utils::object.size(smaller_gtfs)
 
-head(smaller_gtfs$trips[, .(trip_id, trip_headsign, shape_id)])
+smaller_gtfs$trips |>
+  select(trip_id, trip_headsign, shape_id) |>
+  head()
 
 head(unique(smaller_gtfs$shapes$shape_id))
 ```
@@ -99,7 +113,8 @@ smaller_gtfs <- filter_by_weekday(
   weekday = c("saturday", "sunday"),
   combine = "and"
 )
-smaller_gtfs$calendar[, c("service_id", "sunday", "saturday")]
+smaller_gtfs$calendar |>
+  select(service_id, sunday, saturday)
 
 # keeping entries related to services than run EITHER on saturdays OR on sundays
 smaller_gtfs <- filter_by_weekday(
@@ -107,7 +122,8 @@ smaller_gtfs <- filter_by_weekday(
   weekday = c("sunday", "saturday"),
   combine = "or"
 )
-smaller_gtfs$calendar[, c("service_id", "sunday", "saturday")]
+smaller_gtfs$calendar |>
+  select(service_id, sunday, saturday)
 
 # dropping entries related to services that run on saturdaus AND sundays
 smaller_gtfs <- filter_by_weekday(
@@ -116,7 +132,8 @@ smaller_gtfs <- filter_by_weekday(
   combine = "and",
   keep = FALSE
 )
-smaller_gtfs$calendar[, c("service_id", "sunday", "saturday")]
+smaller_gtfs$calendar |>
+  select(service_id, sunday, saturday)
 
 # dropping entries related to services than run EITHER on saturdays OR on
 # sundays
@@ -126,7 +143,8 @@ smaller_gtfs <- filter_by_weekday(
   combine = "or",
   keep = FALSE
 )
-smaller_gtfs$calendar[, c("service_id", "sunday", "saturday")]
+smaller_gtfs$calendar |>
+  select(service_id, sunday, saturday)
 ```
 
 Meanwhile, `filter_by_time_of_day()` takes the beginning and the end of a time block (the `from` and `to` arguments, respectively) and keeps the entries related to trips that run within the specified block. Please note that the function works a bit differently depending on whether a trip's behaviour is described using the `frequencies` and the `stop_times` tables together or using the `stop_times` table alone: the `stop_times` entries of trips described in `frequencies` should not be filtered, because they are just "templates" that describe how long it takes from one stop to another (i.e. the departure and arrival times listed there should not be considered "as is"). Let's see what that means with an example:
@@ -138,7 +156,9 @@ head(smaller_gtfs$frequencies)
 
 # stop_times entries are preserved because they should be interpreted as
 # "templates"
-head(smaller_gtfs$stop_times[, c("trip_id", "departure_time", "arrival_time")])
+smaller_gtfs$stop_times |>
+  select(trip_id, departure_time, arrival_time) |>
+  head()
 
 # had the feed not had a frequencies table, the stop_times table would be
 # adjusted
@@ -146,7 +166,9 @@ frequencies <- gtfs$frequencies
 gtfs$frequencies <- NULL
 smaller_gtfs <- filter_by_time_of_day(gtfs, from = "05:00:00", to = "06:00:00")
 
-head(smaller_gtfs$stop_times[, c("trip_id", "departure_time", "arrival_time")])
+smaller_gtfs$stop_times |>
+  select(trip_id, departure_time, arrival_time) |>
+  head()
 ```
 
 When filtering the `stop_times` table, we have two options. We either keep entire trips that cross the specified time block, or we keep only the trip segments within this block (default behaviour). To control this behaviour you can use the `full_trips` parameter:
@@ -160,7 +182,9 @@ smaller_gtfs <- filter_by_time_of_day(
 )
 
 # CPTM L07-0 trip is kept intact because it crosses the time block
-head(smaller_gtfs$stop_times[, c("trip_id", "departure_time", "arrival_time")])
+smaller_gtfs$stop_times |>
+  select(trip_id, departure_time, arrival_time) |>
+  head()
 
 # dropping entries related to trips that cross the specified time block
 smaller_gtfs <- filter_by_time_of_day(
@@ -172,7 +196,9 @@ smaller_gtfs <- filter_by_time_of_day(
 )
 
 # CPTM L07-0 trip is gone
-head(smaller_gtfs$stop_times[, c("trip_id", "departure_time", "arrival_time")])
+smaller_gtfs$stop_times |>
+  select(trip_id, departure_time, arrival_time) |>
+  head()
 ```
 
 `filter_by_time_of_day()` also includes a `update_frequencies` argument, used to control whether the `frequencies` table should have its `start_time` and `end_time` fields updated to fit inside/outside the specified time of day. Please read the function documentation to understand how this argument interacts with the `exact_times` field.
@@ -213,7 +239,7 @@ Also, please note that our `plotter()` function takes the same arguments of `fil
 
 Let's say that we want to filter GTFS data using the bounding box of the shape `68962`. Here's how the unfiltered data looks like, with the bounding box placed on top of it.
 
-```{r, eval = requireNamespace("ggplot2", quietly = TRUE)}
+```{r, eval = has_dplyr && requireNamespace("ggplot2", quietly = TRUE)}
 bbox <- sf::st_bbox(convert_shapes_to_sf(gtfs, shape_id = "68962"))
 
 plotter(gtfs, bbox, do_filter = FALSE)
@@ -221,25 +247,25 @@ plotter(gtfs, bbox, do_filter = FALSE)
 
 By default `filter_by_spatial_extent()` (and `plotter()`, consequently) keeps all the data related to the trips and shapes that intersect the given geometry. Here's how it looks like:
 
-```{r, eval = requireNamespace("ggplot2", quietly = TRUE)}
+```{r, eval = has_dplyr && requireNamespace("ggplot2", quietly = TRUE)}
 plotter(gtfs, bbox)
 ```
 
 Alternatively you can also *drop* such data:
 
-```{r, eval = requireNamespace("ggplot2", quietly = TRUE)}
+```{r, eval = has_dplyr && requireNamespace("ggplot2", quietly = TRUE)}
 plotter(gtfs, bbox, keep = FALSE)
 ```
 
 You can also control which spatial operation you want to use to filter the data. This is how you'd keep the data that is contained inside the given geometry:
 
-```{r, eval = requireNamespace("ggplot2", quietly = TRUE)}
+```{r, eval = has_dplyr && requireNamespace("ggplot2", quietly = TRUE)}
 plotter(gtfs, bbox, spatial_operation = sf::st_contains)
 ```
 
 And, simultaneously using `spatial_operation` and `keep`, this is how you'd drop the data contained inside the geometry:
 
-```{r, eval = requireNamespace("ggplot2", quietly = TRUE)}
+```{r, eval = has_dplyr && requireNamespace("ggplot2", quietly = TRUE)}
 plotter(gtfs, bbox, spatial_operation = sf::st_contains, keep = FALSE)
 ```
 

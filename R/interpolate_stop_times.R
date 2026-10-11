@@ -54,22 +54,27 @@
 #'
 #' @seealso [get_trip_length()], [get_trip_speed()], [set_trip_speed()]
 #'
-#' @examples
+#' @examplesIf requireNamespace("dplyr", quietly = TRUE)
 #' \dontshow{
 #'   old_dt_threads <- data.table::setDTthreads(1)
-#'   on.exit(data.table::setDTthreads(old_dt_threads), add = TRUE)
 #' }
+#' library(dplyr)
+#'
 #' data_path <- system.file("extdata/poa_gtfs.zip", package = "gtfstools")
 #' gtfs <- read_gtfs(data_path)
 #' trip <- "T2-1@1#520"
 #'
 #' # only the first and last stops of each trip have times
-#' head(gtfs$stop_times[trip_id == trip])
+#' gtfs$stop_times |>
+#'   filter(trip_id == trip) |>
+#'   head()
 #'
 #' # distances measured along the trips' shapes. some trips of this feed have
 #' # times past midnight written as "00:xx:xx", so they are left blank
 #' interpolated_gtfs <- suppressWarnings(interpolate_stop_times(gtfs))
-#' head(interpolated_gtfs$stop_times[trip_id == trip])
+#' interpolated_gtfs$stop_times |>
+#'   filter(trip_id == trip) |>
+#'   head()
 #'
 #' # the speed is now known between every pair of consecutive stops
 #' head(get_trip_speed(interpolated_gtfs, trip, by = "segment"))
@@ -80,7 +85,10 @@
 #'   trip_id = trip,
 #'   method = "euclidean"
 #' )
-#' head(interpolated_gtfs$stop_times[trip_id == trip])
+#' interpolated_gtfs$stop_times |>
+#'   filter(trip_id == trip) |>
+#'   head()
+#' \dontshow{data.table::setDTthreads(old_dt_threads)}
 #'
 #' @export
 interpolate_stop_times <- function(gtfs, trip_id = NULL, method = "shapes") {
