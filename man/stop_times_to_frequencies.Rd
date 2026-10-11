@@ -32,13 +32,16 @@ Trips are grouped together when they share the same \code{route_id},
 present in \code{trips}) and the same sequence of stops (their spatial pattern,
 as identified by \code{\link[=get_stop_times_patterns]{get_stop_times_patterns()}}). Each group is then split into
 one-hour slots of the clock, from \code{HH:00:00} (included) to the next
-\code{HH:00:00} (not included), according to the first departure time of each
-trip. Slots after midnight are kept as such (e.g. from \code{"25:00:00"} to
-\code{"26:00:00"}).
+\code{HH:00:00} (not included), according to the earliest \code{departure_time} of
+each trip in \code{stop_times}, regardless of \code{stop_sequence}. This is the
+departure from the trip's first stop in valid feeds, but not when later
+times are written incorrectly (e.g. times after midnight written as
+\code{"00:30:00"} instead of \code{"24:30:00"}). Slots after midnight are kept as such
+(e.g. from \code{"25:00:00"} to \code{"26:00:00"}).
 
 In each slot with \code{n} trips:
 \itemize{
-\item the trip that departs first (ties broken by \code{trip_id}) becomes the
+\item the trip with the earliest departure (ties broken by \code{trip_id}) becomes the
 template. It keeps its \code{trip_id}, its \code{trips} entry and its \code{stop_times}
 entries, so travel times may differ from one hour to another. As in any
 frequency-based trip, only its times relative to its first departure
