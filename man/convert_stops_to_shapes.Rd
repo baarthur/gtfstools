@@ -50,10 +50,12 @@ Trips with fewer than two distinct stops with coordinates, or without
 }
 
 \examples{
+\dontshow{if (requireNamespace("dplyr", quietly = TRUE)) withAutoprint(\{ # examplesIf}
 \dontshow{
   old_dt_threads <- data.table::setDTthreads(1)
-  on.exit(data.table::setDTthreads(old_dt_threads), add = TRUE)
 }
+library(dplyr)
+
 data_path <- system.file("extdata/spo_gtfs.zip", package = "gtfstools")
 gtfs <- read_gtfs(data_path)
 
@@ -61,7 +63,11 @@ gtfs <- read_gtfs(data_path)
 gtfs$shapes <- NULL
 new_gtfs <- convert_stops_to_shapes(gtfs)
 head(new_gtfs$shapes)
-head(new_gtfs$trips[, c("trip_id", "shape_id")])
+new_gtfs$trips |>
+  select(trip_id, shape_id) |>
+  head()
+\dontshow{data.table::setDTthreads(old_dt_threads)}
+\dontshow{\}) # examplesIf}
 }
 \seealso{
 \code{\link[=get_trip_geometry]{get_trip_geometry()}}, \code{\link[=convert_sf_to_shapes]{convert_sf_to_shapes()}},

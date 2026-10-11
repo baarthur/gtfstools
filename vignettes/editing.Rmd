@@ -8,9 +8,13 @@ vignette: >
 ---
 
 ```{r, include = FALSE}
+# the queries in this vignette use {dplyr}, which gtfstools only suggests
+has_dplyr <- requireNamespace("dplyr", quietly = TRUE)
+
 knitr::opts_chunk$set(
   collapse = TRUE,
-  comment = "#>"
+  comment = "#>",
+  eval = has_dplyr
 )
 
 Sys.setenv(OMP_THREAD_LIMIT = 2)
@@ -41,6 +45,7 @@ We will start by loading the packages required by this demonstration into the cu
 
 ```{r, message = FALSE}
 library(gtfstools)
+library(dplyr)
 ```
 
 # Setting route frequencies
@@ -99,10 +104,9 @@ new_speed_gtfs <- set_trip_speed(spo_gtfs, trip_id = "CPTM L07-0", speed = 50)
 
 get_trip_speed(new_speed_gtfs, trip_id = "CPTM L07-0")
 
-new_speed_gtfs$stop_times[
-  trip_id == "CPTM L07-0",
-  .(stop_id, stop_sequence, arrival_time, departure_time)
-]
+new_speed_gtfs$stop_times |>
+  filter(trip_id == "CPTM L07-0") |>
+  select(stop_id, stop_sequence, arrival_time, departure_time)
 ```
 
 The duration of the trip is set to its length, measured along its shape, divided by the given speed. `set_trip_speed()` updates the arrival time at the last stop accordingly and sets the arrival and departure times at intermediate stops to `""`. To fill in the expected arrival and departure times of intermediate stops, you use `interpolate_stop_times()`, as we'll see in a [later section](#interpolating-stop-times).
@@ -125,11 +129,12 @@ nrow(gtfs$trips)
 nrow(converted_gtfs$trips)
 
 # frequencies of route T2 on weekdays, from 6 to 10 am
-converted_gtfs$frequencies[
-  startsWith(trip_id, "T2-1@1#") &
-    start_time >= "06:00:00" &
+converted_gtfs$frequencies |>
+  filter(
+    startsWith(trip_id, "T2-1@1#"),
+    start_time >= "06:00:00",
     start_time < "10:00:00"
-]
+  )
 
 # the number of departures of route T2 is kept
 get_route_frequency(
@@ -151,7 +156,10 @@ Sometimes, GTFS feeds don't report the arrival and departure times at every stop
 ```{r}
 trip <- "T2-1@1#520"
 
-head(gtfs$stop_times[trip_id == trip, .(stop_id, arrival_time, departure_time)])
+gtfs$stop_times |> 
+  filter(trip_id == trip) |> 
+  select(stop_id, arrival_time, departure_time) |> 
+  head()
 
 ```
 
@@ -160,12 +168,10 @@ head(gtfs$stop_times[trip_id == trip, .(stop_id, arrival_time, departure_time)])
 ```{r}
 interpolated_gtfs <- interpolate_stop_times(gtfs, trip_id = trip)
 
-head(
-  interpolated_gtfs$stop_times[
-    trip_id == trip,
-    .(stop_id, arrival_time, departure_time)
-  ]
-)
+interpolated_gtfs$stop_times |> 
+  filter(trip_id == trip) |> 
+  select(stop_id, arrival_time, departure_time) |> 
+  head()
 
 ```
 

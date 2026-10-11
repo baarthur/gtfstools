@@ -38,11 +38,12 @@
 #' @seealso [remove_duplicates()], [remove_unused_ids()], [set_max_speed()],
 #'   [interpolate_stop_times()]
 #'
-#' @examples
+#' @examplesIf requireNamespace("dplyr", quietly = TRUE)
 #' \dontshow{
 #'   old_dt_threads <- data.table::setDTthreads(1)
-#'   on.exit(data.table::setDTthreads(old_dt_threads), add = TRUE)
 #' }
+#' library(dplyr)
+#'
 #' data_path <- system.file("extdata/spo_gtfs.zip", package = "gtfstools")
 #'
 #' gtfs <- read_gtfs(data_path)
@@ -53,8 +54,14 @@
 #' gtfs$agency
 #' fixed_gtfs$agency
 #'
-#' gtfs$stop_times[trip_id == "CPTM L07-0"][.N]
-#' fixed_gtfs$stop_times[trip_id == "CPTM L07-0"][.N]
+#' gtfs$stop_times |>
+#'   filter(trip_id == "CPTM L07-0") |>
+#'   slice_tail(n = 1)
+#'
+#' fixed_gtfs$stop_times |>
+#'   filter(trip_id == "CPTM L07-0") |>
+#'   slice_tail(n = 1)
+#' \dontshow{data.table::setDTthreads(old_dt_threads)}
 #'
 #' @export
 fix_gtfs <- function(gtfs, max_speed = NULL, unit = "km/h") {

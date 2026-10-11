@@ -59,11 +59,12 @@
 #' with [convert_time_to_seconds()]) are used as-is, not recalculated from the
 #' time strings.
 #'
-#' @examples
+#' @examplesIf requireNamespace("dplyr", quietly = TRUE)
 #' \dontshow{
 #'   old_dt_threads <- data.table::setDTthreads(1)
-#'   on.exit(data.table::setDTthreads(old_dt_threads), add = TRUE)
 #' }
+#' library(dplyr)
+#'
 #' data_path <- system.file("extdata/spo_gtfs.zip", package = "gtfstools")
 #' gtfs <- read_gtfs(data_path)
 #' trip <- "CPTM L07-0"
@@ -75,11 +76,15 @@
 #' converted_gtfs <- frequencies_to_stop_times(gtfs, trip)
 #'
 #' # how the specified trip_id was described in the frequencies table
-#' head(gtfs$frequencies[trip_id == trip])
+#' gtfs$frequencies |>
+#'   filter(trip_id == trip) |>
+#'   head()
 #'
 #' # the first row of each equivalent stop_times entry in the converted gtfs
-#' equivalent_stop_times <- converted_gtfs$stop_times[grepl(trip, trip_id)]
-#' equivalent_stop_times[equivalent_stop_times[, .I[1], by = trip_id]$V1]
+#' converted_gtfs$stop_times |>
+#'   filter(grepl(trip, trip_id)) |>
+#'   distinct(trip_id, .keep_all = TRUE)
+#' \dontshow{data.table::setDTthreads(old_dt_threads)}
 #'
 #' @export
 frequencies_to_stop_times <- function(gtfs,

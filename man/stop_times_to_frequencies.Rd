@@ -81,10 +81,12 @@ time strings, and are filled in for the new \code{frequencies} entries.
 }
 
 \examples{
+\dontshow{if (requireNamespace("dplyr", quietly = TRUE)) withAutoprint(\{ # examplesIf}
 \dontshow{
   old_dt_threads <- data.table::setDTthreads(1)
-  on.exit(data.table::setDTthreads(old_dt_threads), add = TRUE)
 }
+library(dplyr)
+
 data_path <- system.file("extdata/ber_gtfs.zip", package = "gtfstools")
 gtfs <- read_gtfs(data_path)
 
@@ -95,10 +97,13 @@ nrow(converted_gtfs$trips)
 head(converted_gtfs$frequencies)
 
 # converts only the trips of one route
-route_trips <- gtfs$trips[route_id == gtfs$trips$route_id[1]]$trip_id
+route_trips <- gtfs$trips |>
+  filter(route_id == gtfs$trips$route_id[1]) |>
+  pull(trip_id)
 converted_gtfs <- stop_times_to_frequencies(gtfs, route_trips)
 
 # converting back yields evenly spaced scheduled trips
 back_gtfs <- frequencies_to_stop_times(converted_gtfs)
-
+\dontshow{data.table::setDTthreads(old_dt_threads)}
+\dontshow{\}) # examplesIf}
 }

@@ -44,10 +44,12 @@ pass to \code{keep}.
 }
 
 \examples{
+\dontshow{if (requireNamespace("dplyr", quietly = TRUE)) withAutoprint(\{ # examplesIf}
 \dontshow{
   old_dt_threads <- data.table::setDTthreads(1)
-  on.exit(data.table::setDTthreads(old_dt_threads), add = TRUE)
 }
+library(dplyr)
+
 # read gtfs
 data_path <- system.file("extdata/spo_gtfs.zip", package = "gtfstools")
 gtfs <- read_gtfs(data_path)
@@ -56,7 +58,8 @@ object.size(gtfs)
 
 # keeps entries related to services than run EITHER on monday OR on sunday
 smaller_gtfs <- filter_by_weekday(gtfs, weekday = c("monday", "sunday"))
-smaller_gtfs$calendar[, c("service_id", "monday", "sunday")]
+smaller_gtfs$calendar |>
+  select(service_id, monday, sunday)
 object.size(smaller_gtfs)
 
 # keeps entries related to services than run on monday AND on sunday
@@ -65,7 +68,8 @@ smaller_gtfs <- filter_by_weekday(
   weekday = c("monday", "sunday"),
   combine = "and"
 )
-smaller_gtfs$calendar[, c("service_id", "monday", "sunday")]
+smaller_gtfs$calendar |>
+  select(service_id, monday, sunday)
 object.size(smaller_gtfs)
 
 # drops entries related to services than run EITHER on monday OR on sunday
@@ -75,7 +79,8 @@ smaller_gtfs <- filter_by_weekday(
   weekday = c("monday", "sunday"),
   keep = FALSE
 )
-smaller_gtfs$calendar[, c("service_id", "monday", "sunday")]
+smaller_gtfs$calendar |>
+  select(service_id, monday, sunday)
 object.size(smaller_gtfs)
 
 # drops entries related to services than run on monday AND on sunday
@@ -87,8 +92,11 @@ smaller_gtfs <- filter_by_weekday(
   combine = "and",
   keep = FALSE
 )
-smaller_gtfs$calendar[, c("service_id", "monday", "sunday")]
+smaller_gtfs$calendar |>
+  select(service_id, monday, sunday)
 object.size(smaller_gtfs)
+\dontshow{data.table::setDTthreads(old_dt_threads)}
+\dontshow{\}) # examplesIf}
 }
 \seealso{
 Other filtering functions:

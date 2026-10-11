@@ -54,17 +54,19 @@
 #' For trips listed in `frequencies`, these are template times, not actual
 #' departures. Trips whose departure there is blank are left unchanged.
 #'
-#' @examples
+#' @examplesIf requireNamespace("dplyr", quietly = TRUE)
 #' \dontshow{
 #'   old_dt_threads <- data.table::setDTthreads(1)
-#'   on.exit(data.table::setDTthreads(old_dt_threads), add = TRUE)
 #' }
+#' library(dplyr)
+#'
 #' data_path <- system.file("extdata/spo_gtfs.zip", package = "gtfstools")
 #'
 #' gtfs <- read_gtfs(data_path)
 #'
 #' gtfs_new_speed <- set_trip_speed(gtfs, trip_id = "CPTM L07-0", 50)
-#' gtfs_new_speed$stop_times[trip_id == "CPTM L07-0"]
+#' gtfs_new_speed$stop_times |>
+#'   filter(trip_id == "CPTM L07-0")
 #'
 #' # use the unit argument to change the speed unit
 #' gtfs_new_speed <- set_trip_speed(
@@ -73,7 +75,8 @@
 #'   speed = 15,
 #'   unit = "m/s"
 #' )
-#' gtfs_new_speed$stop_times[trip_id == "CPTM L07-0"]
+#' gtfs_new_speed$stop_times |>
+#'   filter(trip_id == "CPTM L07-0")
 #'
 #' # set the speed only between two stops. later stops are shifted
 #' gtfs_new_speed <- set_trip_speed(
@@ -83,7 +86,8 @@
 #'   first_stop = "18917",
 #'   last_stop = "18922"
 #' )
-#' gtfs_new_speed$stop_times[trip_id == "CPTM L07-0"]
+#' gtfs_new_speed$stop_times |>
+#'   filter(trip_id == "CPTM L07-0")
 #'
 #' # set the speed only of the trips that depart within a time of day
 #' poa_path <- system.file("extdata/poa_gtfs.zip", package = "gtfstools")
@@ -96,27 +100,39 @@
 #'   from = "07:00:00",
 #'   to = "09:00:00"
 #' )
+#'
 #' # the arrival at the last stop of a trip that departs at 07:02 changes
-#' poa_gtfs$stop_times[trip_id == "T2-1@1#702"][.N]
-#' poa_new_speed$stop_times[trip_id == "T2-1@1#702"][.N]
+#' poa_gtfs$stop_times |>
+#'   filter(trip_id == "T2-1@1#702") |>
+#'   slice_tail(n = 1)
+#'
+#' poa_new_speed$stop_times |>
+#'   filter(trip_id == "T2-1@1#702") |>
+#'   slice_tail(n = 1)
 #'
 #' # original gtfs remains unchanged
-#' gtfs$stop_times[trip_id == "CPTM L07-0"]
+#' gtfs$stop_times |>
+#'   filter(trip_id == "CPTM L07-0")
 #'
 #' # when doing by reference, original gtfs is changed
 #' set_trip_speed(gtfs, trip_id = "CPTM L07-0", 50, by_reference = TRUE)
-#' gtfs$stop_times[trip_id == "CPTM L07-0"]
+#'
+#' gtfs$stop_times |>
+#'   filter(trip_id == "CPTM L07-0")
+#' \dontshow{data.table::setDTthreads(old_dt_threads)}
 #'
 #' @export
-set_trip_speed <- function(gtfs,
-                           trip_id,
-                           speed,
-                           unit = "km/h",
-                           first_stop = NULL,
-                           last_stop = NULL,
-                           from = NULL,
-                           to = NULL,
-                           by_reference = FALSE) {
+set_trip_speed <- function(
+  gtfs,
+  trip_id,
+  speed,
+  unit = "km/h",
+  first_stop = NULL,
+  last_stop = NULL,
+  from = NULL,
+  to = NULL,
+  by_reference = FALSE
+) {
   gtfs <- assert_and_assign_gtfs_object(gtfs)
   checkmate::assert_character(trip_id, any.missing = FALSE)
   checkmate::assert(
@@ -195,7 +211,9 @@ set_trip_speed <- function(gtfs,
 
   # set speed adequate unit (use km/h for calculations)
 
-  if (length(speed) == 1) speed <- rep(speed, length(trip_id))
+  if (length(speed) == 1) {
+    speed <- rep(speed, length(trip_id))
+  }
 
   # issue #84 - only convert when needed, and never empty vectors (older
   # {units} versions read out of bounds when converting zero-length input)
@@ -243,8 +261,7 @@ set_trip_speed <- function(gtfs,
 
     has_stop_args <- !is.null(first_stop) || !is.null(last_stop)
 
-    trips <- st[
-      ,
+    trips <- st[,
       {
         start <- if (is.null(first_stop)) 1L else match(first_stop, stop_id)
         end <- if (is.null(last_stop)) {
@@ -253,7 +270,9 @@ set_trip_speed <- function(gtfs,
           which(stop_id == last_stop & pos > start)[1L]
         }
         arr_end <- arrival_time[end]
-        if (is.na(arr_end) || arr_end == "") arr_end <- departure_time[end]
+        if (is.na(arr_end) || arr_end == "") {
+          arr_end <- departure_time[end]
+        }
 
         list(
           start = start,
@@ -360,7 +379,9 @@ set_trip_speed <- function(gtfs,
     }
   }
 
-  if (by_reference) return(invisible(gtfs))
+  if (by_reference) {
+    return(invisible(gtfs))
+  }
 
   gtfs$stop_times <- stop_times
   return(gtfs)

@@ -84,16 +84,19 @@ departures. Trips whose departure there is blank are left unchanged.
 }
 
 \examples{
+\dontshow{if (requireNamespace("dplyr", quietly = TRUE)) withAutoprint(\{ # examplesIf}
 \dontshow{
   old_dt_threads <- data.table::setDTthreads(1)
-  on.exit(data.table::setDTthreads(old_dt_threads), add = TRUE)
 }
+library(dplyr)
+
 data_path <- system.file("extdata/spo_gtfs.zip", package = "gtfstools")
 
 gtfs <- read_gtfs(data_path)
 
 gtfs_new_speed <- set_trip_speed(gtfs, trip_id = "CPTM L07-0", 50)
-gtfs_new_speed$stop_times[trip_id == "CPTM L07-0"]
+gtfs_new_speed$stop_times |>
+  filter(trip_id == "CPTM L07-0")
 
 # use the unit argument to change the speed unit
 gtfs_new_speed <- set_trip_speed(
@@ -102,7 +105,8 @@ gtfs_new_speed <- set_trip_speed(
   speed = 15,
   unit = "m/s"
 )
-gtfs_new_speed$stop_times[trip_id == "CPTM L07-0"]
+gtfs_new_speed$stop_times |>
+  filter(trip_id == "CPTM L07-0")
 
 # set the speed only between two stops. later stops are shifted
 gtfs_new_speed <- set_trip_speed(
@@ -112,7 +116,8 @@ gtfs_new_speed <- set_trip_speed(
   first_stop = "18917",
   last_stop = "18922"
 )
-gtfs_new_speed$stop_times[trip_id == "CPTM L07-0"]
+gtfs_new_speed$stop_times |>
+  filter(trip_id == "CPTM L07-0")
 
 # set the speed only of the trips that depart within a time of day
 poa_path <- system.file("extdata/poa_gtfs.zip", package = "gtfstools")
@@ -125,15 +130,25 @@ poa_new_speed <- set_trip_speed(
   from = "07:00:00",
   to = "09:00:00"
 )
+
 # the arrival at the last stop of a trip that departs at 07:02 changes
-poa_gtfs$stop_times[trip_id == "T2-1@1#702"][.N]
-poa_new_speed$stop_times[trip_id == "T2-1@1#702"][.N]
+poa_gtfs$stop_times |>
+  filter(trip_id == "T2-1@1#702") |>
+  slice_tail(n = 1)
+
+poa_new_speed$stop_times |>
+  filter(trip_id == "T2-1@1#702") |>
+  slice_tail(n = 1)
 
 # original gtfs remains unchanged
-gtfs$stop_times[trip_id == "CPTM L07-0"]
+gtfs$stop_times |>
+  filter(trip_id == "CPTM L07-0")
 
 # when doing by reference, original gtfs is changed
 set_trip_speed(gtfs, trip_id = "CPTM L07-0", 50, by_reference = TRUE)
-gtfs$stop_times[trip_id == "CPTM L07-0"]
 
+gtfs$stop_times |>
+  filter(trip_id == "CPTM L07-0")
+\dontshow{data.table::setDTthreads(old_dt_threads)}
+\dontshow{\}) # examplesIf}
 }

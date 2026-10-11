@@ -40,11 +40,12 @@
 #' @seealso [get_trip_geometry()], [convert_sf_to_shapes()],
 #'   [remove_unused_ids()]
 #'
-#' @examples
+#' @examplesIf requireNamespace("dplyr", quietly = TRUE)
 #' \dontshow{
 #'   old_dt_threads <- data.table::setDTthreads(1)
-#'   on.exit(data.table::setDTthreads(old_dt_threads), add = TRUE)
 #' }
+#' library(dplyr)
+#'
 #' data_path <- system.file("extdata/spo_gtfs.zip", package = "gtfstools")
 #' gtfs <- read_gtfs(data_path)
 #'
@@ -52,7 +53,10 @@
 #' gtfs$shapes <- NULL
 #' new_gtfs <- convert_stops_to_shapes(gtfs)
 #' head(new_gtfs$shapes)
-#' head(new_gtfs$trips[, c("trip_id", "shape_id")])
+#' new_gtfs$trips |>
+#'   select(trip_id, shape_id) |>
+#'   head()
+#' \dontshow{data.table::setDTthreads(old_dt_threads)}
 #' @export
 convert_stops_to_shapes <- function(gtfs, trip_id = NULL) {
   gtfs <- assert_and_assign_gtfs_object(gtfs)
