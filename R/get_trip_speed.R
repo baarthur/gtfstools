@@ -13,7 +13,7 @@
 #'   while `"segment"` returns the average speed between each pair of
 #'   consecutive stops.
 #' @param unit A string representing the unit in which the speeds are desired.
-#'   Either `"km/h"` (the default) or `"m/s"`.
+#'   One of `"km/h"` (the default), `"m/s"` or `"mph"` (miles per hour).
 #' @param sort_sequence A logical specifying whether to sort timetables and
 #'   shapes by `stop_sequence` and `shape_pt_sequence`, respectively. Defaults
 #'   to `TRUE`. Set to `FALSE` only if these tables are known to be ordered.
@@ -81,7 +81,7 @@ get_trip_speed <- function(gtfs,
   )
   checkmate::assert(
     checkmate::check_string(unit),
-    checkmate::check_names(unit, subset.of = c("km/h", "m/s")),
+    checkmate::check_names(unit, subset.of = c("km/h", "m/s", "mph")),
     combine = "and"
   )
   checkmate::assert_logical(sort_sequence, any.missing = FALSE, len = 1)
@@ -96,8 +96,10 @@ get_trip_speed <- function(gtfs,
     rep("character", 3)
   )
 
-  length_unit <- ifelse(unit == "km/h", "km", "m")
-  duration_unit <- ifelse(unit == "km/h", "h", "s")
+  # speeds in mph are calculated in km/h and converted at the end
+
+  length_unit <- ifelse(unit == "m/s", "m", "km")
+  duration_unit <- ifelse(unit == "m/s", "s", "h")
 
   if (!is.null(file)) method <- map_deprecated_file(file, "get_trip_speed")
 
@@ -142,6 +144,10 @@ get_trip_speed <- function(gtfs,
 
   speeds[, speed := length / duration]
   speeds[!is.finite(duration) | duration <= 0, speed := NA_real_]
+
+  # 1 international mile = 1.609344 km
+
+  if (unit == "mph") speeds[, speed := speed / 1.609344]
 
   speeds[, c("length", "duration") := NULL]
   data.table::setcolorder(speeds, setdiff(names(lengths), "length"))

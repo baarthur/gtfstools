@@ -86,17 +86,37 @@ get_trip_duration <- function(gtfs, trip_id = NULL, unit = "min") {
     return(durations)
   }
 
-  # create auxiliary columns if needed
+  # the times in seconds are put into a new table (using the existing '_secs'
+  # columns, if any), so that the given 'stop_times' is not modified. the
+  # table is built from a list, which reuses the trip_id vector instead of
+  # copying it (it's only grouped below, never modified)
 
-  if (!gtfsio::check_field_exists(gtfs, "stop_times", "departure_time_secs")) {
-    durations[, departure_time_secs := string_to_seconds(departure_time)]
-    created_departure_secs <- TRUE
-  }
+  has_departure_secs <- gtfsio::check_field_exists(
+    gtfs,
+    "stop_times",
+    "departure_time_secs"
+  )
+  has_arrival_secs <- gtfsio::check_field_exists(
+    gtfs,
+    "stop_times",
+    "arrival_time_secs"
+  )
 
-  if (!gtfsio::check_field_exists(gtfs, "stop_times", "arrival_time_secs")) {
-    durations[, arrival_time_secs := string_to_seconds(arrival_time)]
-    created_arrival_secs <- TRUE
-  }
+  durations <- data.table::setDT(
+    list(
+      trip_id = durations$trip_id,
+      departure_time_secs = if (has_departure_secs) {
+        durations$departure_time_secs
+      } else {
+        string_to_seconds(durations$departure_time)
+      },
+      arrival_time_secs = if (has_arrival_secs) {
+        durations$arrival_time_secs
+      } else {
+        string_to_seconds(durations$arrival_time)
+      }
+    )
+  )
 
   # calculate durations
 
@@ -108,22 +128,6 @@ get_trip_duration <- function(gtfs, trip_id = NULL, unit = "min") {
     ),
     keyby = trip_id
   ]
-
-  # clean up auxiliary columns if needed
-
-  if (
-    gtfsio::check_field_exists(gtfs, "stop_times", "departure_time_secs") &
-    exists("created_departure_secs")
-  ) {
-    gtfs$stop_times[, departure_time_secs := NULL]
-  }
-
-  if (
-    gtfsio::check_field_exists(gtfs, "stop_times", "arrival_time_secs") &
-    exists("created_arrival_secs")
-  ) {
-    gtfs$stop_times[, arrival_time_secs := NULL]
-  }
 
   # convert duration to desired unit
 

@@ -1,0 +1,855 @@
+#' Get a summary of a GTFS feed
+#'
+#' Runs a set of diagnostics on a GTFS feed (optionally restricted to some
+#' dates, routes, modes, agencies and a time of day), writes them to a report
+#' with tables and figures, renders the report to HTML and opens it in the
+#' browser (in interactive sessions). The diagnostics are also returned as a
+#' list of `data.table`s. This function does not validate or look for quality
+#' issues in the GTFS feed. To do that, use [gtfstools::validate_gtfs()].
+#'
+#' @param gtfs A GTFS object, as created by [read_gtfs()], or the path to a
+#'   GTFS file.
+#' @param date A `Date` vector (including `IDate`) or a character vector of
+#'   dates in the `"YYYYMMDD"` or `"YYYY-MM-DD"` formats. If given, only the
+#'   services that run on these dates are described. If `NULL` (the default),
+#'   the whole period covered by the feed is described.
+#' @param route_id A character vector. If given, only these routes are
+#'   described. If `NULL` (the default), all routes are described.
+#' @param mode An integer vector of `route_type`s (see
+#'   [filter_by_route_type()]) or a character vector of mode names (`"tram"`,
+#'   `"subway"`, `"rail"`, `"bus"`, `"ferry"`, `"cable_tram"`, `"aerial_lift"`,
+#'   `"funicular"`, `"trolleybus"` and `"monorail"`, which correspond to the
+#'   basic `route_type`s). If given, only routes of these modes are described.
+#'   If `NULL` (the default), all modes are described.
+#' @param agency A character vector of `agency_id`s. If given, only the
+#'   services of these agencies are described. If `NULL` (the default), all
+#'   agencies are described.
+#' @param from,to Strings in the `"HH:MM:SS"` format. If given (both must be),
+#'   only the trips that run within this time of day are described. If `NULL`
+#'   (the default), the whole day is described.
+#' @param output_dir A string. The directory in which the report is saved
+#'   (created if needed). If `NULL` (the default), a `gtfstools` directory
+#'   inside [tempdir()] is used. Existing reports in this directory are
+#'   overwritten.
+#' @param open_browser A logical. Whether to open the HTML report in the
+#'   browser, in interactive sessions (defaults to `TRUE`).
+#'
+#' @return A named list of `data.table`s (invisibly, if the report was opened
+#'   in the browser):
+#'   - `files`: the tables in the feed (`file`) and their number of rows
+#'     (`n_rows`), before any filtering;
+#'   - `agency`: the `agency_id`, `agency_name`, `agency_timezone`,
+#'     `agency_url` and `agency_lang` columns (those present in the feed) of
+#'     the agencies that run the selected trips (all agencies, if the
+#'     selected routes have no `agency_id`);
+#'   - `services`: a single row summarising the calendar of the selected
+#'     services, with the columns `start_date` and `end_date` (the first and
+#'     last days with service), `n_days` (the number of days between them,
+#'     both included), `n_service_days` (the number of days with service),
+#'     `n_services` (the number of `service_id`s), `mean_trips_per_day` (over
+#'     the days with service), `busiest_date` and `max_trips_per_day` (the day
+#'     with the most trips and its number of trips) and `feed_start_date` and
+#'     `feed_end_date` (from `feed_info`, `NA` if absent);
+#'   - `totals`: the columns `indicator`, `value` and `unit`, with the number
+#'     of agencies, routes, trips and stops, the total length of the shapes
+#'     and of the trips (in km), the total duration of the trips (in hours),
+#'     the mean trip speed (in km/h) and the mean route headway (in minutes);
+#'   - `speed`, `distance` and `frequency`: summary statistics (`n`, `min`,
+#'     `q25`, `median`, `mean`, `q75`, `max` and `unit`) of the trip speeds
+#'     (in km/h), of the trip lengths (in km) and of the route headways (in
+#'     minutes). `frequency` also has the columns `date`, `from` and `to`, with
+#'     the day and the time of day in which the headways were measured.
+#'
+#'   The report is saved as `gtfs_summary.md` and `gtfs_summary.html`
+#'   (together with its figures) in `output_dir`.
+#'
+#' @section Details:
+#' The report requires the `{ggplot2}`, `{knitr}` and `{rmarkdown}` packages,
+#' and [Pandoc](https://pandoc.org/), which is shipped with RStudio.
+#'
+#' The feed is filtered by agency, mode, route, date and time of day, in this
+#' order. The time-of-day filter keeps the whole trips that run within it
+#' (see [filter_by_time_of_day()] with `full_trips = TRUE`), so the trip
+#' speeds and lengths refer to whole trips.
+#'
+#' Trip lengths and speeds are calculated with [get_trip_length()] and
+#' [get_trip_speed()]. Each trip is counted once, however many days it runs on
+#' and however many departures the `frequencies` table lists for it. The total
+#' shape length counts each shape used by the selected trips once, and the
+#' number of stops counts the stops visited by the selected trips.
+#'
+#' The `services` summary and the calendar chart in the report describe the
+#' whole calendar of the selected services: when `date` is given, the
+#' services that run on these dates are kept as a whole (see
+#' [filter_by_date()]), so they may also cover other days. The number of
+#' trips on each day is calculated as in [get_calendar_overlap()], counting
+#' each departure listed in `frequencies`.
+#'
+#' Route headways are calculated with [get_route_frequency()], by route (and
+#' by `direction_id`, if the field is present in the `trips` table), on a
+#' single day: the day with the most trips among the given `date`s, or in the
+#' whole feed if `date` is `NULL` (the earliest one, in case of ties). They
+#' are measured within the given time of day or, if `from` and `to` are
+#' `NULL`, from the first to the last departure of that day, rounded out to
+#' whole hours. Trips that start on the previous day and run after midnight
+#' are not counted, and times are in the local time of each agency.
+#'
+#' @examples
+#' \dontshow{
+#'   old_dt_threads <- data.table::setDTthreads(1)
+#'   on.exit(data.table::setDTthreads(old_dt_threads), add = TRUE)
+#' }
+#' if (
+#'   requireNamespace("ggplot2", quietly = TRUE) &&
+#'     requireNamespace("knitr", quietly = TRUE) &&
+#'     requireNamespace("rmarkdown", quietly = TRUE) &&
+#'     rmarkdown::pandoc_available()
+#' ) {
+#'   data_path <- system.file("extdata/spo_gtfs.zip", package = "gtfstools")
+#'
+#'   feed_summary <- get_summary(
+#'     data_path,
+#'     output_dir = tempdir(),
+#'     open_browser = FALSE
+#'   )
+#'   feed_summary$totals
+#'
+#'   \donttest{
+#'   feed_summary <- get_summary(
+#'     data_path,
+#'     mode = "bus",
+#'     from = "07:00:00",
+#'     to = "09:00:00",
+#'     output_dir = tempdir(),
+#'     open_browser = FALSE
+#'   )
+#'   feed_summary$frequency
+#'   }
+#' }
+#'
+#' @export
+get_summary <- function(
+  gtfs,
+  date = NULL,
+  route_id = NULL,
+  mode = NULL,
+  agency = NULL,
+  from = NULL,
+  to = NULL,
+  output_dir = NULL,
+  open_browser = TRUE
+) {
+  if (!report_deps_available()) {
+    cli::cli_abort(
+      c(
+        "{.fn get_summary} requires the {.pkg ggplot2}, {.pkg knitr} and
+         {.pkg rmarkdown} packages, and Pandoc.",
+        "i" = "Pandoc is shipped with RStudio, or see
+               {.url https://pandoc.org/installing.html}."
+      ),
+      class = "gtfstools_report_dependencies_error"
+    )
+  }
+
+  checkmate::assert(
+    checkmate::check_string(gtfs),
+    checkmate::check_class(gtfs, "gtfs"),
+    .var.name = "gtfs"
+  )
+  if (is.character(gtfs)) {
+    checkmate::assert_file_exists(gtfs)
+  }
+  if (!is.null(date)) {
+    date <- parse_dates(date)
+  }
+  checkmate::assert_character(route_id, any.missing = FALSE, null.ok = TRUE)
+  checkmate::assert(
+    checkmate::check_null(mode),
+    checkmate::check_integerish(mode, any.missing = FALSE, min.len = 1),
+    checkmate::check_character(mode, any.missing = FALSE, min.len = 1),
+    .var.name = "mode"
+  )
+  checkmate::assert_character(agency, any.missing = FALSE, null.ok = TRUE)
+  checkmate::assert_string(output_dir, null.ok = TRUE)
+  checkmate::assert_flag(open_browser)
+
+  time_pattern <- "^\\d{2}:[0-5]\\d:[0-5]\\d$"
+  checkmate::assert_string(from, pattern = time_pattern, null.ok = TRUE)
+  checkmate::assert_string(to, pattern = time_pattern, null.ok = TRUE)
+  if (xor(is.null(from), is.null(to))) {
+    cli::cli_abort(
+      "{.arg from} and {.arg to} must be given together.",
+      class = "gtfstools_invalid_time_of_day"
+    )
+  }
+  if (!is.null(from) && string_to_seconds(from) >= string_to_seconds(to)) {
+    cli::cli_abort(
+      "{.arg from} ({.val {from}}) must be earlier than {.arg to}
+       ({.val {to}}).",
+      class = "gtfstools_invalid_time_of_day"
+    )
+  }
+
+  mode_route_types <- c(
+    tram = 0L,
+    subway = 1L,
+    rail = 2L,
+    bus = 3L,
+    ferry = 4L,
+    cable_tram = 5L,
+    aerial_lift = 6L,
+    funicular = 7L,
+    trolleybus = 11L,
+    monorail = 12L
+  )
+  if (is.character(mode)) {
+    checkmate::assert_names(mode, subset.of = names(mode_route_types))
+    route_type <- unname(mode_route_types[mode])
+  } else {
+    route_type <- mode
+  }
+
+  if (is.null(output_dir)) {
+    output_dir <- file.path(tempdir(), "gtfstools")
+  }
+
+  progress_bar <- cli::cli_progress_bar(
+    total = 8,
+    format = paste0(
+      "{cli::pb_spin} Summarising GTFS feed {cli::pb_bar} ",
+      "{cli::pb_current}/{cli::pb_total} | {cli::pb_status}"
+    ),
+    status = "Reading the feed"
+  )
+
+  # filter_by_time_of_day() adds and drops columns on the 'stop_times' and
+  # 'frequencies' tables it receives by reference, so these tables of a given
+  # feed are copied before it's filtered by time of day (the list itself is
+  # copied on modification, so the caller's isn't changed)
+
+  if (is.character(gtfs)) {
+    gtfs <- read_gtfs(gtfs)
+  } else {
+    gtfs <- assert_and_assign_gtfs_object(gtfs)
+
+    if (!is.null(from)) {
+      copied_tables <- intersect(c("stop_times", "frequencies"), names(gtfs))
+      for (table in copied_tables) {
+        gtfs[[table]] <- data.table::copy(gtfs[[table]])
+      }
+    }
+  }
+
+  # filter_by_agency_id() doesn't filter the routes of feeds whose 'routes'
+  # table has no agency_id field, so unknown agencies are caught beforehand
+
+  if (!is.null(agency)) {
+    invalid_agency <- agency[!agency %chin% gtfs$agency$agency_id]
+
+    if (length(invalid_agency) > 0) {
+      cli::cli_abort(
+        "{.arg agency} contains agency_id{?s} not listed in {.file agency}:
+         {.val {invalid_agency}}.",
+        class = "gtfstools_invalid_agency_id_error"
+      )
+    }
+  }
+
+  cli::cli_progress_update(id = progress_bar, status = "Applying filters")
+
+  feed <- gtfs
+  if (!is.null(agency)) {
+    # feeds whose routes' agency_id is missing or blank have a single agency
+    # (the up-front check ensures it's the given one), so they're not filtered
+
+    route_agencies <- feed$routes$agency_id
+    route_agencies <- route_agencies[!is.na(route_agencies)]
+    if (any(route_agencies != "")) {
+      feed <- filter_by_agency_id(feed, agency)
+    }
+  }
+  if (!is.null(route_type)) {
+    feed <- filter_by_route_type(feed, route_type)
+  }
+  if (!is.null(route_id)) {
+    feed <- filter_by_route_id(feed, route_id)
+  }
+  if (!is.null(date)) {
+    feed <- filter_by_date(feed, date)
+  }
+  if (!is.null(from)) {
+    feed <- filter_by_time_of_day(feed, from, to, full_trips = TRUE)
+  }
+
+  if (NROW(feed$trips) == 0) {
+    cli::cli_abort(
+      "No trips match the given {.arg date}, {.arg route_id}, {.arg mode},
+       {.arg agency}, {.arg from} and {.arg to}.",
+      class = "gtfstools_empty_selection_error"
+    )
+  }
+
+  is_table <- vapply(gtfs, data.table::is.data.table, logical(1))
+  files <- data.table::data.table(
+    file = names(gtfs)[is_table],
+    n_rows = vapply(gtfs[is_table], nrow, integer(1))
+  )
+
+  agency_cols <- c(
+    "agency_id",
+    "agency_name",
+    "agency_timezone",
+    "agency_url",
+    "agency_lang"
+  )
+  agency_table <- data.table::data.table()
+  if (gtfsio::check_file_exists(feed, "agency")) {
+    agency_table <- feed$agency[,
+      intersect(agency_cols, names(feed$agency)),
+      with = FALSE
+    ]
+  }
+
+  # the agencies are narrowed to those that run the selected trips, when the
+  # 'routes' table links routes to agencies. single-agency feeds often leave
+  # routes' agency_id blank, in which case no narrowing is done
+
+  if (
+    gtfsio::check_field_exists(feed, "routes", "agency_id") &&
+      "agency_id" %chin% names(agency_table)
+  ) {
+    selected_routes <- feed$routes[route_id %chin% feed$trips$route_id]
+    route_agencies <- selected_routes$agency_id
+    route_agencies <- route_agencies[!is.na(route_agencies)]
+    route_agencies <- route_agencies[route_agencies != ""]
+
+    if (length(route_agencies) > 0) {
+      agency_table <- agency_table[agency_id %chin% route_agencies]
+    }
+  }
+  agency_table <- unique(agency_table)
+
+  # speeds are calculated from the lengths and durations as in
+  # get_trip_speed(), so that trip geometries are only built once
+
+  cli::cli_progress_update(
+    id = progress_bar,
+    status = "Calculating trip lengths"
+  )
+
+  trip_stats <- get_trip_length(feed, unit = "km")
+
+  cli::cli_progress_update(
+    id = progress_bar,
+    status = "Calculating trip speeds"
+  )
+
+  durations <- get_trip_duration(feed, unit = "h")
+  trip_stats[durations, on = "trip_id", duration := i.duration]
+  trip_stats[,
+    speed := data.table::fifelse(
+      is.finite(duration) & duration > 0,
+      length / duration,
+      NA_real_
+    )
+  ]
+
+  cli::cli_progress_update(
+    id = progress_bar,
+    status = "Calculating shape lengths"
+  )
+
+  # only the shapes used by the selected trips are summed
+
+  total_shape_length <- NA_real_
+  if (
+    gtfsio::check_file_exists(feed, "shapes") &&
+      gtfsio::check_field_exists(feed, "trips", "shape_id")
+  ) {
+    shape_lengths <- get_shape_length(feed)
+    shape_lengths <- shape_lengths[shape_id %chin% feed$trips$shape_id]
+    total_shape_length <- sum_or_na(shape_lengths$length)
+  }
+
+  cli::cli_progress_update(
+    id = progress_bar,
+    status = "Summarising services"
+  )
+
+  service_days <- get_service_days(feed)
+  services <- summarise_services(feed, service_days)
+
+  calendar_plot <- NULL
+  if (nrow(service_days) > 0) {
+    calendar_plot <- get_calendar_overlap(list(feed = feed), plot = TRUE)
+  }
+
+  cli::cli_progress_update(
+    id = progress_bar,
+    status = "Calculating route frequencies"
+  )
+
+  frequency <- summarise_route_frequency(feed, service_days, date, from, to)
+
+  cli::cli_progress_update(id = progress_bar, status = "Writing the report")
+
+  speed <- summarise_distribution(trip_stats$speed, "km/h")
+  distance <- summarise_distribution(trip_stats$length, "km")
+
+  totals <- data.table::data.table(
+    indicator = c(
+      "n_agencies",
+      "n_routes",
+      "n_trips",
+      "n_stops",
+      "total_shape_length",
+      "total_trip_length",
+      "total_trip_duration",
+      "mean_trip_speed",
+      "mean_route_headway"
+    ),
+    value = c(
+      nrow(agency_table),
+      data.table::uniqueN(feed$trips$route_id),
+      nrow(feed$trips),
+      data.table::uniqueN(feed$stop_times$stop_id),
+      total_shape_length,
+      sum_or_na(trip_stats$length),
+      sum_or_na(trip_stats$duration),
+      speed$mean,
+      frequency$stats$mean
+    ),
+    unit = c(NA, NA, NA, NA, "km", "km", "h", "km/h", "min")
+  )
+
+  frequency_table <- cbind(
+    frequency$stats,
+    date = frequency$date,
+    from = frequency$from,
+    to = frequency$to
+  )
+
+  result <- list(
+    files = files,
+    agency = agency_table,
+    services = services,
+    totals = totals,
+    speed = speed,
+    frequency = frequency_table,
+    distance = distance
+  )
+
+  selection <- list(
+    date = if (is.null(date)) NULL else format(date),
+    route_id = route_id,
+    mode = mode,
+    agency = agency,
+    time_of_day = if (is.null(from)) NULL else paste(from, "-", to)
+  )
+  values <- list(
+    speed = trip_stats$speed,
+    distance = trip_stats$length,
+    frequency = frequency$headways,
+    calendar = calendar_plot
+  )
+  report_path <- write_summary_report(result, values, selection, output_dir)
+
+  cli::cli_progress_done(id = progress_bar)
+
+  if (open_browser && interactive()) {
+    utils::browseURL(report_path)
+    return(invisible(result))
+  }
+
+  return(result)
+}
+
+
+
+#' Check whether the report dependencies are available
+#'
+#' @return `TRUE` if `{ggplot2}`, `{knitr}`, `{rmarkdown}` and Pandoc are
+#'   available, `FALSE` otherwise.
+#'
+#' @keywords internal
+report_deps_available <- function() {
+  return(
+    requireNamespace("ggplot2", quietly = TRUE) &&
+      requireNamespace("knitr", quietly = TRUE) &&
+      requireNamespace("rmarkdown", quietly = TRUE) &&
+      rmarkdown::pandoc_available()
+  )
+}
+
+
+
+#' Summarise a distribution
+#'
+#' @param x A numeric vector. `NA`s are ignored.
+#' @param unit A string. The unit of `x`.
+#'
+#' @return A one-row `data.table` with the columns `n` (the number of non-`NA`
+#'   values), `min`, `q25`, `median`, `mean`, `q75`, `max` (all `NA` if there
+#'   are no non-`NA` values) and `unit`.
+#'
+#' @keywords internal
+summarise_distribution <- function(x, unit) {
+  x <- x[!is.na(x)]
+
+  stats <- rep(NA_real_, 6)
+  if (length(x) > 0) {
+    quartiles <- stats::quantile(x, c(0, 0.25, 0.5, 0.75, 1), names = FALSE)
+    stats <- c(quartiles[1:3], mean(x), quartiles[4:5])
+  }
+
+  distribution <- data.table::data.table(
+    n = length(x),
+    min = stats[1],
+    q25 = stats[2],
+    median = stats[3],
+    mean = stats[4],
+    q75 = stats[5],
+    max = stats[6],
+    unit = unit
+  )
+
+  return(distribution)
+}
+
+
+
+#' Sum a vector, or return NA if it has no values
+#'
+#' @param x A numeric vector. Non-finite values (`NA`, `Inf`, `-Inf`) are
+#'   ignored.
+#'
+#' @return The sum of the finite values of `x`, or `NA` if there are none.
+#'
+#' @keywords internal
+sum_or_na <- function(x) {
+  x <- x[is.finite(x)]
+  if (length(x) == 0) {
+    return(NA_real_)
+  }
+
+  return(sum(x))
+}
+
+
+
+#' Summarise the calendar of the services of a feed
+#'
+#' @param feed A `dt_gtfs` object, already filtered.
+#' @param service_days The service days of `feed`, as returned by
+#'   `get_service_days()`.
+#'
+#' @return A one-row `data.table`, as described in the `services` element of
+#'   the [get_summary()] output.
+#'
+#' @keywords internal
+summarise_services <- function(feed, service_days) {
+  has_days <- nrow(service_days) > 0
+  start_date <- as.Date(NA)
+  end_date <- as.Date(NA)
+  busiest_date <- as.Date(NA)
+
+  if (has_days) {
+    start_date <- min(service_days$date)
+    end_date <- max(service_days$date)
+    busiest_date <- service_days$date[which.max(service_days$n_trips)]
+  }
+
+  # feed_info dates are read as Dates, but a feed built by hand may have them
+  # as "YYYYMMDD" strings
+
+  feed_info_date <- function(field) {
+    if (!gtfsio::check_field_exists(feed, "feed_info", field)) {
+      return(as.Date(NA))
+    }
+
+    value <- feed$feed_info[[field]][1]
+    if (!inherits(value, "Date")) {
+      value <- as.Date(as.character(value), format = "%Y%m%d")
+    }
+
+    return(value)
+  }
+
+  services <- data.table::data.table(
+    start_date = start_date,
+    end_date = end_date,
+    n_days = as.integer(end_date - start_date) + 1L,
+    n_service_days = nrow(service_days),
+    n_services = data.table::uniqueN(feed$trips$service_id),
+    mean_trips_per_day = if (has_days) mean(service_days$n_trips) else NA_real_,
+    busiest_date = busiest_date,
+    max_trips_per_day = if (has_days) {
+      as.numeric(max(service_days$n_trips))
+    } else {
+      NA_real_
+    },
+    feed_start_date = feed_info_date("feed_start_date"),
+    feed_end_date = feed_info_date("feed_end_date")
+  )
+
+  return(services)
+}
+
+
+
+#' Calculate the route headways of a feed on its busiest day
+#'
+#' @param feed A `dt_gtfs` object, already filtered.
+#' @param service_days The service days of `feed`, as returned by
+#'   `get_service_days()`.
+#' @param date A `Date` vector, or `NULL`. The day is chosen among these dates.
+#' @param from,to Strings in the `"HH:MM:SS"` format, or `NULL`, in which case
+#'   the time of day spans the departures of the day, rounded out to whole
+#'   hours.
+#'
+#' @return A list with the elements `headways` (the headway of each route and
+#'   direction, in minutes), `stats` (their summary, as created by
+#'   [summarise_distribution()]), `date`, `from` and `to` (the day and time of
+#'   day in which the headways were measured, `NA` if there is none).
+#'
+#' @keywords internal
+summarise_route_frequency <- function(feed, service_days, date, from, to) {
+  user_dates <- date
+  headways <- numeric(0)
+  frequency_day <- as.Date(NA)
+  frequency_from <- NA_character_
+  frequency_to <- NA_character_
+
+  if (!is.null(user_dates)) {
+    service_days <- service_days[service_days$date %in% user_dates]
+  }
+
+  if (nrow(service_days) == 0) {
+    cli::cli_warn(
+      "The selected services run on no day, so route frequencies were not
+       calculated.",
+      class = "gtfstools_no_service_days"
+    )
+  } else {
+    busiest_day <- service_days$date[which.max(service_days$n_trips)]
+    day_feed <- filter_by_date(feed, busiest_day)
+
+    # the default time of day spans the departures of the day (which include
+    # those listed in 'frequencies'), and ends one hour after the last
+    # departure is rounded down, because 'to' itself is excluded
+
+    if (is.null(from)) {
+      departures <- get_trip_departures(day_feed, day_feed$trips$trip_id)
+
+      if (nrow(departures) > 0) {
+        first_departure <- min(departures$departure_secs, na.rm = TRUE)
+        last_departure <- max(departures$departure_secs, na.rm = TRUE)
+        from <- seconds_to_string(as.integer(first_departure %/% 3600 * 3600))
+        to <- seconds_to_string(
+          as.integer((last_departure %/% 3600 + 1) * 3600)
+        )
+      }
+    }
+
+    if (!is.null(from)) {
+      frequency_day <- busiest_day
+      frequency_from <- from
+      frequency_to <- to
+
+      route_frequency <- get_route_frequency(day_feed, from = from, to = to)
+      group_cols <- setdiff(
+        names(route_frequency),
+        c("service_id", "departures", "mean_headway")
+      )
+      route_frequency <- route_frequency[,
+        .(departures = sum(departures)),
+        by = group_cols
+      ]
+
+      window_minutes <- (string_to_seconds(to) - string_to_seconds(from)) / 60
+      headways <- window_minutes / route_frequency$departures
+    }
+  }
+
+  frequency <- list(
+    headways = headways,
+    stats = summarise_distribution(headways, "min"),
+    date = frequency_day,
+    from = frequency_from,
+    to = frequency_to
+  )
+
+  return(frequency)
+}
+
+
+
+#' Write and render the report of get_summary()
+#'
+#' @param result The list of diagnostics returned by [get_summary()].
+#' @param values A named list with the numeric vectors to be plotted
+#'   (`speed`, `distance` and `frequency`) and the calendar chart created by
+#'   [get_calendar_overlap()] (`calendar`, `NULL` if there is none).
+#' @param selection A named list with the filters used (`NULL` elements mean
+#'   no filter).
+#' @param output_dir A string. The directory in which the report is saved.
+#'
+#' @return The path to the HTML report.
+#'
+#' @keywords internal
+write_summary_report <- function(result, values, selection, output_dir) {
+  dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
+
+  # text from the feed is escaped so that pandoc doesn't read it as markdown
+  # (e.g. "$...$" as math). pipes are escaped by knitr::kable(), and the
+  # escaped brackets aren't read as math because tex_math_single_backslash is
+  # turned off when rendering
+
+  md_escape <- function(x) {
+    return(gsub("([\\\\`*_$<>#~^\\[\\]])", "\\\\\\1", x, perl = TRUE))
+  }
+
+  # missing strings and dates (e.g. the unit of counts) are shown as blank
+  # cells
+
+  md_table <- function(x) {
+    x <- as.data.frame(x)
+    is_text <- vapply(
+      x,
+      function(col) is.character(col) || inherits(col, "Date"),
+      logical(1)
+    )
+    x[is_text] <- lapply(
+      x[is_text],
+      function(col) ifelse(is.na(col), "", md_escape(as.character(col)))
+    )
+
+    table <- knitr::kable(
+      x,
+      format = "pipe",
+      digits = 2,
+      format.args = list(drop0trailing = TRUE)
+    )
+    return(c("", as.character(table), ""))
+  }
+
+  # every figure uses the same theme, which is built only once because
+  # building it takes a noticeable share of the report time
+
+  report_theme <- ggplot2::theme_minimal()
+
+  md_saved_plot <- function(plot, name) {
+    plot_file <- paste0("gtfs_summary_", name, ".png")
+    ggplot2::ggsave(
+      file.path(output_dir, plot_file),
+      plot + report_theme,
+      width = 7,
+      height = 4,
+      dpi = 150,
+      bg = "white"
+    )
+
+    return(c("", paste0("![](", plot_file, ")"), ""))
+  }
+
+  # each distribution is plotted as a histogram, unless it has no values
+
+  md_plot <- function(x, label, name) {
+    x <- x[!is.na(x)]
+    if (length(x) == 0) {
+      return(c("", "No data to plot.", ""))
+    }
+
+    plot <- ggplot2::ggplot(data.frame(value = x), ggplot2::aes(x = value)) +
+      ggplot2::geom_histogram(bins = 30, fill = "#0072B2") +
+      ggplot2::labs(x = label, y = "Count")
+
+    return(md_saved_plot(plot, name))
+  }
+
+  md_calendar_plot <- function(plot) {
+    if (is.null(plot)) {
+      return(c("", "No service days to plot.", ""))
+    }
+
+    return(md_saved_plot(plot, "calendar"))
+  }
+
+  selection_lines <- vapply(
+    names(selection),
+    function(name) {
+      value <- selection[[name]]
+      value <- if (is.null(value)) {
+        "all"
+      } else {
+        md_escape(paste(value, collapse = ", "))
+      }
+      paste0("- **", name, "**: ", value)
+    },
+    character(1)
+  )
+
+  frequency <- result$frequency
+  frequency_note <- if (is.na(frequency$from)) {
+    "Route frequencies could not be calculated."
+  } else {
+    paste0(
+      "Headways by route (and direction) on ",
+      format(frequency$date),
+      ", between ",
+      frequency$from,
+      " and ",
+      frequency$to,
+      "."
+    )
+  }
+
+  lines <- c(
+    "---",
+    "title: \"GTFS feed description\"",
+    paste0("date: \"", format(Sys.Date()), "\""),
+    "---",
+    "",
+    "## Selection",
+    "",
+    selection_lines,
+    "",
+    "## Files",
+    md_table(result$files),
+    "## Agencies",
+    md_table(result$agency),
+    "## Services",
+    md_table(result$services),
+    md_calendar_plot(values$calendar),
+    "## Totals",
+    md_table(result$totals),
+    "## Trip speed",
+    md_table(result$speed),
+    md_plot(values$speed, "Trip speed (km/h)", "speed"),
+    "## Trip distance",
+    md_table(result$distance),
+    md_plot(values$distance, "Trip length (km)", "distance"),
+    "## Route frequency",
+    "",
+    frequency_note,
+    md_table(result$frequency),
+    md_plot(values$frequency, "Route headway (min)", "frequency")
+  )
+
+  md_path <- file.path(output_dir, "gtfs_summary.md")
+  writeLines(enc2utf8(lines), md_path, useBytes = TRUE)
+
+  html_path <- rmarkdown::render(
+    md_path,
+    output_format = rmarkdown::html_document(
+      md_extensions = "-tex_math_single_backslash"
+    ),
+    output_file = "gtfs_summary.html",
+    output_dir = output_dir,
+    intermediates_dir = output_dir,
+    envir = new.env(),
+    quiet = TRUE
+  )
+
+  return(html_path)
+}

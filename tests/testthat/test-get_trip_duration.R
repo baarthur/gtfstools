@@ -140,4 +140,23 @@ test_that("doesn't change given gtfs (except for stop_times index)", {
 
   data.table::setindex(new_gtfs$stop_times, NULL)
   expect_identical(original_gtfs, new_gtfs)
+
+  # with all trips, the given stop_times is used directly and must not get
+  # (even temporary) auxiliary columns. an error in the middle of the
+  # calculation would leave them behind if they were added by reference
+
+  stop_times_before <- data.table::copy(new_gtfs$stop_times)
+  tester(gtfs = new_gtfs)
+  expect_identical(new_gtfs$stop_times, stop_times_before)
+
+  n_calls <- 0
+  testthat::local_mocked_bindings(
+    string_to_seconds = function(x) {
+      n_calls <<- n_calls + 1
+      if (n_calls > 1) stop("interrupted")
+      return(rep(0L, length(x)))
+    }
+  )
+  expect_error(tester(gtfs = new_gtfs), "interrupted")
+  expect_identical(names(new_gtfs$stop_times), names(stop_times_before))
 })

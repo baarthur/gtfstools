@@ -12,6 +12,7 @@
 
 ## New features
 
+- New function `get_summary()`, which summarises a feed (its files, agencies, service calendar, totals and the distributions of trip speeds, trip lengths and route headways), optionally restricted to some dates, routes, modes, agencies and a time of day. It returns a list of `data.table`s and writes an HTML report with tables and figures (requires `{ggplot2}`, `{knitr}`, `{rmarkdown}` and Pandoc).
 - New function `filter_by_date()`, which filters a feed by the services that run on the given dates.
 - New function `get_stops()`, which returns the stops visited by the given trips and/or routes.
 - New function `get_stop_distances()`, which returns the great-circle distances between each pair of stops visited by the given trips and/or routes.
@@ -31,11 +32,14 @@
 - New function `list_validator_versions()`, which lists the available validator versions. PR contribution by @baarthur.
 - `get_trip_length()` and `get_trip_speed()` gain the `by` argument, to calculate lengths and speeds between consecutive stops. They and `get_trip_geometry()` gain the `method` argument, to measure along the trip's shape or as straight lines between stops. Without shapes, they now fall back to straight lines with a warning, instead of raising an error.
 - `set_trip_speed()` gains the `first_stop`, `last_stop`, `from` and `to` arguments, to change speeds only between two stops and only for trips departing within a time of day (#89).
+- `get_trip_speed()` and `set_trip_speed()` now accept `unit = "mph"`, for speeds in miles per hour.
 - `frequencies_to_stop_times()` gains the `strategy` argument, to shift the departures of frequency-based trips by half the headway or by a random offset (#56).
 - `write_gtfs()` gains the `compression_level` argument. Its default, 6 (previously always 9), makes writing about 2 to 3 times faster for files of very similar size.
+- New vignette "Editing GTFS feeds", which lists the functions that edit feeds and demonstrates `set_route_frequency()`, `set_trip_speed()`, `stop_times_to_frequencies()` and `interpolate_stop_times()`.
 
 ## Bug fixes
 
+- `get_trip_duration()` no longer adds temporary columns to the `stop_times` table of the given GTFS object, which could be left behind if an error happened during the calculation.
 - The `filter_by_*()` functions no longer drop:
   - rows whose blank keys mean "applies to all": zone `fare_rules` without `route_id`, `transfers` without `from_stop_id`/`to_stop_id` and `attributions` without `agency_id`;
   - the `agency` of single-agency feeds whose `routes.agency_id` is blank or absent;

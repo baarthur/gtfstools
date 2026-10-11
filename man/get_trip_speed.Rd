@@ -34,7 +34,7 @@ while \code{"segment"} returns the average speed between each pair of
 consecutive stops.}
 
 \item{unit}{A string representing the unit in which the speeds are desired.
-Either \code{"km/h"} (the default) or \code{"m/s"}.}
+One of \code{"km/h"} (the default), \code{"m/s"} or \code{"mph"} (miles per hour).}
 
 \item{sort_sequence}{A logical specifying whether to sort timetables and
 shapes by \code{stop_sequence} and \code{shape_pt_sequence}, respectively. Defaults

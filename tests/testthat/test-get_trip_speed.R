@@ -148,6 +148,13 @@ test_that("outputs speeds in the correct unit", {
   in_kmh <- tester(trip_id = trip_id)
   in_ms <- tester(trip_id = trip_id, unit = "m/s")
   expect_equal(in_ms$speed, in_kmh$speed / 3.6)
+
+  in_mph <- tester(trip_id = trip_id, unit = "mph")
+  expect_equal(in_mph$speed, in_kmh$speed / 1.609344)
+
+  in_kmh <- tester(trip_id = trip_id, by = "segment")
+  in_mph <- tester(trip_id = trip_id, by = "segment", unit = "mph")
+  expect_equal(in_mph$speed, in_kmh$speed / 1.609344)
 })
 
 test_that("doesn't change the given gtfs", {
