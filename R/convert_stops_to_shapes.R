@@ -127,8 +127,7 @@ convert_stops_to_shapes <- function(gtfs, trip_id = NULL) {
 
   st <- prepare_trip_stops(
     gtfs,
-    target_trips[target_trips %chin% gtfs$stop_times$trip_id],
-    sort_sequence = TRUE
+    target_trips[target_trips %chin% gtfs$stop_times$trip_id]
   )
 
   has_coords <- !is.na(st$stop_lat) & !is.na(st$stop_lon)

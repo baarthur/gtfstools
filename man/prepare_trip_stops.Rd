@@ -4,21 +4,18 @@
 \alias{prepare_trip_stops}
 \title{Select and prepare the stop_times of the relevant trips}
 \usage{
-prepare_trip_stops(gtfs, trip_id, sort_sequence)
+prepare_trip_stops(gtfs, trip_id)
 }
 \arguments{
 \item{gtfs}{A GTFS object.}
 
 \item{trip_id}{The \code{trip_id}s whose stop_times should be selected, or \code{NULL}
 to select every trip.}
-
-\item{sort_sequence}{Whether to sort the stop_times by \code{stop_sequence}.}
 }
 \value{
-A new \code{data.table} with the \code{trip_id}, \code{stop_id} (and, if
-\code{sort_sequence} is \code{TRUE}, \code{stop_sequence}) of the selected stop_times,
-in which the rows of each trip are contiguous, plus the \code{stop_lat} and
-\code{stop_lon} of each stop.
+A new \code{data.table} with the \code{trip_id}, \code{stop_id} and
+\code{stop_sequence} of the selected stop_times, sorted by \code{trip_id} and
+\code{stop_sequence}, plus the \code{stop_lat} and \code{stop_lon} of each stop.
 }
 \description{
 Select and prepare the stop_times of the relevant trips

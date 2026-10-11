@@ -254,3 +254,23 @@ test_that("works with non dt_gtfs objects", {
 
   expect_identical(merged_gtfs, merge_gtfs(spo_gtfs, tidy_ggl))
 })
+
+test_that("elements that are not tables are not merged, with a warning", {
+  locations <- list(type = "FeatureCollection", features = list())
+  flex_spo <- read_gtfs(spo_path)
+  flex_spo$locations <- locations
+  flex_ggl <- read_gtfs(ggl_path)
+  flex_ggl$locations <- locations
+
+  expect_warning(
+    result <- merge_gtfs(flex_spo, flex_ggl),
+    class = "gtfstools_unmerged_files"
+  )
+  expect_null(result$locations)
+  expect_identical(result, merge_gtfs(spo_gtfs, ggl_gtfs))
+
+  expect_error(
+    suppressWarnings(merge_gtfs(flex_spo, flex_ggl, files = "locations")),
+    regexp = "None of the GTFS to be merged contain the files"
+  )
+})

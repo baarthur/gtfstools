@@ -672,3 +672,32 @@ test_that("segment and time of day args work by reference and on other feeds", {
     poa_gtfs$stop_times[trip_id %chin% in_window]
   ))
 })
+
+test_that("raises an error with non-positive speeds", {
+  for (speed in list(0, -30, c(50, 0))) {
+    trip_ids <- c("CPTM L07-0", "6450-51-0")[seq_along(speed)]
+    expect_error(
+      set_trip_speed(gtfs, trip_ids, speed),
+      class = "gtfstools_invalid_speed"
+    )
+    expect_error(
+      set_trip_speed(gtfs, trip_ids, speed, unit = "m/s"),
+      class = "gtfstools_invalid_speed"
+    )
+  }
+})
+
+test_that("raises an error with infinite or conflicting speeds", {
+  expect_error(
+    set_trip_speed(gtfs, "CPTM L07-0", Inf),
+    class = "gtfstools_invalid_speed"
+  )
+  expect_error(
+    set_trip_speed(gtfs, c("CPTM L07-0", "CPTM L07-0"), c(30, 60)),
+    class = "gtfstools_conflicting_speeds"
+  )
+  expect_identical(
+    set_trip_speed(gtfs, c("CPTM L07-0", "CPTM L07-0"), c(30, 30)),
+    set_trip_speed(gtfs, "CPTM L07-0", 30)
+  )
+})

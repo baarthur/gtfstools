@@ -15,11 +15,9 @@
 #'   `shape_id` column, `"euclidean"` is used instead, with a warning.
 #' @param crs The CRS of the resulting object, either as an EPSG code or as an
 #'   `crs` object. Defaults to 4326 (WGS 84).
-#' @param sort_sequence A logical specifying whether to sort timetables and
-#'   shapes by `stop_sequence` and `shape_pt_sequence`, respectively. Defaults
-#'   to `TRUE`. Set to `FALSE` only if these tables are known to be ordered.
-#'   Geometries generated from unordered sequences do not correctly depict the
-#'   trip trajectories.
+#' @param sort_sequence Deprecated; do not supply. Timetables and shapes are
+#'   now always sorted by `stop_sequence` and `shape_pt_sequence`. Passing
+#'   `TRUE` raises a warning, and passing `FALSE` raises an error.
 #' @param file Deprecated. Use `method` instead (`file = "stop_times"`
 #'   corresponds to `method = "euclidean"`).
 #'
@@ -79,8 +77,16 @@ get_trip_geometry <- function(gtfs,
                               trip_id = NULL,
                               method = "shapes",
                               crs = 4326,
-                              sort_sequence = TRUE,
+                              sort_sequence,
                               file = NULL) {
+  if (!missing(sort_sequence)) {
+    check_deprecated_sort_sequence(
+      sort_sequence,
+      "get_trip_geometry",
+      c("stop_sequence", "shape_pt_sequence")
+    )
+  }
+
   gtfs <- assert_and_assign_gtfs_object(gtfs)
   checkmate::assert_character(trip_id, null.ok = TRUE, any.missing = FALSE)
   if (!is.null(file)) {
@@ -103,19 +109,12 @@ get_trip_geometry <- function(gtfs,
     checkmate::check_class(crs, "crs"),
     combine = "or"
   )
-  checkmate::assert_logical(sort_sequence, any.missing = FALSE, len = 1)
 
-  stop_times_cols <- c("trip_id", "stop_id")
-  stop_times_classes <- c("character", "character")
-  if (sort_sequence) {
-    stop_times_cols <- c(stop_times_cols, "stop_sequence")
-    stop_times_classes <- c(stop_times_classes, "integer")
-  }
   gtfsio::assert_field_class(
     gtfs,
     "stop_times",
-    stop_times_cols,
-    stop_times_classes
+    c("trip_id", "stop_id", "stop_sequence"),
+    c("character", "character", "integer")
   )
   gtfsio::assert_field_class(
     gtfs,
@@ -152,16 +151,15 @@ get_trip_geometry <- function(gtfs,
       c("character", "character")
     )
 
-    shapes_cols <- c("shape_id", "shape_pt_lat", "shape_pt_lon")
-    shapes_classes <- c("character", "numeric", "numeric")
-    if (sort_sequence) {
-      shapes_cols <- c(shapes_cols, "shape_pt_sequence")
-      shapes_classes <- c(shapes_classes, "integer")
-    }
-    gtfsio::assert_field_class(gtfs, "shapes", shapes_cols, shapes_classes)
+    gtfsio::assert_field_class(
+      gtfs,
+      "shapes",
+      c("shape_id", "shape_pt_lat", "shape_pt_lon", "shape_pt_sequence"),
+      c("character", "numeric", "numeric", "integer")
+    )
   }
 
-  st <- prepare_trip_stops(gtfs, trip_id, sort_sequence)
+  st <- prepare_trip_stops(gtfs, trip_id)
 
   trip_ids <- unique(st$trip_id)
   trip_index <- data.table::chmatch(st$trip_id, trip_ids)
@@ -187,13 +185,7 @@ get_trip_geometry <- function(gtfs,
       "stop_lat"
     )
   } else {
-    position <- locate_stops_along_shapes(
-      gtfs,
-      st,
-      st$stop_lat,
-      st$stop_lon,
-      sort_sequence
-    )
+    position <- locate_stops_along_shapes(gtfs, st, st$stop_lat, st$stop_lon)
     shape_points <- attr(position, "shape_points")
 
     # each trip is cut from its first to its last located stop. trips sharing

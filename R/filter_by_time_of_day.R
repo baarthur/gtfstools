@@ -33,11 +33,13 @@
 #' operators try to maintain the listed headways. In such cases, if
 #' `update_frequencies` is `TRUE` we just update `start_time` and `end_time` to
 #' the appropriate value of `from` or `to` (which of this value is used depends
-#' on `keep`). When `keep` is `TRUE`, `end_time` is set to one second after
-#' `to`: as required by the GTFS specification, no trip departs at the
-#' `end_time` of an entry, so this keeps a departure that happens exactly at
-#' `to` (e.g. when converting the filtered feed with
-#' [frequencies_to_stop_times()]).
+#' on `keep`). The time of day includes both `from` and `to`. As required by the
+#' GTFS specification, no trip departs at the `end_time` of an entry, so when
+#' `keep` is `TRUE`, `end_time` is set to one second after `to`, which keeps a
+#' departure that happens exactly at `to` (e.g. when converting the filtered
+#' feed with [frequencies_to_stop_times()]). When `keep` is `FALSE`, the
+#' entries that cross `to` start one second after it. Entries left without any
+#' departure are removed.
 #'
 #' If `exact_times` is 1, however, operators try to strictly adhere to the start
 #' times and headway. As a result, when updating the `start_time` field we need
@@ -112,12 +114,13 @@
 #' head(smaller_gtfs$frequencies)
 #' head(smaller_gtfs$stop_times)
 #'
-#' # frequencies entries can be adjusted using update_frequencies = TRUE
+#' # frequencies entries are adjusted by default. use update_frequencies =
+#' # FALSE to keep their original times
 #' smaller_gtfs <- filter_by_time_of_day(
 #'   gtfs,
 #'   "05:30:00",
 #'   "06:00:00",
-#'   update_frequencies = TRUE
+#'   update_frequencies = FALSE
 #' )
 #' head(smaller_gtfs$frequencies)
 #'
@@ -267,7 +270,7 @@ filter_frequencies <- function(gtfs,
     ,
     `:=`(
       from_within = from_secs > start_time_secs & from_secs < end_time_secs,
-      to_within = to_secs > start_time_secs & to_secs < end_time_secs,
+      to_within = to_secs >= start_time_secs & to_secs < end_time_secs,
       within_from_to = start_time_secs >= from_secs & end_time_secs <= to_secs
     )
   ]
@@ -281,6 +284,12 @@ filter_frequencies <- function(gtfs,
       from_within == TRUE | to_within == TRUE | within_from_to == FALSE
     ]
   }
+
+  # when every row is selected, the subset may share its columns with the
+  # given table, which is then modified by the updates below. the table is
+  # small, so it's copied
+
+  filtered_frequencies <- data.table::copy(filtered_frequencies)
 
   # update the start and end time in the frequencies table if update_frequencies
   # is TRUE
@@ -330,18 +339,23 @@ update_frequencies_times <- function(filtered_frequencies,
   # - keep is TRUE or FALSE. this changes whether start/end time relates to
   # to/from.
 
+  # the time columns in seconds are updated along with the time strings, so
+  # that entries left without any departure can be removed at the end
+
   if (is.null(filtered_frequencies$exact_times)) {
     if (keep) {
+      filtered_frequencies[from_within == TRUE, start_time_secs := from_secs]
       filtered_frequencies[
         from_within == TRUE,
-        start_time := seconds_to_string(from_secs)
+        start_time := seconds_to_string(start_time_secs)
       ]
       # end_time is exclusive, so it's set to one second after 'to' to keep the
       # departure at 'to', if there is one
 
+      filtered_frequencies[to_within == TRUE, end_time_secs := to_secs + 1L]
       filtered_frequencies[
         to_within == TRUE,
-        end_time := seconds_to_string(to_secs + 1L)
+        end_time := seconds_to_string(end_time_secs)
       ]
     } else {
       # when keep = FALSE, there may be cases in which the the time of day to
@@ -373,14 +387,18 @@ update_frequencies_times <- function(filtered_frequencies,
       filtered_frequencies[, is_duplicated := NULL]
 
       # the rest of the filtering is pretty standard but "inverted" when
-      # compared to keep = TRUE
+      # compared to keep = TRUE. the time of day includes 'to', so the
+      # remaining entries start one second after it
+
+      filtered_frequencies[from_within == TRUE, end_time_secs := from_secs]
       filtered_frequencies[
         from_within == TRUE,
-        end_time := seconds_to_string(from_secs)
+        end_time := seconds_to_string(end_time_secs)
       ]
+      filtered_frequencies[to_within == TRUE, start_time_secs := to_secs + 1L]
       filtered_frequencies[
         to_within == TRUE,
-        start_time := seconds_to_string(to_secs)
+        start_time := seconds_to_string(start_time_secs)
       ]
     }
   } else {
@@ -452,28 +470,37 @@ update_frequencies_times <- function(filtered_frequencies,
         end_time := seconds_to_string(end_time_secs)
       ]
 
+      # the time of day includes 'to', so the remaining entries start one
+      # second after it or, with exact times, at the first departure after it
+
       filtered_frequencies[
         to_within == TRUE & !exact_times %in% 1L,
-        start_time_secs := to_secs
+        start_time_secs := to_secs + 1L
       ]
       filtered_frequencies[
         to_within == TRUE & exact_times %in% 1L,
         start_time_secs := start_time_secs +
-          ceiling((to_secs - start_time_secs) / headway_secs) * headway_secs
+          (floor((to_secs - start_time_secs) / headway_secs) + 1) *
+            headway_secs
       ]
       filtered_frequencies[
         to_within == TRUE,
         start_time := seconds_to_string(start_time_secs)
       ]
     }
-
-    # updating the start_time respecting the headway may yield start_times
-    # higher than the end_times. we remove the entries in which this situation
-    # happens
-    filtered_frequencies <- filtered_frequencies[
-      start_time_secs <= end_time_secs
-    ]
   }
+
+  # updating the start_time may yield start_times higher than the end_times,
+  # or equal to them, in which case no departure is left. we remove these
+  # entries. entries not updated whose start_time equals their end_time are
+  # kept, since they describe a single departure
+
+  filtered_frequencies <- filtered_frequencies[
+    !(
+      start_time_secs > end_time_secs |
+        ((from_within | to_within) & start_time_secs == end_time_secs)
+    )
+  ]
 
   return(filtered_frequencies)
 }

@@ -15,6 +15,8 @@ reference:
   - title: "Query information from GTFS feeds"
   - contents:
     - starts_with("get_")
+    - -get_trip_geometry
+    - -get_route_geometry
   - title: "Filter GTFS feeds"
   - contents:
     - starts_with("filter_by_")
@@ -25,13 +27,17 @@ reference:
     - convert_shapes_to_sf
     - convert_stops_to_sf
     - filter_by_spatial_extent
+    - get_trip_geometry
+    - get_route_geometry
   - title: "Editing GTFS feeds"
   - contents:
     - interpolate_stop_times
     - merge_gtfs
     - remove_duplicates
     - remove_unused_ids
+    - fix_gtfs
     - set_dwell_time
+    - set_max_speed
     - set_route_frequency
     - set_trip_speed
     - stop_times_to_frequencies

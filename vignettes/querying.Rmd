@@ -1,0 +1,120 @@
+---
+title: "Querying GTFS feeds"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Querying GTFS feeds}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+
+Sys.setenv(OMP_THREAD_LIMIT = 2)
+data.table::setDTthreads(2)
+
+library(gtfstools)
+```
+
+GTFS feeds hold a lot of information about transit services, but much of it is not readily available in their tables. How often does a route run during the morning peak? How long, and how fast, are its trips? **gtfstools** includes many `get_*()` functions that extract this kind of information from a feed and return it as a `data.table`. This vignette will introduce you to some of them:
+
+- `get_route_frequency()`: the number of departures and the mean headway of routes within a time of day;
+- `get_stop_frequency()`: the number of departures and the mean headway at stops within a time of day;
+- `get_stop_timetable()`: the timetable of stops on given dates;
+- `get_trip_length()`: the length of trips;
+- `get_trip_duration()`: the duration of trips;
+- `get_trip_speed()`: the average speed of trips;
+- `get_summary()`: a summary of the whole feed.
+
+The other `get_*()` functions are listed in the [function reference](https://ipea.github.io/gtfstools/reference/index.html). To check which dates have service in several feeds at once, see `get_calendar_overlap()` and the [Checking the calendar overlap of GTFS feeds](calendar_overlap.html) vignette.
+
+We will start by loading the packages required by this demonstration into the current **R** session:
+
+```{r, message = FALSE}
+library(gtfstools)
+```
+
+# Frequencies and timetables
+
+`get_route_frequency()` counts the trips of each route that depart within a time of day, by service (and by direction, when `direction_id` is present in `trips`). Let's see how often two routes of São Paulo's feed run from 7 to 9 am:
+
+```{r}
+spo_path <- system.file("extdata/spo_gtfs.zip", package = "gtfstools")
+gtfs <- read_gtfs(spo_path)
+
+get_route_frequency(
+  gtfs,
+  route_id = c("CPTM L07", "2002-10"),
+  from = "07:00:00",
+  to = "09:00:00"
+)
+```
+
+`get_stop_frequency()` does the same for stops, counting each departure from each stop (except from the last stop of each trip). Use `by_route = TRUE` to count the departures of each route separately:
+
+```{r}
+get_stop_frequency(
+  gtfs,
+  stop_id = c("18848", "18960"),
+  from = "07:00:00",
+  to = "09:00:00"
+)
+```
+
+`get_stop_timetable()` returns the stop times at the given stops on the given dates, together with the information of their trips. Let's see the first departures from a stop of Berlin's feed on January 4, 2021 (`get_route_timetable()` does the same for routes):
+
+```{r}
+ber_path <- system.file("extdata/ber_gtfs.zip", package = "gtfstools")
+ber_gtfs <- read_gtfs(ber_path)
+
+timetable <- get_stop_timetable(
+  ber_gtfs,
+  stop_id = "100000720101",
+  date = "2021-01-04"
+)
+head(timetable[, .(date, trip_id, route_id, trip_headsign, departure_time)])
+```
+
+# Trip lengths, durations and speeds
+
+`get_trip_length()` snaps each stop of a trip to the closest point of the trip's shape, and measures the trip's length along the shape, from its first to its last stop. Use `by = "segment"` to get the length between each pair of consecutive stops instead:
+
+```{r}
+trip_ids <- c("CPTM L07-0", "2002-10-0")
+
+# 'unit' argument defaults to "km"
+get_trip_length(gtfs, trip_ids)
+```
+
+With `method = "euclidean"`, lengths are measured as straight lines between stops. The same happens, with a warning, when the feed has no `shapes` table or its `trips` have no `shape_id`. Trips not linked to a usable shape get `NA` lengths, with a warning.
+
+`get_trip_duration()` returns the time from the first departure to the last arrival of each trip:
+
+```{r}
+# 'unit' argument defaults to "min"
+get_trip_duration(gtfs, trip_ids)
+```
+
+And `get_trip_speed()` divides the length of each trip by its duration:
+
+```{r}
+# 'unit' argument defaults to "km/h"
+get_trip_speed(gtfs, trip_ids)
+```
+
+# Summarising a feed
+
+`get_summary()` runs a set of diagnostics on a feed, such as the number of routes, trips and stops, and the distributions of trip speeds, lengths and route headways. It returns them as a list of `data.table`s and writes an HTML report with tables and figures, which is opened in the browser by default in interactive sessions:
+
+```{r, eval = requireNamespace("ggplot2", quietly = TRUE) && requireNamespace("knitr", quietly = TRUE) && requireNamespace("rmarkdown", quietly = TRUE) && rmarkdown::pandoc_available()}
+feed_summary <- get_summary(spo_path, open_browser = FALSE)
+
+feed_summary$totals
+```
+
+**Note:**
+
+The results of these functions are readily available to be further analyzed, or to be combined with the rest of **gtfstools**' toolkit. For more information on how to use other functions made available by the package, please see the [introductory vignette](gtfstools.html) and the [function reference](https://ipea.github.io/gtfstools/reference/index.html).

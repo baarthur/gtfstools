@@ -5,15 +5,15 @@
 #' are selected through a specified spatial operation.
 #'
 #' @template gtfs
-#' @param geom An `sf` object. Describes the spatial extent used to filter the
-#'   data.
+#' @param geom An `sf`, `sfc` or `bbox` object, in WGS 84 (EPSG 4326).
+#'   Describes the spatial extent used to filter the data.
 #' @param spatial_operation A spatial operation function from the set of
-#'   options listed in [geos_binary_pred][sf::geos_binary_pred] (check the
-#'   [DE-I9M](https://en.wikipedia.org/wiki/DE-9IM) Wikipedia entry for the
-#'   definition of each function). Defaults to [`sf::st_intersects`], which
+#'   options listed in [geos_binary_pred][sf::geos_binary_pred]. Defaults to [`sf::st_intersects`], which
 #'   tests if the shapes and trips have ANY intersection with the object
 #'   specified in `geom`. Please note that `geom` is passed as the `x` argument
-#'   of these functions.
+#'   of these functions. [sf::st_equals_exact()] and
+#'   [sf::st_is_within_distance()] are not supported, since they require
+#'   additional arguments.
 #' @param keep A logical. Whether the entries related to the shapes and trips
 #'   selected by the given spatial operation should be kept or dropped (defaults
 #'   to `TRUE`, which keeps the entries).
@@ -53,10 +53,12 @@
 #' object.size(smaller_gtfs)
 #'
 #' @export
-filter_by_spatial_extent <- function(gtfs,
-                                     geom,
-                                     spatial_operation = sf::st_intersects,
-                                     keep = TRUE) {
+filter_by_spatial_extent <- function(
+  gtfs,
+  geom,
+  spatial_operation = sf::st_intersects,
+  keep = TRUE
+) {
   gtfs <- assert_and_assign_gtfs_object(gtfs)
   checkmate::assert_logical(keep, len = 1)
   checkmate::assert(
@@ -68,7 +70,9 @@ filter_by_spatial_extent <- function(gtfs,
 
   # convert 'geom' to polygon if a bounding box was given
 
-  if (inherits(geom, "bbox")) geom <- sf::st_buffer(sf::st_as_sfc(geom), 0)
+  if (inherits(geom, "bbox")) {
+    geom <- sf::st_buffer(sf::st_as_sfc(geom), 0)
+  }
 
   if (sf::st_crs(geom) != sf::st_crs(4326)) {
     stop("'geom' CRS must be WGS 84 (EPSG 4326).")
@@ -139,9 +143,7 @@ assert_spatial_operation <- function(spatial_operation) {
     overlaps = sf::st_overlaps,
     equals = sf::st_equals,
     covers = sf::st_covers,
-    covered_by = sf::st_covered_by,
-    equals_exact = sf::st_equals_exact,
-    is_within_distance = sf::st_is_within_distance
+    covered_by = sf::st_covered_by
   )
 
   checkmate::assert_class(spatial_operation, "function")
@@ -154,14 +156,18 @@ assert_spatial_operation <- function(spatial_operation) {
 
   if (!any(operation_matches)) {
     function_listing <- paste0(
-      "'sf::st_", names(available_operations), "'",
+      "'sf::st_",
+      names(available_operations),
+      "'",
       collapse = ", "
     )
 
     stop(
       "Assertion on 'spatial_operation' failed: ",
       "Must be a geometric binary predicate listed in '?sf::geos_binary_pred' ",
-      "- i.e. one of ", function_listing, "."
+      "- i.e. one of ",
+      function_listing,
+      "."
     )
   }
 

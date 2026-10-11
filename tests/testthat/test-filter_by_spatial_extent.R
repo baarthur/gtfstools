@@ -186,3 +186,15 @@ test_that("ignores stops with missing coordinates", {
   result <- tester(na_gtfs, geom = feed_bbox)
   expect_true("CPTM L07-0" %chin% result$trips$trip_id)
 })
+
+test_that("predicates that require additional arguments are not accepted", {
+  expect_error(
+    tester(spatial_operation = sf::st_equals_exact),
+    regexp = "geometric binary predicate"
+  )
+  expect_error(
+    tester(spatial_operation = sf::st_is_within_distance),
+    regexp = "geometric binary predicate"
+  )
+  expect_s3_class(tester(spatial_operation = sf::st_within), "dt_gtfs")
+})

@@ -27,7 +27,8 @@ Returns the duration of each specified \code{trip_id}.
 
 The duration of a trip is defined as the time difference between its last
 arrival time and its first departure time, as specified in the \code{stop_times}
-table.
+table. Trips without any arrival time or without any departure time get a
+\code{NA} duration, with a warning.
 
 Existing \verb{_secs} columns in \code{stop_times} (e.g. created with
 \code{\link[=convert_time_to_seconds]{convert_time_to_seconds()}}) are used as-is, not recalculated from the time

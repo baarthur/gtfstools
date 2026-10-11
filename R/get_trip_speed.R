@@ -14,9 +14,9 @@
 #'   consecutive stops.
 #' @param unit A string representing the unit in which the speeds are desired.
 #'   One of `"km/h"` (the default), `"m/s"` or `"mph"` (miles per hour).
-#' @param sort_sequence A logical specifying whether to sort timetables and
-#'   shapes by `stop_sequence` and `shape_pt_sequence`, respectively. Defaults
-#'   to `TRUE`. Set to `FALSE` only if these tables are known to be ordered.
+#' @param sort_sequence Deprecated; do not supply. Timetables and shapes are
+#'   now always sorted by `stop_sequence` and `shape_pt_sequence`. Passing
+#'   `TRUE` raises a warning, and passing `FALSE` raises an error.
 #' @param file Deprecated. Use `method` instead (`file = "stop_times"`
 #'   corresponds to `method = "euclidean"`).
 #'
@@ -30,7 +30,9 @@
 #' duration calculated by [get_trip_duration()] (with `by = "trip"`) or by
 #' [get_trip_segment_duration()] (with `by = "segment"`). Speeds are `NA` when
 #' the length is `NA` (e.g. trips not linked to a shape) or when the duration
-#' is missing (e.g. blank times at intermediate stops) or not positive.
+#' is missing (e.g. blank times at intermediate stops) or not positive. With
+#' `by = "trip"`, trips without any arrival or departure time raise the warning
+#' of [get_trip_duration()].
 #'
 #' Existing `_secs` columns in `stop_times` (e.g. created with
 #' [convert_time_to_seconds()]) are used as-is, not recalculated from the time
@@ -70,8 +72,16 @@ get_trip_speed <- function(gtfs,
                            method = "shapes",
                            by = "trip",
                            unit = "km/h",
-                           sort_sequence = TRUE,
+                           sort_sequence,
                            file = NULL) {
+  if (!missing(sort_sequence)) {
+    check_deprecated_sort_sequence(
+      sort_sequence,
+      "get_trip_speed",
+      c("stop_sequence", "shape_pt_sequence")
+    )
+  }
+
   gtfs <- assert_and_assign_gtfs_object(gtfs)
   checkmate::assert_character(trip_id, null.ok = TRUE, any.missing = FALSE)
   checkmate::assert(
@@ -84,7 +94,6 @@ get_trip_speed <- function(gtfs,
     checkmate::check_names(unit, subset.of = c("km/h", "m/s", "mph")),
     combine = "and"
   )
-  checkmate::assert_logical(sort_sequence, any.missing = FALSE, len = 1)
 
   # check the fields required to calculate durations before calculating
   # lengths, so errors are not thrown very late
@@ -103,14 +112,7 @@ get_trip_speed <- function(gtfs,
 
   if (!is.null(file)) method <- map_deprecated_file(file, "get_trip_speed")
 
-  lengths <- get_trip_length(
-    gtfs,
-    trip_id,
-    method,
-    by,
-    length_unit,
-    sort_sequence
-  )
+  lengths <- get_trip_length(gtfs, trip_id, method, by, length_unit)
 
   if (nrow(lengths) == 0) {
     data.table::setnames(lengths, "length", "speed")
@@ -128,12 +130,7 @@ get_trip_speed <- function(gtfs,
     durations <- get_trip_duration(gtfs, duration_trips, duration_unit)
     join_cols <- "trip_id"
   } else {
-    durations <- get_trip_segment_duration(
-      gtfs,
-      duration_trips,
-      duration_unit,
-      sort_sequence
-    )
+    durations <- get_trip_segment_duration(gtfs, duration_trips, duration_unit)
     join_cols <- c("trip_id", "segment")
   }
 

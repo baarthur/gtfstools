@@ -14,16 +14,16 @@ filter_by_spatial_extent(
 \arguments{
 \item{gtfs}{A GTFS object, as created by \code{\link[=read_gtfs]{read_gtfs()}}.}
 
-\item{geom}{An \code{sf} object. Describes the spatial extent used to filter the
-data.}
+\item{geom}{An \code{sf}, \code{sfc} or \code{bbox} object, in WGS 84 (EPSG 4326).
+Describes the spatial extent used to filter the data.}
 
 \item{spatial_operation}{A spatial operation function from the set of
-options listed in \link[sf:geos_binary_pred]{geos_binary_pred} (check the
-\href{https://en.wikipedia.org/wiki/DE-9IM}{DE-I9M} Wikipedia entry for the
-definition of each function). Defaults to \code{\link[sf:st_intersects]{sf::st_intersects}}, which
+options listed in \link[sf:geos_binary_pred]{geos_binary_pred}. Defaults to \code{\link[sf:st_intersects]{sf::st_intersects}}, which
 tests if the shapes and trips have ANY intersection with the object
 specified in \code{geom}. Please note that \code{geom} is passed as the \code{x} argument
-of these functions.}
+of these functions. \code{\link[sf:st_equals_exact]{sf::st_equals_exact()}} and
+\code{\link[sf:st_is_within_distance]{sf::st_is_within_distance()}} are not supported, since they require
+additional arguments.}
 
 \item{keep}{A logical. Whether the entries related to the shapes and trips
 selected by the given spatial operation should be kept or dropped (defaults

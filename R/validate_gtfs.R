@@ -7,7 +7,7 @@
 #' complete set of rules used in the validation
 #' [here](https://github.com/MobilityData/gtfs-validator/blob/master/RULES.md).
 #' Please note that this function requires a working installation of Java 11 or
-#' higher to work.
+#' higher to work. Recent versions of the validator require Java 17 or higher.
 #'
 #' @param gtfs The GTFS to be validated. Can be in the format of a GTFS object,
 #'   of a path to a GTFS file, of a path to a directory or an URL to a feed.
@@ -27,7 +27,7 @@
 #'   `TRUE`.
 #' @param n_threads An integer between 1 and the number of cores in the running
 #'   machine. Control how many threads are used during the validation. Defaults
-#'   to using all but one of the available cores.
+#'   to 1.
 #'
 #' @return Invisibly returns the normalized path to the directory where the
 #'   validation results were saved to.
@@ -195,8 +195,9 @@ assert_and_assign_gtfs_input <- function(gtfs, quiet) {
 
 assert_java_version <- function() {
   informative_message <- paste0(
-    "Please install Java version 11 or higher to run the validator.\n",
-    "You can download Java 11 from https://jdk.java.net/java-se-ri/11."
+    "Please install Java version 11 or higher to run the validator ",
+    "(recent versions of the validator require Java 17 or higher).\n",
+    "You can download Java from https://jdk.java.net/java-se-ri/17."
   )
   java_version_output <- tryCatch(
     processx::run("java", "-version"),

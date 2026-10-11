@@ -196,7 +196,7 @@ merged_files <- merge_gtfs(spo_gtfs, ggl_gtfs, files = c("shapes", "trips"))
 names(merged_files)
 ```
 
-`set_trip_speed()` sets the average speed of specified trips by adjusting the `arrival_time` and `departure_time` columns in the `stop_times` table. Average speed is calculated as the difference between the arrival time at the last stop minus the departure time at the first stop, divided by the trip's length. Please note that arrival and departure times at intermediate stops are set as `""`. Some transport routing software, such as [OpenTripPlanner](https://www.opentripplanner.org/) and [R5](https://github.com/conveyal/r5), support specifying stop times like so, in which case they interpolate arrival/departure times at intermediate stops based on the trip's average speed and the euclidean distance between stops.
+`set_trip_speed()` sets the average speed of specified trips by adjusting the `arrival_time` and `departure_time` columns in the `stop_times` table. Average speed is calculated as the trip's length divided by the difference between the arrival time at the last stop and the departure time at the first stop. Please note that arrival and departure times at intermediate stops are set as `""`. Some transport routing software, such as [OpenTripPlanner](https://www.opentripplanner.org/) and [R5](https://github.com/conveyal/r5), support specifying stop times like so, in which case they interpolate arrival/departure times at intermediate stops based on the trip's average speed and the euclidean distance between stops.
 
 ```{r}
 selected_trips <- c("2002-10-0", "CPTM L07-0")

@@ -28,9 +28,9 @@ seconds after midnight. Instead of overwritting the existing fields, creates
 new fields with the \verb{_secs} suffix.
 }
 \details{
-Other gtfstools functions use existing \verb{_secs} columns as-is. Only the
-functions that edit times (\code{\link[=set_trip_speed]{set_trip_speed()}} and \code{\link[=filter_by_time_of_day]{filter_by_time_of_day()}})
-keep them in sync, so re-run \code{convert_time_to_seconds()} after other edits.
+Other gtfstools functions use existing \verb{_secs} columns as-is. The functions
+that edit times keep them in sync, but other edits (e.g. made directly to
+the tables) don't, so re-run \code{convert_time_to_seconds()} after them.
 }
 \examples{
 \dontshow{

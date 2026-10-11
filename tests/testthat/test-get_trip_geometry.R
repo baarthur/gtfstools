@@ -7,9 +7,8 @@ trip_id <- "CPTM L07-0"
 tester <- function(gtfs = get("gtfs", envir = parent.frame()),
                    trip_id = NULL,
                    method = "shapes",
-                   crs = 4326,
-                   sort_sequence = TRUE) {
-  get_trip_geometry(gtfs, trip_id, method, crs, sort_sequence)
+                   crs = 4326) {
+  get_trip_geometry(gtfs, trip_id, method, crs)
 }
 
 # creates a feed with a single shape ('shape_lon' and 'shape_lat') and a single
@@ -59,9 +58,6 @@ test_that("raises errors due to incorrect input types/value", {
   expect_error(tester(method = "stop_times"))
   expect_error(tester(method = c("shapes", "euclidean")))
   expect_error(tester(crs = "4674"))
-  expect_error(tester(sort_sequence = "FALSE"))
-  expect_error(tester(sort_sequence = NA))
-  expect_error(tester(sort_sequence = c(TRUE, TRUE)))
   expect_error(get_trip_geometry(gtfs, file = c("shapes", "stops")))
 })
 
@@ -108,10 +104,6 @@ test_that("raises errors if gtfs doesn't have required files/fields", {
     expect_error(tester(no_sts_stopid_gtfs, trip_id, method))
     expect_error(tester(no_sts_stoplat_gtfs, trip_id, method))
     expect_error(tester(no_sts_stoplon_gtfs, trip_id, method))
-    expect_s3_class(
-      tester(no_stt_stopseq_gtfs, trip_id, method, sort_sequence = FALSE),
-      "sf"
-    )
   }
 
   # 'shapes'-based geometries also require 'trips' and 'shapes' fields
@@ -121,10 +113,6 @@ test_that("raises errors if gtfs doesn't have required files/fields", {
   expect_error(tester(no_shp_shapelat_gtfs, trip_id, "shapes"))
   expect_error(tester(no_shp_shapelon_gtfs, trip_id, "shapes"))
   expect_error(tester(no_shp_shapeseq_gtfs, trip_id, "shapes"))
-  expect_s3_class(
-    tester(no_shp_shapeseq_gtfs, trip_id, "shapes", sort_sequence = FALSE),
-    "sf"
-  )
 
   # 'euclidean' geometries don't require 'trips' or 'shapes'
 
@@ -510,19 +498,13 @@ test_that("doesn't change given gtfs", {
   expect_identical(original_gtfs, gtfs)
 
   for (method in c("shapes", "euclidean")) {
-    for (sort_sequence in c(TRUE, FALSE)) {
-      sf_geom <- tester(method = method, sort_sequence = sort_sequence)
-      sf_geom <- tester(
-        trip_id = "CPTM L07-0",
-        method = method,
-        sort_sequence = sort_sequence
-      )
-      expect_identical(original_gtfs, gtfs)
-    }
+    sf_geom <- tester(method = method)
+    sf_geom <- tester(trip_id = "CPTM L07-0", method = method)
+    expect_identical(original_gtfs, gtfs)
   }
 })
 
-test_that("sort_sequence works correctly", {
+test_that("stop_times and shapes are sorted by their sequences", {
   unordered_gtfs <- read_gtfs(data_path)
   unordered_gtfs$shapes <- gtfs$shapes[shape_id == "17846"]
   unordered_gtfs$shapes <- unordered_gtfs$shapes[c(200:547, 1:199)]
@@ -531,22 +513,20 @@ test_that("sort_sequence works correctly", {
 
   for (method in c("shapes", "euclidean")) {
     geoms <- tester(trip_id = trip_id, method = method)
-
-    unordered_geoms <- tester(
-      unordered_gtfs,
-      trip_id,
-      method,
-      sort_sequence = FALSE
-    )
-    expect_false(identical(unordered_geoms, geoms))
-
     ordered_geoms <- tester(unordered_gtfs, trip_id, method)
     expect_identical(ordered_geoms, geoms)
-
-    # sort_sequence defaults to TRUE (#94)
-    default_geoms <- get_trip_geometry(unordered_gtfs, trip_id, method)
-    expect_identical(default_geoms, geoms)
   }
+})
+
+test_that("sort_sequence is deprecated", {
+  expect_warning(
+    get_trip_geometry(gtfs, trip_id, sort_sequence = TRUE),
+    class = "deprecated_sort_sequence"
+  )
+  expect_error(
+    get_trip_geometry(gtfs, trip_id, sort_sequence = FALSE),
+    class = "gtfstools_defunct_sort_sequence_error"
+  )
 })
 
 test_that("geometries along shapes handle repeated points and shape ends", {

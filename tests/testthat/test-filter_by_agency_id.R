@@ -175,3 +175,21 @@ test_that("behaves correctly when agency_id = character(0)", {
   ]
   expect_identical(modified_ber, full)
 })
+
+test_that("keeps fare_attributes without agency_id", {
+  blank_gtfs <- read_gtfs(ber_path)
+  blank_gtfs$fare_attributes <- data.table::data.table(
+    fare_id = c("a", "b", "c", "d"),
+    price = 1,
+    currency_type = "EUR",
+    payment_method = 0L,
+    transfers = 0L,
+    agency_id = c(ber_agency, "other", "", NA)
+  )
+
+  result <- tester(blank_gtfs)
+  expect_identical(result$fare_attributes$fare_id, c("a", "c", "d"))
+
+  result <- tester(blank_gtfs, keep = FALSE)
+  expect_identical(result$fare_attributes$fare_id, c("b", "c", "d"))
+})

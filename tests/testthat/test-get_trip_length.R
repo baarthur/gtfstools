@@ -5,9 +5,8 @@ tester <- function(gtfs = spo_gtfs,
                    trip_id = NULL,
                    method = "shapes",
                    by = "trip",
-                   unit = "km",
-                   sort_sequence = TRUE) {
-  get_trip_length(gtfs, trip_id, method, by, unit, sort_sequence)
+                   unit = "km") {
+  get_trip_length(gtfs, trip_id, method, by, unit)
 }
 
 # creates a feed with a single shape ('shape_lon' and 'shape_lat') and a single
@@ -55,7 +54,6 @@ test_that("raises errors due to incorrect input types and missing fields", {
   expect_error(tester(method = c("shapes", "euclidean")))
   expect_error(tester(by = "stop"))
   expect_error(tester(unit = "mi"))
-  expect_error(tester(sort_sequence = NA))
 
   # missing required tables and fields
 
@@ -67,7 +65,6 @@ test_that("raises errors due to incorrect input types and missing fields", {
     "stop_sequence"
   )
   expect_error(tester(no_seq_gtfs), class = "missing_required_field")
-  expect_s3_class(tester(no_seq_gtfs, sort_sequence = FALSE), "data.table")
 
   # 'shapes' is present but misses a required field
 
@@ -143,6 +140,17 @@ test_that("the deprecated 'file' argument still works", {
   expect_error(get_trip_length(spo_gtfs, file = "shape"))
 })
 
+test_that("sort_sequence is deprecated", {
+  expect_warning(
+    get_trip_length(spo_gtfs, "CPTM L07-0", sort_sequence = TRUE),
+    class = "deprecated_sort_sequence"
+  )
+  expect_error(
+    get_trip_length(spo_gtfs, "CPTM L07-0", sort_sequence = FALSE),
+    class = "gtfstools_defunct_sort_sequence_error"
+  )
+})
+
 test_that("results in data.tables with the right columns and types", {
   trip_result <- tester()
   expect_s3_class(trip_result, "data.table")
@@ -166,17 +174,9 @@ test_that("doesn't change the given gtfs", {
   expect_identical(original_gtfs, gtfs)
 
   for (method in c("shapes", "euclidean")) {
-    for (sort_sequence in c(TRUE, FALSE)) {
-      for (trip_id in list(NULL, "CPTM L07-0")) {
-        result <- tester(
-          gtfs,
-          trip_id = trip_id,
-          method = method,
-          by = "segment",
-          sort_sequence = sort_sequence
-        )
-        expect_identical(original_gtfs, gtfs)
-      }
+    for (trip_id in list(NULL, "CPTM L07-0")) {
+      result <- tester(gtfs, trip_id = trip_id, method = method, by = "segment")
+      expect_identical(original_gtfs, gtfs)
     }
   }
 })
@@ -323,20 +323,9 @@ test_that("stops are located along synthetic shapes correctly", {
 
 test_that("segments are numbered as in get_trip_segment_duration()", {
   trips <- c("CPTM L07-0", "CPTM L07-1")
-  compare_numbering <- function(gtfs, sort_sequence = TRUE) {
-    distances <- suppressWarnings(
-      tester(
-        gtfs,
-        trips,
-        by = "segment",
-        sort_sequence = sort_sequence
-      )
-    )
-    durations <- get_trip_segment_duration(
-      gtfs,
-      trips,
-      sort_sequence = sort_sequence
-    )
+  compare_numbering <- function(gtfs) {
+    distances <- suppressWarnings(tester(gtfs, trips, by = "segment"))
+    durations <- get_trip_segment_duration(gtfs, trips)
     expect_identical(distances$trip_id, durations$trip_id)
     expect_identical(distances$segment, durations$segment)
     return(distances)
@@ -344,13 +333,13 @@ test_that("segments are numbered as in get_trip_segment_duration()", {
 
   compare_numbering(spo_gtfs)
 
-  # interleaved rows, without sorting
+  # interleaved rows
 
   interleaved_gtfs <- read_gtfs(spo_path)
   st <- interleaved_gtfs$stop_times[trip_id %chin% trips]
   data.table::setorderv(st, c("stop_sequence", "trip_id"))
   interleaved_gtfs$stop_times <- st
-  compare_numbering(interleaved_gtfs, sort_sequence = FALSE)
+  compare_numbering(interleaved_gtfs)
 
   # a stop with missing coordinates results in NA distances for the segments
   # around it and for its trip, without changing the numbering
@@ -446,8 +435,7 @@ test_that("unit argument converts distances correctly", {
 })
 
 test_that("shape rows of different shapes may be interleaved", {
-  # with sort_sequence = FALSE the points of each shape are used in the order
-  # they appear, even if the rows of different shapes are interleaved
+  # the rows of different shapes may be interleaved in 'shapes'
 
   sorted_gtfs <- read_gtfs(spo_path)
   data.table::setorderv(sorted_gtfs$shapes, c("shape_id", "shape_pt_sequence"))
@@ -459,7 +447,7 @@ test_that("shape rows of different shapes may be interleaved", {
 
   # the order of the trips in the result may change, but not their lengths
 
-  interleaved_lengths <- tester(interleaved_gtfs, sort_sequence = FALSE)
+  interleaved_lengths <- tester(interleaved_gtfs)
   sorted_lengths <- tester(sorted_gtfs)
   expect_identical(
     interleaved_lengths[order(trip_id)],
@@ -489,4 +477,62 @@ test_that("results don't depend on the number of threads", {
   )
 
   expect_identical(two_threads, one_thread)
+})
+
+test_that("raises an informative error with a blank shape_id in shapes", {
+  blank_gtfs <- read_gtfs(spo_path)
+  blank_gtfs$trips[trip_id == "CPTM L07-0", shape_id := ""]
+
+  # a blank shape_id only in trips means that the trip has no shape
+
+  expect_warning(
+    tester(blank_gtfs, "CPTM L07-0"),
+    class = "gtfstools_trips_without_shape"
+  )
+
+  blank_shape <- spo_gtfs$trips[trip_id == "CPTM L07-0"]$shape_id
+  is_blank_shape <- blank_gtfs$shapes$shape_id == blank_shape
+  blank_gtfs$shapes[is_blank_shape, shape_id := ""]
+  expect_error(
+    tester(blank_gtfs, "CPTM L07-0"),
+    class = "gtfstools_blank_shape_id"
+  )
+  expect_error(
+    get_trip_geometry(blank_gtfs, "CPTM L07-0"),
+    class = "gtfstools_blank_shape_id"
+  )
+
+  # trips whose shapes have a non-blank shape_id are not affected
+
+  expect_identical(
+    tester(blank_gtfs, "6450-51-0"),
+    tester(trip_id = "6450-51-0")
+  )
+})
+
+test_that("ignores stop_times entries without trip_id", {
+  na_gtfs <- read_gtfs(spo_path)
+  na_gtfs$stop_times[
+    trip_id == "CPTM L07-0" & stop_sequence %in% 3:4,
+    trip_id := NA
+  ]
+
+  result <- tester(na_gtfs, by = "segment", method = "euclidean")
+  expected <- tester(spo_gtfs, by = "segment", method = "euclidean")
+  expect_identical(
+    result[trip_id != "CPTM L07-0"],
+    expected[trip_id != "CPTM L07-0"]
+  )
+  expect_false(anyNA(result$trip_id))
+})
+
+test_that("ignores stop_times entries with a blank trip_id", {
+  blank_gtfs <- read_gtfs(spo_path)
+  blank_gtfs$stop_times[
+    trip_id == "CPTM L07-0" & stop_sequence %in% 3:4,
+    trip_id := ""
+  ]
+
+  result <- tester(blank_gtfs, by = "segment", method = "euclidean")
+  expect_false("" %chin% result$trip_id)
 })

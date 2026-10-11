@@ -41,7 +41,7 @@ Defaults to \code{FALSE}.}
 
 \item{n_threads}{An integer between 1 and the number of cores in the running
 machine. Control how many threads are used during the validation. Defaults
-to using all but one of the available cores.}
+to 1.}
 }
 \value{
 Invisibly returns the normalized path to the directory where the
@@ -54,7 +54,7 @@ validator v3.1.0 or higher is used) and in JSON format. Please check the
 complete set of rules used in the validation
 \href{https://github.com/MobilityData/gtfs-validator/blob/master/RULES.md}{here}.
 Please note that this function requires a working installation of Java 11 or
-higher to work.
+higher to work. Recent versions of the validator require Java 17 or higher.
 }
 \examples{
 \dontshow{if (identical(tolower(Sys.getenv("NOT_CRAN")), "true")) withAutoprint(\{ # examplesIf}

@@ -202,3 +202,50 @@ warn_missing_ids <- function(id, existing_id, table, id_name) {
 
   return(invisible(invalid_id))
 }
+
+#' Raise the deprecation condition of the `sort_sequence` argument
+#'
+#' `sort_sequence` was deprecated after gtfstools 1.4.0: the functions that
+#' took it now always sort by the sequence columns. Passing `TRUE` raises a
+#' warning, and passing `FALSE` raises an error.
+#'
+#' @param sort_sequence The value passed by the user.
+#' @param fn_name The name of the function the argument was passed to.
+#' @param columns The sequence columns the function sorts by.
+#'
+#' @return Invisibly returns `NULL`, if it doesn't raise an error.
+#'
+#' @keywords internal
+check_deprecated_sort_sequence <- function(sort_sequence, fn_name, columns) {
+  checkmate::assert_flag(sort_sequence, .var.name = "sort_sequence")
+
+  if (!sort_sequence) {
+    cli::cli_abort(
+      class = "gtfstools_defunct_sort_sequence_error",
+      call = parent.frame(),
+      message = c(
+        "{.code sort_sequence = FALSE} is no longer supported.",
+        "i" = paste0(
+          "{.fn {fn_name}} now always orders the data by {.field {columns}}, ",
+          "so {cli::qty(columns)}th{?is/ese} column{?s} {?is/are} required."
+        ),
+        "i" = "Please remove {.arg sort_sequence} from your call."
+      )
+    )
+  }
+
+  cli::cli_warn(
+    class = "deprecated_sort_sequence",
+    call = parent.frame(),
+    message = c(
+      paste0(
+        "The {.arg sort_sequence} argument of {.fn {fn_name}} is deprecated ",
+        "and ignored."
+      ),
+      "i" = "{.fn {fn_name}} now always orders the data by {.field {columns}}.",
+      "i" = "Please remove {.arg sort_sequence} from your call."
+    )
+  )
+
+  return(invisible(NULL))
+}

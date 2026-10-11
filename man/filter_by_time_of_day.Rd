@@ -55,11 +55,13 @@ present), the service does not follow a fixed schedule. Instead, the
 operators try to maintain the listed headways. In such cases, if
 \code{update_frequencies} is \code{TRUE} we just update \code{start_time} and \code{end_time} to
 the appropriate value of \code{from} or \code{to} (which of this value is used depends
-on \code{keep}). When \code{keep} is \code{TRUE}, \code{end_time} is set to one second after
-\code{to}: as required by the GTFS specification, no trip departs at the
-\code{end_time} of an entry, so this keeps a departure that happens exactly at
-\code{to} (e.g. when converting the filtered feed with
-\code{\link[=frequencies_to_stop_times]{frequencies_to_stop_times()}}).
+on \code{keep}). The time of day includes both \code{from} and \code{to}. As required by the
+GTFS specification, no trip departs at the \code{end_time} of an entry, so when
+\code{keep} is \code{TRUE}, \code{end_time} is set to one second after \code{to}, which keeps a
+departure that happens exactly at \code{to} (e.g. when converting the filtered
+feed with \code{\link[=frequencies_to_stop_times]{frequencies_to_stop_times()}}). When \code{keep} is \code{FALSE}, the
+entries that cross \code{to} start one second after it. Entries left without any
+departure are removed.
 
 If \code{exact_times} is 1, however, operators try to strictly adhere to the start
 times and headway. As a result, when updating the \code{start_time} field we need
@@ -133,12 +135,13 @@ smaller_gtfs <- filter_by_time_of_day(gtfs, "05:00:00", "06:00:00")
 head(smaller_gtfs$frequencies)
 head(smaller_gtfs$stop_times)
 
-# frequencies entries can be adjusted using update_frequencies = TRUE
+# frequencies entries are adjusted by default. use update_frequencies =
+# FALSE to keep their original times
 smaller_gtfs <- filter_by_time_of_day(
   gtfs,
   "05:30:00",
   "06:00:00",
-  update_frequencies = TRUE
+  update_frequencies = FALSE
 )
 head(smaller_gtfs$frequencies)
 

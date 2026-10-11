@@ -27,11 +27,13 @@ GTFS feeds describe the transit services of a city or region as they are. Quite 
 - `set_trip_speed()`: sets the average speed of trips, or of a segment of them;
 - `stop_times_to_frequencies()`: approximates scheduled trips by frequency-based ones;
 - `interpolate_stop_times()`: fills blank stop times, assuming a constant speed between stops with known times;
+- `set_max_speed()`: caps the speed of trips, slowing down only the parts that are faster than a maximum speed;
 - `set_dwell_time()`: sets how long vehicles stay at stops;
 - `frequencies_to_stop_times()`: converts frequency-based trips into scheduled ones;
 - `merge_gtfs()`: combines several feeds into a single one;
 - `remove_duplicates()`: removes duplicated entries from the feed's tables;
-- `remove_unused_ids()`: removes the ids that the feed doesn't use, with their entries in every table.
+- `remove_unused_ids()`: removes the ids that the feed doesn't use, with their entries in every table;
+- `fix_gtfs()`: cleans a feed in one call, removing duplicated entries and unused ids, optionally capping the speed of trips and filling blank stop times.
 
 This vignette will introduce you to the first four functions and will cover their usage in detail. By default, they return an edited copy of the feed and leave the given GTFS object unchanged.
 
@@ -39,7 +41,6 @@ We will start by loading the packages required by this demonstration into the cu
 
 ```{r, message = FALSE}
 library(gtfstools)
-library(dplyr)
 ```
 
 # Setting route frequencies
@@ -104,11 +105,11 @@ new_speed_gtfs$stop_times[
 ]
 ```
 
-The duration of the trip is set to its length, measured along its shape, divided by the given speed. The arrival time at the all the stops along the trip change accordingly. In this particular feed of São Paulo, the arrival and departure times at intermediate stops are set to `""`, so the function `set_trip_speed()` only updates the arrival time of the last stop. To fill in the expected arrival and departure times of intermediate stops, you use `interpolate_stop_times()`, as we'll see in a [later section](#interpolating-stop-times).
+The duration of the trip is set to its length, measured along its shape, divided by the given speed. `set_trip_speed()` updates the arrival time at the last stop accordingly and sets the arrival and departure times at intermediate stops to `""`. To fill in the expected arrival and departure times of intermediate stops, you use `interpolate_stop_times()`, as we'll see in a [later section](#interpolating-stop-times).
 
 The `set_trip_speed()` function also includes a few other arguments that control which trips and parts of trips are changed:
 
-- `unit` sets the unit in which the speed is given, either `"km/h"` (the default) or `"m/s"`;
+- `unit` sets the unit in which the speed is given, either `"km/h"` (the default), `"m/s"` or `"mph"`;
 - `first_stop` and `last_stop` set the speed of only a segment of the trips, between two stops. The times at the stops after the segment are shifted by the change in its duration;
 - `from` and `to` only change the trips that depart from the segment's first stop between `from` "HH:MM:SS" and `to` "HH:MM:SS" (both included);
 - `by_reference = TRUE` updates the `stop_times` table by reference, thus changing the given GTFS object.
@@ -150,10 +151,7 @@ Sometimes, GTFS feeds don't report the arrival and departure times at every stop
 ```{r}
 trip <- "T2-1@1#520"
 
-gtfs$stop_times |> 
-  filter(trip_id == trip) |> 
-  select(stop_id, arrival_time, departure_time) |> 
-  head()
+head(gtfs$stop_times[trip_id == trip, .(stop_id, arrival_time, departure_time)])
 
 ```
 
@@ -162,10 +160,12 @@ gtfs$stop_times |>
 ```{r}
 interpolated_gtfs <- interpolate_stop_times(gtfs, trip_id = trip)
 
-interpolated_gtfs$stop_times |> 
-  filter(trip_id == trip) |> 
-  select(stop_id, arrival_time, departure_time) |> 
-  head()
+head(
+  interpolated_gtfs$stop_times[
+    trip_id == trip,
+    .(stop_id, arrival_time, departure_time)
+  ]
+)
 
 ```
 

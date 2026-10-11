@@ -25,7 +25,12 @@ remove_duplicates <- function(gtfs) {
 
   gtfs <- assert_and_assign_gtfs_object(gtfs)
 
-  for (table in names(gtfs)) gtfs[[table]] <- unique(gtfs[[table]])
+  # only tables are deduplicated. other elements, such as GTFS-Flex's
+  # 'locations' (a list read from a geojson file), are kept as they are
+
+  for (table in names(gtfs)) {
+    if (is.data.frame(gtfs[[table]])) gtfs[[table]] <- unique(gtfs[[table]])
+  }
 
   return(gtfs)
 
