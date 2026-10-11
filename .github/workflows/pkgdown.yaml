@@ -2,14 +2,27 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
+      - dev
 
 name: pkgdown
 
+permissions: read-all
+
 jobs:
   pkgdown:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
+
+    # deploys run one at a time; builds of pull requests run in parallel
+    concurrency:
+      group: pkgdown-${{ github.event_name != 'pull_request' || github.run_id }}
+
+    permissions:
+      contents: write
+
     env:
-      RSPM: https://packagemanager.rstudio.com/cran/__linux__/jammy/latest
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
@@ -17,6 +30,8 @@ jobs:
 
       - uses: r-lib/actions/setup-r@v2
         id: install-r
+        with:
+          use-public-rspm: true
 
       - uses: r-lib/actions/setup-pandoc@v2
 
@@ -31,7 +46,13 @@ jobs:
           extra-packages: any::pkgdown, local::.
           needs: website
 
+      - name: Build pkgdown site
+        if: github.event_name == 'pull_request'
+        run: pkgdown::build_site(new_process = FALSE, install = FALSE)
+        shell: Rscript {0}
+
       - name: Build and deploy pkgdown site
+        if: github.event_name != 'pull_request'
         run: |
           git config --local user.name "GitHub Actions"
           git config --local user.email "actions@github.com"
