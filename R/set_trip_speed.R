@@ -10,7 +10,7 @@
 #'   either equal 1, in which case the value is recycled for all
 #'   `trip_id`s, or equal `trip_id`'s length.
 #' @param unit A string representing the unit in which the speed is given. One
-#'   of `"km/h"` (the default) or `"m/s"`.
+#'   of `"km/h"` (the default), `"m/s"` or `"mph"` (miles per hour).
 #' @param first_stop A string. The `stop_id` where the segment whose speed is
 #'   set starts. If `NULL` (the default), the segment starts at each trip's
 #'   first stop.
@@ -125,7 +125,7 @@ set_trip_speed <- function(gtfs,
   )
   checkmate::assert(
     checkmate::check_string(unit),
-    checkmate::check_names(unit, subset.of = c("km/h", "m/s")),
+    checkmate::check_names(unit, subset.of = c("km/h", "m/s", "mph")),
     combine = "and"
   )
   checkmate::assert_string(first_stop, min.chars = 1, null.ok = TRUE)
@@ -181,7 +181,9 @@ set_trip_speed <- function(gtfs,
   # {units} versions read out of bounds when converting zero-length input)
 
   if (unit != "km/h" && length(speed) > 0) {
-    units(speed) <- unit
+    # udunits doesn't parse "mph" as miles per hour, hence "mi/h"
+
+    units(speed) <- ifelse(unit == "mph", "mi/h", unit)
     speed <- as.numeric(units::set_units(speed, "km/h"))
   }
   names(speed) <- trip_id

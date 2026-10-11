@@ -161,6 +161,7 @@ utils::globalVariables(
     "end_secs",
     "is_invalid",
     "n_departures",
-    "density_weight"
+    "density_weight",
+    "value"
   )
 )

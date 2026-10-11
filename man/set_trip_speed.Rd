@@ -27,7 +27,7 @@ either equal 1, in which case the value is recycled for all
 \code{trip_id}s, or equal \code{trip_id}'s length.}
 
 \item{unit}{A string representing the unit in which the speed is given. One
-of \code{"km/h"} (the default) or \code{"m/s"}.}
+of \code{"km/h"} (the default), \code{"m/s"} or \code{"mph"} (miles per hour).}
 
 \item{first_stop}{A string. The \code{stop_id} where the segment whose speed is
 set starts. If \code{NULL} (the default), the segment starts at each trip's

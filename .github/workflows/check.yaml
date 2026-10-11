@@ -2,11 +2,20 @@ on:
   push:
     branches:
       - main
+      - dev
   pull_request:
     branches:
       - main
+      - dev
+  workflow_dispatch:
 
 name: check
+
+permissions: read-all
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   check:
@@ -19,21 +28,23 @@ jobs:
       matrix:
         config:
         - {os: windows-latest, r: 'release'}
-        - {os: macOS-latest, r: 'release'}
-        - {os: ubuntu-22.04, r: 'devel', rspm: "https://packagemanager.rstudio.com/cran/__linux__/jammy/latest"}
-        - {os: ubuntu-22.04, r: 'release', rspm: "https://packagemanager.rstudio.com/cran/__linux__/jammy/latest"}
-        - {os: ubuntu-22.04, r: 'oldrel', rspm: "https://packagemanager.rstudio.com/cran/__linux__/jammy/latest"}
+        - {os: macos-latest, r: 'release'}
+        - {os: ubuntu-latest, r: 'devel', http-user-agent: 'release'}
+        - {os: ubuntu-latest, r: 'release'}
+        - {os: ubuntu-latest, r: 'oldrel'}
 
     env:
-      RSPM: ${{ matrix.config.rspm }}
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      NOT_CRAN: true
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
 
     - uses: r-lib/actions/setup-r@v2
       with:
         r-version: ${{ matrix.config.r }}
+        http-user-agent: ${{ matrix.config.http-user-agent }}
+        use-public-rspm: true
 
     - uses: r-lib/actions/setup-pandoc@v2
 
@@ -42,12 +53,6 @@ jobs:
       with:
         java-version: '17'
         distribution: 'temurin'
-
-    - name: Configure Java PATH
-      run: |
-        echo "JAVA_HOME=${{ env.JAVA_HOME }}" >> $GITHUB_ENV
-        echo "${{ env.JAVA_HOME }}/bin" >> $GITHUB_PATH
-      shell: bash
 
     - uses: r-lib/actions/setup-r-dependencies@v2
       with:

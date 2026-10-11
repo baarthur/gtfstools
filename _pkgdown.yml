@@ -27,9 +27,6 @@ reference:
     - filter_by_spatial_extent
   - title: "Editing GTFS feeds"
   - contents:
-    - convert_stops_to_shapes
-    - convert_time_to_seconds
-    - frequencies_to_stop_times
     - interpolate_stop_times
     - merge_gtfs
     - remove_duplicates
@@ -38,11 +35,16 @@ reference:
     - set_route_frequency
     - set_trip_speed
     - stop_times_to_frequencies
+    - frequencies_to_stop_times
   - title: "Validate GTFS feeds"
   - contents:
     - download_validator
     - list_validator_versions
     - validate_gtfs
+  - title: "Support functions"
+  - contents:
+    - convert_stops_to_shapes
+    - convert_time_to_seconds
   - title: "Interoperability between GTFS packages"
   - contents:
     - "as_dt_gtfs"
