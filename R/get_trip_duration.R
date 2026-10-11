@@ -15,7 +15,8 @@
 #' @section Details:
 #' The duration of a trip is defined as the time difference between its last
 #' arrival time and its first departure time, as specified in the `stop_times`
-#' table.
+#' table. Trips without any arrival time or without any departure time get a
+#' `NA` duration, with a warning.
 #'
 #' Existing `_secs` columns in `stop_times` (e.g. created with
 #' [convert_time_to_seconds()]) are used as-is, not recalculated from the time
@@ -118,16 +119,60 @@ get_trip_duration <- function(gtfs, trip_id = NULL, unit = "min") {
     )
   )
 
-  # calculate durations
+  # calculate durations. trips without any arrival or departure time get a NA
+  # duration. they are set aside before aggregating the other trips, since
+  # max() and min() would return -Inf or Inf for them (or even fail, as these
+  # values don't fit the type of integer time columns). max() and min() are
+  # kept as separate expressions so that {data.table} optimises them (GForce)
 
-  durations <- durations[
-    ,
-    .(
-      duration = max(arrival_time_secs, na.rm = TRUE) -
-        min(departure_time_secs, na.rm = TRUE)
-    ),
-    keyby = trip_id
-  ]
+  trip_ids <- unique(durations$trip_id)
+  timed_trips <- intersect(
+    durations$trip_id[!is.na(durations$arrival_time_secs)],
+    durations$trip_id[!is.na(durations$departure_time_secs)]
+  )
+  trips_without_times <- trip_ids[!trip_ids %chin% timed_trips]
+
+  if (length(trips_without_times) > 0) {
+    durations <- durations[durations$trip_id %chin% timed_trips]
+  }
+
+  # {data.table} evaluates j even without rows, so the aggregation is skipped
+  # when no trip has times
+
+  if (length(timed_trips) > 0) {
+    durations <- durations[
+      ,
+      .(
+        last_arrival = max(arrival_time_secs, na.rm = TRUE),
+        first_departure = min(departure_time_secs, na.rm = TRUE)
+      ),
+      keyby = trip_id
+    ]
+    durations[, duration := last_arrival - first_departure]
+    durations[, c("last_arrival", "first_departure") := NULL]
+  } else {
+    durations <- data.table::data.table(
+      trip_id = character(0),
+      duration = durations$arrival_time_secs[0]
+    )
+  }
+
+  if (length(trips_without_times) > 0) {
+    durations <- rbind(
+      durations,
+      data.table::data.table(trip_id = trips_without_times),
+      fill = TRUE
+    )
+    data.table::setkeyv(durations, "trip_id")
+    cli::cli_warn(
+      paste0(
+        "{length(trips_without_times)} trip{?s} {?has/have} no arrival time ",
+        "or no departure time, so {?its duration is/their durations are} ",
+        "{.val NA}: {.val {trips_without_times}}."
+      ),
+      class = "gtfstools_trips_without_times"
+    )
+  }
 
   # convert duration to desired unit
 

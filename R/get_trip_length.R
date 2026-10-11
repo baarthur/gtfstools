@@ -361,6 +361,24 @@ locate_stops_along_shapes <- function(gtfs,
     !is.na(gtfs$shapes$shape_pt_lon)
   shapes <- gtfs$shapes[is_relevant_point, .SD, .SDcols = shapes_cols]
 
+  # shapes are looked up by their shape_ids as names below, which can't match
+  # a blank shape_id. a blank shape_id only in 'trips' just means that the
+  # trip isn't linked to a shape, but one also used in 'shapes' is ambiguous
+
+  if ("" %chin% shapes$shape_id) {
+    n_blank_trips <- sum(trip_shape_id %chin% "")
+    cli::cli_abort(
+      c(
+        paste0(
+          "{.file shapes} has points with a blank {.field shape_id}, used ",
+          "by {n_blank_trips} trip{?s} in {.file trips}."
+        ),
+        "i" = "Give these shapes a non-blank {.field shape_id}."
+      ),
+      class = "gtfstools_blank_shape_id"
+    )
+  }
+
   if (sort_sequence) {
     data.table::setorderv(shapes, c("shape_id", "shape_pt_sequence"))
   }
@@ -377,14 +395,7 @@ locate_stops_along_shapes <- function(gtfs,
   trips_without_shape <- st$trip_id[trip_start][!has_usable_shape & n_stops > 1]
 
   if (length(trips_without_shape) > 0) {
-    cli::cli_warn(
-      paste0(
-        "{length(trips_without_shape)} trip{?s} {?is/are} not linked to a ",
-        "shape with at least two distinct points: ",
-        "{.val {trips_without_shape}}."
-      ),
-      class = "gtfstools_trips_without_shape"
-    )
+    warn_trips_without_shape(trips_without_shape)
   }
 
   # trips sharing the same shape and the same sequence of stops (a pattern)
@@ -450,6 +461,32 @@ locate_stops_along_shapes <- function(gtfs,
   )
 
   return(position)
+}
+
+
+
+#' Warn about trips not linked to a usable shape
+#'
+#' @param trip_ids The `trip_id`s of the trips not linked to a shape with at
+#'   least two distinct points.
+#'
+#' @return Invisibly returns `NULL`. Raises a warning of class
+#'   `"gtfstools_trips_without_shape"`, whose `trip_id` field holds the given
+#'   `trip_id`s.
+#'
+#' @keywords internal
+warn_trips_without_shape <- function(trip_ids) {
+  cli::cli_warn(
+    paste0(
+      "{length(trip_ids)} trip{?s} {?is/are} not linked to a ",
+      "shape with at least two distinct points: ",
+      "{.val {trip_ids}}."
+    ),
+    class = "gtfstools_trips_without_shape",
+    trip_id = trip_ids
+  )
+
+  return(invisible(NULL))
 }
 
 

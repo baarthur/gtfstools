@@ -490,3 +490,34 @@ test_that("results don't depend on the number of threads", {
 
   expect_identical(two_threads, one_thread)
 })
+
+test_that("raises an informative error with a blank shape_id in shapes", {
+  blank_gtfs <- read_gtfs(spo_path)
+  blank_gtfs$trips[trip_id == "CPTM L07-0", shape_id := ""]
+
+  # a blank shape_id only in trips means that the trip has no shape
+
+  expect_warning(
+    tester(blank_gtfs, "CPTM L07-0"),
+    class = "gtfstools_trips_without_shape"
+  )
+
+  blank_shape <- spo_gtfs$trips[trip_id == "CPTM L07-0"]$shape_id
+  is_blank_shape <- blank_gtfs$shapes$shape_id == blank_shape
+  blank_gtfs$shapes[is_blank_shape, shape_id := ""]
+  expect_error(
+    tester(blank_gtfs, "CPTM L07-0"),
+    class = "gtfstools_blank_shape_id"
+  )
+  expect_error(
+    get_trip_geometry(blank_gtfs, "CPTM L07-0"),
+    class = "gtfstools_blank_shape_id"
+  )
+
+  # trips whose shapes have a non-blank shape_id are not affected
+
+  expect_identical(
+    tester(blank_gtfs, "6450-51-0"),
+    tester(trip_id = "6450-51-0")
+  )
+})

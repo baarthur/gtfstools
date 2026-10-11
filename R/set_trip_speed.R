@@ -8,7 +8,7 @@
 #'   average speed set.
 #' @param speed A numeric representing the speed to be set. Its length must
 #'   either equal 1, in which case the value is recycled for all
-#'   `trip_id`s, or equal `trip_id`'s length.
+#'   `trip_id`s, or equal `trip_id`'s length. Must be positive.
 #' @param unit A string representing the unit in which the speed is given. One
 #'   of `"km/h"` (the default), `"m/s"` or `"mph"` (miles per hour).
 #' @param first_stop A string. The `stop_id` where the segment whose speed is
@@ -123,6 +123,12 @@ set_trip_speed <- function(gtfs,
     checkmate::check_numeric(speed, len = length(trip_id), any.missing = FALSE),
     combine = "or"
   )
+  if (any(speed <= 0)) {
+    cli::cli_abort(
+      "{.arg speed} must be positive.",
+      class = "gtfstools_invalid_speed"
+    )
+  }
   checkmate::assert(
     checkmate::check_string(unit),
     checkmate::check_names(unit, subset.of = c("km/h", "m/s", "mph")),

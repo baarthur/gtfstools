@@ -162,6 +162,14 @@ utils::globalVariables(
     "is_invalid",
     "n_departures",
     "density_weight",
-    "value"
+    "value",
+    "t_dep",
+    "t_arr",
+    "label",
+    "prev_label",
+    "span_len",
+    "i.span_len",
+    "delay",
+    "last_arrival"
   )
 )

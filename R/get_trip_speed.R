@@ -30,7 +30,9 @@
 #' duration calculated by [get_trip_duration()] (with `by = "trip"`) or by
 #' [get_trip_segment_duration()] (with `by = "segment"`). Speeds are `NA` when
 #' the length is `NA` (e.g. trips not linked to a shape) or when the duration
-#' is missing (e.g. blank times at intermediate stops) or not positive.
+#' is missing (e.g. blank times at intermediate stops) or not positive. With
+#' `by = "trip"`, trips without any arrival or departure time raise the warning
+#' of [get_trip_duration()].
 #'
 #' Existing `_secs` columns in `stop_times` (e.g. created with
 #' [convert_time_to_seconds()]) are used as-is, not recalculated from the time

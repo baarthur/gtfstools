@@ -24,7 +24,7 @@ average speed set.}
 
 \item{speed}{A numeric representing the speed to be set. Its length must
 either equal 1, in which case the value is recycled for all
-\code{trip_id}s, or equal \code{trip_id}'s length.}
+\code{trip_id}s, or equal \code{trip_id}'s length. Must be positive.}
 
 \item{unit}{A string representing the unit in which the speed is given. One
 of \code{"km/h"} (the default), \code{"m/s"} or \code{"mph"} (miles per hour).}

@@ -160,3 +160,43 @@ test_that("doesn't change given gtfs (except for stop_times index)", {
   expect_error(tester(gtfs = new_gtfs), "interrupted")
   expect_identical(names(new_gtfs$stop_times), names(stop_times_before))
 })
+
+test_that("trips without times get NA durations, with a warning", {
+  blank_gtfs <- read_gtfs(data_path)
+  trip_ids <- sort(unique(blank_gtfs$stop_times$trip_id))
+  blank_trips <- trip_ids[c(1, 10)]
+  blank_gtfs$stop_times[
+    trip_id %chin% blank_trips,
+    `:=`(arrival_time = "", departure_time = "")
+  ]
+
+  expected <- get_trip_duration(gtfs, unit = "s")
+  expected[trip_id %chin% blank_trips, duration := NA]
+
+  old_options <- options(datatable.optimize = Inf)
+  on.exit(options(old_options), add = TRUE)
+
+  for (optimize in c(Inf, 0L)) {
+    options(datatable.optimize = optimize)
+
+    expect_warning(
+      result <- get_trip_duration(blank_gtfs, unit = "s"),
+      class = "gtfstools_trips_without_times"
+    )
+    expect_identical(result, expected)
+    expect_type(result$duration, "integer")
+
+    expect_warning(
+      result <- get_trip_duration(blank_gtfs, blank_trips, unit = "s"),
+      class = "gtfstools_trips_without_times"
+    )
+    expect_identical(result, expected[trip_id %chin% blank_trips])
+  }
+  options(old_options)
+
+  expect_warning(
+    speeds <- get_trip_speed(blank_gtfs, blank_trips),
+    class = "gtfstools_trips_without_times"
+  )
+  expect_true(all(is.na(speeds$speed)))
+})

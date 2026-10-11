@@ -59,7 +59,9 @@ The speed is the length calculated by \code{\link[=get_trip_length]{get_trip_len
 duration calculated by \code{\link[=get_trip_duration]{get_trip_duration()}} (with \code{by = "trip"}) or by
 \code{\link[=get_trip_segment_duration]{get_trip_segment_duration()}} (with \code{by = "segment"}). Speeds are \code{NA} when
 the length is \code{NA} (e.g. trips not linked to a shape) or when the duration
-is missing (e.g. blank times at intermediate stops) or not positive.
+is missing (e.g. blank times at intermediate stops) or not positive. With
+\code{by = "trip"}, trips without any arrival or departure time raise the warning
+of \code{\link[=get_trip_duration]{get_trip_duration()}}.
 
 Existing \verb{_secs} columns in \code{stop_times} (e.g. created with
 \code{\link[=convert_time_to_seconds]{convert_time_to_seconds()}}) are used as-is, not recalculated from the time
