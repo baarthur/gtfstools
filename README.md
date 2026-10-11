@@ -62,6 +62,9 @@ Please read **gtfstools** vignettes for more on the package usage:
 - Querying GTFS feeds. Run `vignette("querying", package = "gtfstools")`
   or check it on the website ([Querying GTFS
   feeds](https://ipea.github.io/gtfstools/articles/querying.html)).
+- Mapping GTFS feeds. Run `vignette("mapping", package = "gtfstools")`
+  or check it on the website ([Mapping GTFS
+  feeds](https://ipea.github.io/gtfstools/articles/mapping.html)).
 - Validating GTFS feeds. Run
   `vignette("validating", package = "gtfstools")` or check it on the
   website ([Validating GTFS

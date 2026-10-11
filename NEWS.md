@@ -40,6 +40,7 @@
 - `write_gtfs()` gains the `compression_level` argument. Its default, 6 (previously always 9), makes writing about 2 to 3 times faster for files of very similar size.
 - New vignette "Editing GTFS feeds", which lists the functions that edit feeds and demonstrates `set_route_frequency()`, `set_trip_speed()`, `stop_times_to_frequencies()` and `interpolate_stop_times()`.
 - New vignette "Querying GTFS feeds", which demonstrates `get_route_frequency()`, `get_stop_frequency()`, `get_stop_timetable()`, `get_trip_length()`, `get_trip_duration()`, `get_trip_speed()` and `get_summary()`.
+- New vignette "Mapping GTFS feeds", which maps the transit network, routes by speed and stops by frequency with `convert_shapes_to_sf()`, `get_route_geometry()` and `convert_stops_to_sf()`.
 
 ## Bug fixes
 
