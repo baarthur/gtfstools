@@ -30,10 +30,11 @@ dealing with GTFS data.
 In order to answer these puzzling questions, **gtfstools** includes
 `validate_gtfs()`, a function that wraps the [Canonical GTFS
 Validator](https://github.com/MobilityData/gtfs-validator) developed by
-MobilityData. The validator requires Java 11 or higher to run - you can check
+MobilityData. The validator requires Java 11 or higher to run (recent versions
+require Java 17 or higher) - you can check
 the version you have currently installed with the command `java -version` on a
 terminal session or with the command `system("java -version")` from your R
-session. If need be, you can download Java 11 from
+session. If need be, you can download Java from
 https://www.oracle.com/java/technologies/downloads.
 
 Using `validate_gtfs()` is very simple and requires no more than a few function

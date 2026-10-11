@@ -1,7 +1,7 @@
 #' Get distances between stops
 #'
-#' Returns the Euclidean distance between each pair of stops visited by the given trips
-#' and/or routes.
+#' Returns the great-circle distance between each pair of stops visited by the
+#' given trips and/or routes.
 #'
 #' @template gtfs
 #' @param trip_id A character vector including the `trip_id`s whose stops

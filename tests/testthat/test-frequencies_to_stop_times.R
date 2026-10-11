@@ -500,3 +500,27 @@ test_that("doesn't change given gtfs with other strategies", {
   data.table::setindex(gtfs$trips, NULL)
   expect_identical(gtfs, original_gtfs)
 })
+
+test_that("arrivals before 00:00:00 are set to 00:00:00", {
+  dwell_gtfs <- read_gtfs(data_path)
+  dwell_gtfs$frequencies <- data.table::data.table(
+    trip_id = trip_id,
+    start_time = "00:00:00",
+    end_time = "01:00:00",
+    headway_secs = 1800L
+  )
+  first_stop <- dwell_gtfs$stop_times$trip_id == trip_id &
+    dwell_gtfs$stop_times$stop_sequence == 1L
+  first_departure <- dwell_gtfs$stop_times$departure_time[first_stop]
+  dwell_gtfs$stop_times[
+    first_stop,
+    arrival_time := seconds_to_string(string_to_seconds(first_departure) - 60L)
+  ]
+
+  result <- tester(dwell_gtfs)
+  first_stops <- result$stop_times[
+    startsWith(trip_id, "CPTM L07-0_") & stop_sequence == 1L
+  ]
+  expect_identical(first_stops$arrival_time, c("00:00:00", "00:29:00"))
+  expect_identical(first_stops$departure_time, c("00:00:00", "00:30:00"))
+})

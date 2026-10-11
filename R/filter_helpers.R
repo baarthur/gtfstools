@@ -48,8 +48,13 @@ filter_fare_attr_from_agency_id <- function(gtfs,
       "agency_id",
       "character"
     )
+    # fares without an agency_id can't be matched to an agency, so they're
+    # always kept
+
     gtfs$fare_attributes <- gtfs$fare_attributes[
-      agency_id %ffilter% relevant_agencies
+      is.na(agency_id) |
+        agency_id %chin% "" |
+        agency_id %ffilter% relevant_agencies
     ]
   }
 

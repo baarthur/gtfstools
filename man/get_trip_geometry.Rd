@@ -9,7 +9,7 @@ get_trip_geometry(
   trip_id = NULL,
   method = "shapes",
   crs = 4326,
-  sort_sequence = TRUE,
+  sort_sequence,
   file = NULL
 )
 }
@@ -30,11 +30,9 @@ doesn't have a \code{shapes} table, or if its \code{trips} table doesn't have a
 \item{crs}{The CRS of the resulting object, either as an EPSG code or as an
 \code{crs} object. Defaults to 4326 (WGS 84).}
 
-\item{sort_sequence}{A logical specifying whether to sort timetables and
-shapes by \code{stop_sequence} and \code{shape_pt_sequence}, respectively. Defaults
-to \code{TRUE}. Set to \code{FALSE} only if these tables are known to be ordered.
-Geometries generated from unordered sequences do not correctly depict the
-trip trajectories.}
+\item{sort_sequence}{Deprecated; do not supply. Timetables and shapes are
+now always sorted by \code{stop_sequence} and \code{shape_pt_sequence}. Passing
+\code{TRUE} raises a warning, and passing \code{FALSE} raises an error.}
 
 \item{file}{Deprecated. Use \code{method} instead (\code{file = "stop_times"}
 corresponds to \code{method = "euclidean"}).}

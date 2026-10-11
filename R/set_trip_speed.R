@@ -8,7 +8,8 @@
 #'   average speed set.
 #' @param speed A numeric representing the speed to be set. Its length must
 #'   either equal 1, in which case the value is recycled for all
-#'   `trip_id`s, or equal `trip_id`'s length. Must be positive.
+#'   `trip_id`s, or equal `trip_id`'s length. Must be positive and finite. A
+#'   `trip_id` listed more than once must be given the same speed.
 #' @param unit A string representing the unit in which the speed is given. One
 #'   of `"km/h"` (the default), `"m/s"` or `"mph"` (miles per hour).
 #' @param first_stop A string. The `stop_id` where the segment whose speed is
@@ -123,11 +124,24 @@ set_trip_speed <- function(gtfs,
     checkmate::check_numeric(speed, len = length(trip_id), any.missing = FALSE),
     combine = "or"
   )
-  if (any(speed <= 0)) {
+  if (any(speed <= 0 | !is.finite(speed))) {
     cli::cli_abort(
-      "{.arg speed} must be positive.",
+      "{.arg speed} must be positive and finite.",
       class = "gtfstools_invalid_speed"
     )
+  }
+  if (length(speed) > 1) {
+    first_speed <- speed[match(trip_id, trip_id)]
+    if (any(speed != first_speed)) {
+      conflicting_ids <- unique(trip_id[speed != first_speed])
+      cli::cli_abort(
+        paste0(
+          "Different speeds were given to the same trip{?s}: ",
+          "{.val {conflicting_ids}}."
+        ),
+        class = "gtfstools_conflicting_speeds"
+      )
+    }
   }
   checkmate::assert(
     checkmate::check_string(unit),

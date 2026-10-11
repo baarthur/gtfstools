@@ -5,7 +5,9 @@
 #' @param ... GTFS objects to be merged. Each argument can either be a GTFS or
 #' a list of GTFS objects.
 #' @param files A character vector listing the GTFS tables to be merged. If
-#' `NULL` (the default), all tables are merged.
+#' `NULL` (the default), all tables are merged. Elements that are not tables,
+#' such as the `locations` of GTFS-Flex feeds (read from a geojson file), are
+#' not merged and are left out of the result, with a warning.
 #' @param prefix Either a logical or a character vector (defaults to `FALSE`).
 #' Whether to add a prefix to the value of id fields that identify from which
 #' GTFS object the value comes from. If `TRUE`, the prefixes will range from
@@ -94,18 +96,51 @@ merge_gtfs <- function(..., files = NULL, prefix = FALSE) {
   if (!is.null(files)) {
     invalid_files <- files[! files %chin% files_within_gtfs]
     files_to_merge <- files[! files %chin% invalid_files]
+  }
+
+  # elements that are not tables, such as the 'locations' of GTFS-Flex feeds
+  # (read from a geojson file as a list), can't be merged with rbindlist(), so
+  # they are left out of the merged feed
+
+  is_table <- vapply(
+    files_to_merge,
+    function(file) {
+      all(
+        vapply(
+          gtfs_objects,
+          function(g) is.null(g[[file]]) || is.data.frame(g[[file]]),
+          logical(1)
+        )
+      )
+    },
+    logical(1)
+  )
+
+  if (!all(is_table)) {
+    unmerged_files <- files_to_merge[!is_table]
+    files_to_merge <- files_to_merge[is_table]
+
+    cli::cli_warn(
+      paste0(
+        "The following element{?s} {?is/are} not {?a table/tables} and ",
+        "{?was/were} not merged: {.file {unmerged_files}}."
+      ),
+      class = "gtfstools_unmerged_files"
+    )
+  }
+
+  if (!is.null(files)) {
+    if (identical(files_to_merge, character(0))) {
+      stop(
+        "None of the GTFS to be merged contain the files passed to 'files'"
+      )
+    }
 
     if (!identical(invalid_files, character(0))) {
-      if (!identical(files_to_merge, character(0))) {
-        warning(
-          "None of the GTFS to be merged contain the following files: ",
-          paste0("'", invalid_files, "'", collapse = ", ")
-        )
-      } else if (identical(files_to_merge, character(0))) {
-        stop(
-          "None of the GTFS to be merged contain the files passed to 'files'"
-        )
-      }
+      warning(
+        "None of the GTFS to be merged contain the following files: ",
+        paste0("'", invalid_files, "'", collapse = ", ")
+      )
     }
   }
 

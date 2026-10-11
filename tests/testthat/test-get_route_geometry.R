@@ -9,18 +9,15 @@ route_id <- "CPTM L07"
 tester <- function(gtfs = get("gtfs", envir = parent.frame()),
                    route_id = NULL,
                    method = "shapes",
-                   crs = 4326,
-                   sort_sequence = TRUE) {
-  get_route_geometry(gtfs, route_id, method, crs, sort_sequence)
+                   crs = 4326) {
+  get_route_geometry(gtfs, route_id, method, crs)
 }
 
 # the variants of each route, computed from the geometries of all trips listed
 # in 'trips' (only their first entry), with the count of trips of each variant
 
-oracle <- function(gtfs, method = "shapes", sort_sequence = TRUE) {
-  trip_geom <- suppressWarnings(
-    get_trip_geometry(gtfs, method = method, sort_sequence = sort_sequence)
-  )
+oracle <- function(gtfs, method = "shapes") {
+  trip_geom <- suppressWarnings(get_trip_geometry(gtfs, method = method))
   trips <- gtfs$trips[!duplicated(gtfs$trips$trip_id)]
   trip_geom <- trip_geom[trip_geom$trip_id %chin% trips$trip_id, ]
 
@@ -93,9 +90,6 @@ test_that("raises errors due to incorrect input types/value", {
   expect_error(tester(method = "stop_times"))
   expect_error(tester(method = c("shapes", "euclidean")))
   expect_error(tester(crs = "4674"))
-  expect_error(tester(sort_sequence = "FALSE"))
-  expect_error(tester(sort_sequence = NA))
-  expect_error(tester(sort_sequence = c(TRUE, TRUE)))
 })
 
 test_that("raises errors if gtfs doesn't have required files/fields", {
@@ -107,13 +101,6 @@ test_that("raises errors if gtfs doesn't have required files/fields", {
   expect_error(tester(copy_gtfs_without_field(gtfs, "stops", "stop_lat")))
   expect_error(
     tester(copy_gtfs_without_field(gtfs, "stop_times", "stop_sequence"))
-  )
-  expect_s3_class(
-    tester(
-      copy_gtfs_without_field(gtfs, "stop_times", "stop_sequence"),
-      sort_sequence = FALSE
-    ),
-    "sf"
   )
   expect_error(
     tester(copy_gtfs_diff_field_class(gtfs, "trips", "shape_id", "factor"))
@@ -149,12 +136,7 @@ test_that("results in a LINESTRING sf with the right columns", {
 
 test_that("variants and their numbers of trips are correct", {
   for (method in c("shapes", "euclidean")) {
-    for (sort_sequence in c(TRUE, FALSE)) {
-      expect_identical(
-        as_variants(tester(method = method, sort_sequence = sort_sequence)),
-        oracle(gtfs, method, sort_sequence)
-      )
-    }
+    expect_identical(as_variants(tester(method = method)), oracle(gtfs, method))
   }
 
   # ggl doesn't have shapes, ber does
@@ -170,10 +152,8 @@ test_that("handles edge cases correctly", {
   feed <- edge_feed()
 
   for (method in c("shapes", "euclidean")) {
-    result <- suppressWarnings(
-      tester(feed, method = method, sort_sequence = FALSE)
-    )
-    expect_identical(as_variants(result), oracle(feed, method, FALSE))
+    result <- suppressWarnings(tester(feed, method = method))
+    expect_identical(as_variants(result), oracle(feed, method))
 
     # the ghost trip and the second entry of the duplicated trip are ignored,
     # and the trip without route_id gets a NA route_id
@@ -286,14 +266,8 @@ test_that("doesn't change given gtfs", {
   expect_identical(original_gtfs, gtfs)
 
   for (method in c("shapes", "euclidean")) {
-    for (sort_sequence in c(TRUE, FALSE)) {
-      result <- tester(method = method, sort_sequence = sort_sequence)
-      result <- tester(
-        route_id = route_id,
-        method = method,
-        sort_sequence = sort_sequence
-      )
-      expect_identical(original_gtfs, gtfs)
-    }
+    result <- tester(method = method)
+    result <- tester(route_id = route_id, method = method)
+    expect_identical(original_gtfs, gtfs)
   }
 })

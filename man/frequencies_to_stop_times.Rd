@@ -70,6 +70,11 @@ suffix to the newly created trips to differentiate each one of them (e.g. in
 this case, the new trips, described in the \code{trips} and \code{stop_times} tables,
 would be called \code{"example_trip_1"} and \code{"example_trip_2"}).
 
+The times of each new trip are those of its template, shifted so that it
+departs from the first stop at the departure time. When the template has a
+dwell time at the first stop, a departure close to midnight may yield an
+arrival before 00:00:00, which is set to 00:00:00 instead.
+
 Existing \verb{_secs} columns in \code{stop_times} and \code{frequencies} (e.g. created
 with \code{\link[=convert_time_to_seconds]{convert_time_to_seconds()}}) are used as-is, not recalculated from the
 time strings.

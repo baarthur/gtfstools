@@ -5,9 +5,11 @@
 #'
 #' @template gtfs
 #' @param stop_id A character vector. The `stop_id`s used to filter the data.
-#' @param keep A logical. Whether the entries related to the `trip_id`s that
-#'   passes through the specified `stop_id`s should be kept or dropped (defaults
-#'   to `TRUE`, which keeps the entries).
+#' @param keep A logical. Whether the `stop_times` entries at the specified
+#'   `stop_id`s (and the entries related to them in other tables) should be
+#'   kept or dropped (defaults to `TRUE`, which keeps the entries). Trips that
+#'   still have entries in `stop_times` are kept. To keep or drop entire trips,
+#'   pass the `trip_id`s that serve these stops to [filter_by_trip_id()].
 #' @param include_children A logical. Whether the filtered output should
 #'   keep/drop children stops of those specified in `stop_id`. Defaults to
 #'   `TRUE` - i.e. by default children stops are kept if their parents are kept
@@ -39,11 +41,11 @@
 #'
 #' object.size(gtfs)
 #'
-#' # keeps entries related to trips that pass through specified stop_ids
+#' # keeps the stop_times entries at the specified stop_ids
 #' smaller_gtfs <- filter_by_stop_id(gtfs, stop_ids)
 #' object.size(smaller_gtfs)
 #'
-#' # drops entries related to trips that pass through specified stop_ids
+#' # drops the stop_times entries at the specified stop_ids
 #' smaller_gtfs <- filter_by_stop_id(gtfs, stop_ids, keep = FALSE)
 #' object.size(smaller_gtfs)
 #' @export

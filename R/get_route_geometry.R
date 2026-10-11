@@ -16,11 +16,6 @@
 #'   `"euclidean"` is used instead, with a warning.
 #' @param crs The CRS of the resulting object, either as an EPSG code or as an
 #'   `crs` object. Defaults to 4326 (WGS 84).
-#' @param sort_sequence A logical specifying whether to sort timetables and
-#'   shapes by `stop_sequence` and `shape_pt_sequence`, respectively. Defaults
-#'   to `TRUE`. Set to `FALSE` only if these tables are known to be ordered.
-#'   Geometries generated from unordered sequences do not correctly depict the
-#'   trip trajectories.
 #'
 #' @return A `LINESTRING sf` with one row per route and distinct trip
 #'   geometry, with the columns `route_id`, `n_trips` (the number of trips of
@@ -68,8 +63,7 @@
 get_route_geometry <- function(gtfs,
                                route_id = NULL,
                                method = "shapes",
-                               crs = 4326,
-                               sort_sequence = TRUE) {
+                               crs = 4326) {
   gtfs <- assert_and_assign_gtfs_object(gtfs)
   checkmate::assert_character(route_id, null.ok = TRUE, any.missing = FALSE)
   checkmate::assert(
@@ -82,7 +76,6 @@ get_route_geometry <- function(gtfs,
     checkmate::check_class(crs, "crs"),
     combine = "or"
   )
-  checkmate::assert_logical(sort_sequence, any.missing = FALSE, len = 1)
 
   gtfsio::assert_field_class(
     gtfs,
@@ -91,17 +84,11 @@ get_route_geometry <- function(gtfs,
     c("character", "character")
   )
 
-  stop_times_cols <- c("trip_id", "stop_id")
-  stop_times_classes <- c("character", "character")
-  if (sort_sequence) {
-    stop_times_cols <- c(stop_times_cols, "stop_sequence")
-    stop_times_classes <- c(stop_times_classes, "integer")
-  }
   gtfsio::assert_field_class(
     gtfs,
     "stop_times",
-    stop_times_cols,
-    stop_times_classes
+    c("trip_id", "stop_id", "stop_sequence"),
+    c("character", "character", "integer")
   )
   gtfsio::assert_field_class(
     gtfs,
@@ -156,8 +143,7 @@ get_route_geometry <- function(gtfs,
 
   st <- prepare_trip_stops(
     gtfs,
-    if (all(is_selected)) NULL else trip_ids[is_selected],
-    sort_sequence
+    if (all(is_selected)) NULL else trip_ids[is_selected]
   )
 
   trip_start <- which(!duplicated(st$trip_id))
@@ -185,7 +171,7 @@ get_route_geometry <- function(gtfs,
   # groups, as if the geometries of all trips had been generated
 
   trip_geometry <- withCallingHandlers(
-    get_trip_geometry(gtfs, group_trip_ids, method, crs, sort_sequence),
+    get_trip_geometry(gtfs, group_trip_ids, method, crs),
     gtfstools_trips_without_shape = function(cnd) {
       warned_group <- data.table::chmatch(cnd$trip_id, group_trip_ids)
       warn_trips_without_shape(st_trip_ids[group %in% warned_group])

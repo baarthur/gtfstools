@@ -50,6 +50,11 @@
 #' this case, the new trips, described in the `trips` and `stop_times` tables,
 #' would be called `"example_trip_1"` and `"example_trip_2"`).
 #'
+#' The times of each new trip are those of its template, shifted so that it
+#' departs from the first stop at the departure time. When the template has a
+#' dwell time at the first stop, a departure close to midnight may yield an
+#' arrival before 00:00:00, which is set to 00:00:00 instead.
+#'
 #' Existing `_secs` columns in `stop_times` and `frequencies` (e.g. created
 #' with [convert_time_to_seconds()]) are used as-is, not recalculated from the
 #' time strings.
@@ -280,6 +285,15 @@ frequencies_to_stop_times <- function(gtfs,
       departure_time_secs = departure_time_secs + seconds_to_add,
       arrival_time_secs = arrival_time_secs + seconds_to_add
     )
+  ]
+
+  # the arrival at the first stop is earlier than the first departure when
+  # there's a dwell time there, so departures close to midnight may yield
+  # negative arrivals, which are set to 00:00:00 instead
+
+  stop_times_to_add[
+    arrival_time_secs < 0L,
+    arrival_time_secs := 0L
   ]
   stop_times_to_add[
     ,

@@ -7,11 +7,9 @@
 #'   If `NULL` (the default), all shapes are converted.
 #' @param crs The CRS of the resulting object, either as an EPSG code or as an
 #'   `crs` object. Defaults to 4326 (WGS 84).
-#' @param sort_sequence A logical. Whether to sort shapes by
-#'   `shape_pt_sequence`. Defaults to `TRUE`. Sorting an already ordered table is
-#'   cheap, and shapes generated from unordered sequences do not correctly
-#'   depict the real life trip shapes. Set to `FALSE` only if the shapes are
-#'   known to be ordered.
+#' @param sort_sequence Deprecated; do not supply. Shapes are now always sorted
+#'   by `shape_pt_sequence`. Passing `TRUE` raises a warning, and passing
+#'   `FALSE` raises an error.
 #'
 #' @return A `LINESTRING sf` object.
 #'
@@ -34,7 +32,15 @@
 convert_shapes_to_sf <- function(gtfs,
                                  shape_id = NULL,
                                  crs = 4326,
-                                 sort_sequence = TRUE) {
+                                 sort_sequence) {
+  if (!missing(sort_sequence)) {
+    check_deprecated_sort_sequence(
+      sort_sequence,
+      "convert_shapes_to_sf",
+      "shape_pt_sequence"
+    )
+  }
+
   gtfs <- assert_and_assign_gtfs_object(gtfs)
   checkmate::assert_character(shape_id, null.ok = TRUE, any.missing = FALSE)
   checkmate::assert(
@@ -42,15 +48,13 @@ convert_shapes_to_sf <- function(gtfs,
     checkmate::check_class(crs, "crs"),
     combine = "or"
   )
-  checkmate::assert_logical(sort_sequence, any.missing = FALSE, len = 1)
 
-  required_cols <- c("shape_id", "shape_pt_lat", "shape_pt_lon")
-  required_classes <- c("character", "numeric", "numeric")
-  if (sort_sequence) {
-    required_cols <- c(required_cols, "shape_pt_sequence")
-    required_classes <- c(required_classes, "integer")
-  }
-  gtfsio::assert_field_class(gtfs, "shapes", required_cols, required_classes)
+  gtfsio::assert_field_class(
+    gtfs,
+    "shapes",
+    c("shape_id", "shape_pt_lat", "shape_pt_lon", "shape_pt_sequence"),
+    c("character", "numeric", "numeric", "integer")
+  )
 
   # select relevant shape_ids and raise warning/error if given shape_ids don't
   # exist in shapes
@@ -65,10 +69,8 @@ convert_shapes_to_sf <- function(gtfs,
     shapes <- gtfs$shapes
   }
 
-  if (sort_sequence) {
-    if (is.null(shape_id)) shapes <- data.table::copy(shapes)
-    shapes <- data.table::setorderv(shapes, c("shape_id", "shape_pt_sequence"))
-  }
+  if (is.null(shape_id)) shapes <- data.table::copy(shapes)
+  shapes <- data.table::setorderv(shapes, c("shape_id", "shape_pt_sequence"))
 
   # create an empty LINESTRING sf if shapes is empty
 

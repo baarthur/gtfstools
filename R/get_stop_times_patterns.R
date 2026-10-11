@@ -10,12 +10,9 @@
 #'   analyses the pattern of every `trip_id` in the GTFS.
 #' @param type A string specifying the type of patterns to be analyzed. Either
 #'   `"spatial"` (the default) or "spatiotemporal".
-#' @param sort_sequence A logical specifying whether to sort timetables by
-#'   `stop_sequence`. Defaults to `TRUE`. Sorting an already ordered table is
-#'   cheap, and pattern identification based on unordered timetables may result
-#'   in multiple ids identifying what would be the same pattern, had the table
-#'   been ordered. Set to `FALSE` only if the timetables are known to be
-#'   ordered.
+#' @param sort_sequence Deprecated; do not supply. Timetables are now always
+#'   sorted by `stop_sequence`. Passing `TRUE` raises a warning, and passing
+#'   `FALSE` raises an error.
 #'
 #' @return A `data.table` associating each `trip_id` to a `pattern_id`.
 #'
@@ -28,13 +25,11 @@
 #' the trip started is ignored (e.g. if two trips depart from stop A and follow
 #' the same sequence of stops to arrive at stop B, taking both 1 hour to do so,
 #' their spatiotemporal pattern will be considered the same, even if one
-#' departed at 6 am and another at 7 am). Please also note that the
-#' `stop_sequence` field is currently ignored - which means that two stops are
-#' considered to follow the same sequence if one is listed right below the
-#' other on the `stop_times` table (e.g. if trip X lists stops A followed by
-#' stop B with `stop_sequence`s 1 and 2, and trip Y lists stops A followed by
-#' stop B with `stop_sequence`s 1 and 3, they are assigned to the same
-#' `pattern_id`).
+#' departed at 6 am and another at 7 am). Please also note that only the order
+#' given by `stop_sequence` matters, not its values - e.g. if trip X lists stops
+#' A followed by stop B with `stop_sequence`s 1 and 2, and trip Y lists stops A
+#' followed by stop B with `stop_sequence`s 1 and 3, they are assigned to the
+#' same `pattern_id`.
 #'
 #' Existing `_secs` columns in `stop_times` (e.g. created with
 #' [convert_time_to_seconds()]) are used as-is, not recalculated from the time
@@ -71,7 +66,15 @@
 get_stop_times_patterns <- function(gtfs,
                                     trip_id = NULL,
                                     type = "spatial",
-                                    sort_sequence = TRUE) {
+                                    sort_sequence) {
+  if (!missing(sort_sequence)) {
+    check_deprecated_sort_sequence(
+      sort_sequence,
+      "get_stop_times_patterns",
+      "stop_sequence"
+    )
+  }
+
   gtfs <- assert_and_assign_gtfs_object(gtfs)
   checkmate::assert_character(trip_id, null.ok = TRUE, any.missing = FALSE)
   checkmate::assert(
@@ -79,17 +82,12 @@ get_stop_times_patterns <- function(gtfs,
     checkmate::check_names(type, subset.of = c("spatial", "spatiotemporal")),
     combine = "and"
   )
-  checkmate::assert_logical(sort_sequence, any.missing = FALSE, len = 1)
 
-  must_exist <- c("trip_id", "stop_id")
-  classes <- rep("character", 2)
+  must_exist <- c("trip_id", "stop_id", "stop_sequence")
+  classes <- c("character", "character", "integer")
   if (type == "spatiotemporal") {
     must_exist <- c(must_exist, "departure_time", "arrival_time")
     classes <- c(classes, rep("character", 2))
-  }
-  if (sort_sequence) {
-    must_exist <- c(must_exist, "stop_sequence")
-    classes <- c(classes, "integer")
   }
   gtfsio::assert_field_class(
     gtfs,
@@ -111,10 +109,8 @@ get_stop_times_patterns <- function(gtfs,
     patterns <- gtfs$stop_times
   }
 
-  if (sort_sequence) {
-    if (is.null(trip_id)) patterns <- data.table::copy(patterns)
-    patterns <- data.table::setorderv(patterns, c("trip_id", "stop_sequence"))
-  }
+  if (is.null(trip_id)) patterns <- data.table::copy(patterns)
+  patterns <- data.table::setorderv(patterns, c("trip_id", "stop_sequence"))
 
   # each trip's sequence of stops is described by integer codes, which are
   # compared by cpp_sequence_pattern_id()
@@ -122,24 +118,9 @@ get_stop_times_patterns <- function(gtfs,
   stop_codes <- data.table::chmatch(patterns$stop_id, unique(patterns$stop_id))
 
   # the rows of each trip must be contiguous and the trips ordered as keyby
-  # would order them. when sort_sequence is TRUE, setorderv() above already did
-  # that. otherwise, data.table's ordering is used instead of order(method =
-  # "radix"), which sorts strings by their bytes and would separate the rows of
-  # a trip_id written in different encodings. the ordering is stable, so the
-  # rows of each trip keep their order
+  # would order them, which setorderv() above already did
 
   tid <- patterns$trip_id
-
-  if (!sort_sequence) {
-    ord <- data.table::setorderv(
-      data.table::data.table(i = seq_along(tid), trip_id = tid),
-      "trip_id",
-      na.last = FALSE
-    )$i
-    tid <- tid[ord]
-    stop_codes <- stop_codes[ord]
-  }
-
   trip_start <- which(!duplicated(tid))
   n_stops <- diff(c(trip_start, length(tid) + 1L))
 
@@ -161,11 +142,6 @@ get_stop_times_patterns <- function(gtfs,
 
     dep <- patterns$departure_time_secs
     arr <- patterns$arrival_time_secs
-
-    if (!sort_sequence) {
-      dep <- dep[ord]
-      arr <- arr[ord]
-    }
 
     # times are compared relative to the first departure of each trip: its
     # smallest non-NA departure, found by sorting the departures within each

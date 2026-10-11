@@ -4,13 +4,7 @@
 \alias{get_route_geometry}
 \title{Get route geometry}
 \usage{
-get_route_geometry(
-  gtfs,
-  route_id = NULL,
-  method = "shapes",
-  crs = 4326,
-  sort_sequence = TRUE
-)
+get_route_geometry(gtfs, route_id = NULL, method = "shapes", crs = 4326)
 }
 \arguments{
 \item{gtfs}{A GTFS object, as created by \code{\link[=read_gtfs]{read_gtfs()}}.}
@@ -28,12 +22,6 @@ specifying how the geometry of each trip is generated. Please see
 
 \item{crs}{The CRS of the resulting object, either as an EPSG code or as an
 \code{crs} object. Defaults to 4326 (WGS 84).}
-
-\item{sort_sequence}{A logical specifying whether to sort timetables and
-shapes by \code{stop_sequence} and \code{shape_pt_sequence}, respectively. Defaults
-to \code{TRUE}. Set to \code{FALSE} only if these tables are known to be ordered.
-Geometries generated from unordered sequences do not correctly depict the
-trip trajectories.}
 }
 \value{
 A \verb{LINESTRING sf} with one row per route and distinct trip

@@ -9,9 +9,18 @@ test_that("raises errors due to incorrect input types", {
   expect_error(convert_shapes_to_sf(gtfs, shape_id = NA))
   expect_error(convert_shapes_to_sf(gtfs, crs = "4326"))
   expect_error(convert_shapes_to_sf(gtfs, crs = NA))
-  expect_error(convert_shapes_to_sf(gtfs, sort_sequence = "FALSE"))
-  expect_error(convert_shapes_to_sf(gtfs, sort_sequence = NA))
-  expect_error(convert_shapes_to_sf(gtfs, sort_sequence = c(TRUE, TRUE)))
+  expect_error(
+    convert_shapes_to_sf(gtfs, sort_sequence = "FALSE"),
+    regexp = "sort_sequence"
+  )
+  expect_error(
+    convert_shapes_to_sf(gtfs, sort_sequence = NA),
+    regexp = "sort_sequence"
+  )
+  expect_error(
+    convert_shapes_to_sf(gtfs, sort_sequence = c(TRUE, TRUE)),
+    regexp = "sort_sequence"
+  )
 
   wrong_types_gtfs <- read_gtfs(data_path)
   wrong_types_gtfs$shapes[, shape_id := as.factor(shape_id)]
@@ -35,7 +44,7 @@ test_that("raises errors due to incorrect input types", {
   ]
   expect_error(convert_shapes_to_sf(wrong_types_gtfs))
 
-  # shape_pt_sequence is required when sort_sequence = TRUE
+  # shape_pt_sequence is always required
   wrong_types_gtfs$shapes[
     ,
     `:=`(
@@ -43,7 +52,7 @@ test_that("raises errors due to incorrect input types", {
       shape_pt_sequence = as.character(shape_pt_sequence)
     )
   ]
-  expect_error(convert_shapes_to_sf(wrong_types_gtfs, sort_sequence = TRUE))
+  expect_error(convert_shapes_to_sf(wrong_types_gtfs))
 })
 
 test_that("convert correct shapes", {
@@ -92,21 +101,25 @@ test_that("returns a LINESTRING sf with correct crs", {
   expect_s3_class(shapes_sf$geometry, "sfc_LINESTRING")
 })
 
-test_that("sort_sequence works correctly", {
+test_that("shapes are sorted by shape_pt_sequence", {
   shapes_sf <- convert_shapes_to_sf(gtfs, "17846")
 
   unordered_gtfs <- gtfs
   unordered_gtfs$shapes <- gtfs$shapes[shape_id == "17846"]
   unordered_gtfs$shapes <- unordered_gtfs$shapes[c(200:547, 1:199)]
 
-  unordered_sf <- convert_shapes_to_sf(unordered_gtfs, sort_sequence = FALSE)
-  expect_false(identical(unordered_sf, shapes_sf))
-
-  ordered_sf <- convert_shapes_to_sf(unordered_gtfs, sort_sequence = TRUE)
-  expect_identical(ordered_sf, shapes_sf)
-
-  # sort_sequence defaults to TRUE (#94)
   expect_identical(convert_shapes_to_sf(unordered_gtfs), shapes_sf)
+})
+
+test_that("sort_sequence is deprecated", {
+  expect_warning(
+    convert_shapes_to_sf(gtfs, "17846", sort_sequence = TRUE),
+    class = "deprecated_sort_sequence"
+  )
+  expect_error(
+    convert_shapes_to_sf(gtfs, "17846", sort_sequence = FALSE),
+    class = "gtfstools_defunct_sort_sequence_error"
+  )
 })
 
 test_that("doesn't change passed gtfs object (only the index of gtfs$shapes)", {
@@ -116,9 +129,5 @@ test_that("doesn't change passed gtfs object (only the index of gtfs$shapes)", {
 
   # 'shape_id' is set as gtfs$shapes index because of data.table subset
   data.table::setindex(gtfs$shapes, NULL)
-  expect_identical(original_gtfs, gtfs)
-
-  # should also work when sorting shapes
-  shapes_sf <- convert_shapes_to_sf(gtfs, sort_sequence = TRUE)
   expect_identical(original_gtfs, gtfs)
 })

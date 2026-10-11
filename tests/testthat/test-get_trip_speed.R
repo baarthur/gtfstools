@@ -6,9 +6,8 @@ tester <- function(gtfs = get("gtfs", envir = parent.frame()),
                    trip_id = NULL,
                    method = "shapes",
                    by = "trip",
-                   unit = "km/h",
-                   sort_sequence = TRUE) {
-  get_trip_speed(gtfs, trip_id, method, by, unit, sort_sequence)
+                   unit = "km/h") {
+  get_trip_speed(gtfs, trip_id, method, by, unit)
 }
 
 # tests -------------------------------------------------------------------
@@ -21,10 +20,28 @@ test_that("raises errors due to incorrect input types/value", {
   expect_error(tester(by = "stop"))
   expect_error(tester(unit = "km"))
   expect_error(tester(unit = c("km/h", "m/s")))
-  expect_error(tester(sort_sequence = NA))
 
   no_time_gtfs <- copy_gtfs_without_field(gtfs, "stop_times", "arrival_time")
   expect_error(tester(no_time_gtfs), class = "missing_required_field")
+})
+
+test_that("sort_sequence is deprecated", {
+  # the warning is raised only once, even with by = "segment"
+
+  warnings <- character(0)
+  withCallingHandlers(
+    get_trip_speed(gtfs, trip_id, by = "segment", sort_sequence = TRUE),
+    deprecated_sort_sequence = function(cnd) {
+      warnings <<- c(warnings, conditionMessage(cnd))
+      invokeRestart("muffleWarning")
+    }
+  )
+  expect_length(warnings, 1)
+
+  expect_error(
+    get_trip_speed(gtfs, trip_id, sort_sequence = FALSE),
+    class = "gtfstools_defunct_sort_sequence_error"
+  )
 })
 
 test_that("outputs data.tables with the right columns and types", {

@@ -24,8 +24,8 @@ sorted by \code{from_stop_id} and \code{to_stop_id}. It is empty if fewer than t
 stops are selected.
 }
 \description{
-Returns the Euclidean distance between each pair of stops visited by the given trips
-and/or routes.
+Returns the great-circle distance between each pair of stops visited by the
+given trips and/or routes.
 }
 \section{Details}{
 

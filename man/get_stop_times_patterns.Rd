@@ -4,12 +4,7 @@
 \alias{get_stop_times_patterns}
 \title{Get stop times patterns}
 \usage{
-get_stop_times_patterns(
-  gtfs,
-  trip_id = NULL,
-  type = "spatial",
-  sort_sequence = TRUE
-)
+get_stop_times_patterns(gtfs, trip_id = NULL, type = "spatial", sort_sequence)
 }
 \arguments{
 \item{gtfs}{A GTFS object, as created by \code{\link[=read_gtfs]{read_gtfs()}}.}
@@ -21,12 +16,9 @@ analyses the pattern of every \code{trip_id} in the GTFS.}
 \item{type}{A string specifying the type of patterns to be analyzed. Either
 \code{"spatial"} (the default) or "spatiotemporal".}
 
-\item{sort_sequence}{A logical specifying whether to sort timetables by
-\code{stop_sequence}. Defaults to \code{TRUE}. Sorting an already ordered table is
-cheap, and pattern identification based on unordered timetables may result
-in multiple ids identifying what would be the same pattern, had the table
-been ordered. Set to \code{FALSE} only if the timetables are known to be
-ordered.}
+\item{sort_sequence}{Deprecated; do not supply. Timetables are now always
+sorted by \code{stop_sequence}. Passing \code{TRUE} raises a warning, and passing
+\code{FALSE} raises an error.}
 }
 \value{
 A \code{data.table} associating each \code{trip_id} to a \code{pattern_id}.
@@ -46,13 +38,11 @@ case, only the time between stops is taken into account, and the time that
 the trip started is ignored (e.g. if two trips depart from stop A and follow
 the same sequence of stops to arrive at stop B, taking both 1 hour to do so,
 their spatiotemporal pattern will be considered the same, even if one
-departed at 6 am and another at 7 am). Please also note that the
-\code{stop_sequence} field is currently ignored - which means that two stops are
-considered to follow the same sequence if one is listed right below the
-other on the \code{stop_times} table (e.g. if trip X lists stops A followed by
-stop B with \code{stop_sequence}s 1 and 2, and trip Y lists stops A followed by
-stop B with \code{stop_sequence}s 1 and 3, they are assigned to the same
-\code{pattern_id}).
+departed at 6 am and another at 7 am). Please also note that only the order
+given by \code{stop_sequence} matters, not its values - e.g. if trip X lists stops
+A followed by stop B with \code{stop_sequence}s 1 and 2, and trip Y lists stops A
+followed by stop B with \code{stop_sequence}s 1 and 3, they are assigned to the
+same \code{pattern_id}.
 
 Existing \verb{_secs} columns in \code{stop_times} (e.g. created with
 \code{\link[=convert_time_to_seconds]{convert_time_to_seconds()}}) are used as-is, not recalculated from the time

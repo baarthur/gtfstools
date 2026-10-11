@@ -4,7 +4,7 @@
 \alias{locate_stops_along_shapes}
 \title{Locate stops along their trips' shapes}
 \usage{
-locate_stops_along_shapes(gtfs, st, stop_lat, stop_lon, sort_sequence)
+locate_stops_along_shapes(gtfs, st, stop_lat, stop_lon)
 }
 \arguments{
 \item{gtfs}{A GTFS object.}
@@ -13,8 +13,6 @@ locate_stops_along_shapes(gtfs, st, stop_lat, stop_lon, sort_sequence)
 the rows of each trip are contiguous.}
 
 \item{stop_lat, stop_lon}{The coordinates of the stops listed in \code{st}.}
-
-\item{sort_sequence}{Whether to sort the shapes by \code{shape_pt_sequence}.}
 }
 \value{
 A numeric vector with the position of each stop along its trip's
@@ -22,7 +20,7 @@ shape, in meters from the start of the shape. Stops whose trip is not
 linked to a usable shape, or that don't have coordinates, get \code{NA}. Its
 \code{"shape_points"} attribute is a list with the shape points on which the
 positions were measured (\code{shapes}, without missing coordinates and
-sorted if \code{sort_sequence} is \code{TRUE}), the rows of each shape in \code{shapes}
+sorted by \code{shape_pt_sequence}), the rows of each shape in \code{shapes}
 (\code{rows}) and the \code{shape_id} of each trip (\code{trip_shape_id}), in order of
 appearance in \code{st}.
 }

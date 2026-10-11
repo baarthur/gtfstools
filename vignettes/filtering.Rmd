@@ -46,7 +46,7 @@ library(ggplot2)
 
 # Filtering by `agency_id`, `route_id`, `service_id`, `shape_id`, `stop_id`, `trip_id` or `route_type`:
 
-The first six work in a very similar fashion. You specify a vector of identifiers, and the function keeps (or drops, as we'll see soon) all the entries that are in any way related to this id. Let's see how that works using `filter_by_trip_id()`:
+The first seven work in a very similar fashion. You specify a vector of identifiers, and the function keeps (or drops, as we'll see soon) all the entries that are in any way related to this id. Let's see how that works using `filter_by_trip_id()`:
 
 ```{r}
 path <- system.file("extdata/spo_gtfs.zip", package = "gtfstools")
@@ -84,7 +84,7 @@ head(unique(smaller_gtfs$shapes$shape_id))
 
 And the specified trips (and their respective shapes as well) are nowhere to be seen. Please note that, since we are keeping many more entries in the second case, the resulting GTFS object, though smaller than the original, is much larger than in the first case.
 
-The same logic demonstrated with `filter_by_trip_id()` applies to the functions that filter feeds by `agency_id`, `route_id`, `service_id`, `shape_id`, `stop_id` and `route_type`.
+The same logic demonstrated with `filter_by_trip_id()` applies to the functions that filter feeds by `agency_id`, `route_id`, `service_id`, `shape_id` and `route_type`. `filter_by_stop_id()` is slightly different: it keeps (or drops) the `stop_times` entries at the given stops, rather than entire trips. To keep or drop the entire trips that serve some stops, pass their `trip_id`s to `filter_by_trip_id()`.
 
 # Filtering by day of the week or time of the day:
 

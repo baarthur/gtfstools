@@ -52,15 +52,15 @@
 #' # the trip is faster than 30 km/h between some of its stops
 #' get_trip_speed(gtfs, "CPTM L07-0", by = "segment")
 #'
-#' gtfs_capped <- set_max_speed(gtfs, 30, trip_id = "CPTM L07-0")
+#' gtfs_capped <- set_max_speed(gtfs, max_speed = 30, trip_id = "CPTM L07-0")
 #' get_trip_speed(gtfs_capped, "CPTM L07-0", by = "segment")
 #'
 #' # the later stops are shifted, so the trip ends later
-#' gtfs$stop_times[trip_id == "CPTM L07-0"][.N]
-#' gtfs_capped$stop_times[trip_id == "CPTM L07-0"][.N]
+#'  get_start_and_end_times(gtfs, trip_id = "CPTM L07-0")
+#'  get_start_and_end_times(gtfs_capped, trip_id = "CPTM L07-0")
 #'
-#' # cap the speed of all the trips of a route, using another unit
-#' gtfs_capped <- set_max_speed(gtfs, 8, route_id = "CPTM L07", unit = "m/s")
+#' # cap the speed of all the trips of all routes of the GTFS feed
+#' gtfs_capped <- set_max_speed(gtfs, max_speed = 8)
 #'
 #' @export
 set_max_speed <- function(

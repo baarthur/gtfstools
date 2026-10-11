@@ -4,9 +4,8 @@ trip_id <- "143765658"
 
 tester <- function(gtfs = get("gtfs", envir = parent.frame()),
                    trip_id = NULL,
-                   type = "spatial",
-                   sort_sequence = FALSE) {
-  get_stop_times_patterns(gtfs, trip_id, type, sort_sequence)
+                   type = "spatial") {
+  get_stop_times_patterns(gtfs, trip_id, type)
 }
 
 test_that("raises errors due to incorrect input types/value", {
@@ -16,9 +15,6 @@ test_that("raises errors due to incorrect input types/value", {
   expect_error(tester(type = NA))
   expect_error(tester(type = c("spatial", "spatial")))
   expect_error(tester(type = "oie"))
-  expect_error(tester(sort_sequence = "FALSE"))
-  expect_error(tester(sort_sequence = NA))
-  expect_error(tester(sort_sequence = c(TRUE, TRUE)))
 })
 
 test_that("raises warning if a non-existent trip_id is specified", {
@@ -186,11 +182,6 @@ test_that("doesn't change original gtfs", {
   patterns <- tester(new_gtfs, type = "spatiotemporal")
   expect_identical(new_gtfs, original_gtfs)
 
-  # should also work if sort_sequence = TRUE
-
-  patterns <- tester(new_gtfs, sort_sequence = TRUE)
-  expect_identical(new_gtfs, original_gtfs)
-
   # should also work if gtfs contain time-in-seconds columns
 
   convert_time_to_seconds(new_gtfs, file = "stop_times", by_reference = TRUE)
@@ -204,7 +195,7 @@ test_that("doesn't change original gtfs", {
   expect_identical(new_gtfs, original_gtfs)
 })
 
-test_that("sort_sequence works correctly", {
+test_that("stop_times are sorted by stop_sequence", {
   # trips 143765659 and 143765658 have the same spatial pattern
   ids <- c("143765658", "143765659")
   patterns <- tester(trip_id = ids)
@@ -215,15 +206,18 @@ test_that("sort_sequence works correctly", {
     c(10:18, 1:9, 19:62)
   ]
 
-  unordered_patterns <- tester(unordered_gtfs, ids)
-  expect_false(identical(unordered_patterns, patterns))
+  expect_identical(tester(unordered_gtfs, ids), patterns)
+})
 
-  ordered_patterns <- tester(unordered_gtfs, ids, sort_sequence = TRUE)
-  expect_identical(ordered_patterns, patterns)
-
-  # sort_sequence defaults to TRUE (#94)
-  default_patterns <- get_stop_times_patterns(unordered_gtfs, ids)
-  expect_identical(default_patterns, patterns)
+test_that("sort_sequence is deprecated", {
+  expect_warning(
+    get_stop_times_patterns(gtfs, trip_id, sort_sequence = TRUE),
+    class = "deprecated_sort_sequence"
+  )
+  expect_error(
+    get_stop_times_patterns(gtfs, trip_id, sort_sequence = FALSE),
+    class = "gtfstools_defunct_sort_sequence_error"
+  )
 })
 
 test_that("stop_ids containing separators don't make patterns collide", {
@@ -293,11 +287,9 @@ test_that("rows with NA trip_id are grouped together", {
     c("x", "x", "y", "x", "y", "y")
   )
 
-  for (sort_sequence in c(TRUE, FALSE)) {
-    patterns <- tester(na_gtfs, sort_sequence = sort_sequence)
-    expect_identical(patterns$trip_id, c(NA, "a", "b"))
-    expect_identical(patterns$pattern_id, c(1L, 1L, 1L))
-  }
+  patterns <- tester(na_gtfs)
+  expect_identical(patterns$trip_id, c(NA, "a", "b"))
+  expect_identical(patterns$pattern_id, c(1L, 1L, 1L))
 })
 
 test_that("sequences that start with the same stops are different patterns", {

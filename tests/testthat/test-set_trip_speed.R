@@ -686,3 +686,18 @@ test_that("raises an error with non-positive speeds", {
     )
   }
 })
+
+test_that("raises an error with infinite or conflicting speeds", {
+  expect_error(
+    set_trip_speed(gtfs, "CPTM L07-0", Inf),
+    class = "gtfstools_invalid_speed"
+  )
+  expect_error(
+    set_trip_speed(gtfs, c("CPTM L07-0", "CPTM L07-0"), c(30, 60)),
+    class = "gtfstools_conflicting_speeds"
+  )
+  expect_identical(
+    set_trip_speed(gtfs, c("CPTM L07-0", "CPTM L07-0"), c(30, 30)),
+    set_trip_speed(gtfs, "CPTM L07-0", 30)
+  )
+})

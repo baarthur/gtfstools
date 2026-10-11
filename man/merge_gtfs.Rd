@@ -11,7 +11,9 @@ merge_gtfs(..., files = NULL, prefix = FALSE)
 a list of GTFS objects.}
 
 \item{files}{A character vector listing the GTFS tables to be merged. If
-\code{NULL} (the default), all tables are merged.}
+\code{NULL} (the default), all tables are merged. Elements that are not tables,
+such as the \code{locations} of GTFS-Flex feeds (read from a geojson file), are
+not merged and are left out of the result, with a warning.}
 
 \item{prefix}{Either a logical or a character vector (defaults to \code{FALSE}).
 Whether to add a prefix to the value of id fields that identify from which
