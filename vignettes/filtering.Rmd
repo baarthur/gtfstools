@@ -36,6 +36,7 @@ GTFS feeds are often used to describe very large and complex public transport ne
 - `filter_by_route_type()`
 - `filter_by_weekday()`
 - `filter_by_date()`
+- `filter_by_period()`
 - `filter_by_time_of_day()`
 - `filter_by_spatial_extent()`
 

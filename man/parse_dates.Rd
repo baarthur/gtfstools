@@ -4,13 +4,15 @@
 \alias{parse_dates}
 \title{Parse dates given as \code{Date}s or strings}
 \usage{
-parse_dates(date, call = parent.frame())
+parse_dates(date, call = parent.frame(), arg = "date")
 }
 \arguments{
 \item{date}{The \code{date} argument to be parsed.}
 
 \item{call}{The environment of the function whose \code{date} argument is
 parsed, in which errors are reported.}
+
+\item{arg}{A string. The name of the argument, used in error messages.}
 }
 \value{
 A \code{Date} vector.
