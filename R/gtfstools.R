@@ -170,6 +170,7 @@ utils::globalVariables(
     "span_len",
     "i.span_len",
     "delay",
-    "last_arrival"
+    "last_arrival",
+    "date"
   )
 )

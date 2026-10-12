@@ -10,15 +10,25 @@
 #' @param keep A logical. Whether the entries related to the services that run
 #'   in the specified period should be kept or dropped (defaults to `TRUE`,
 #'   which keeps the entries).
+#' @param trim A logical. Whether the calendars of the kept services should be
+#'   cut to the period (defaults to `TRUE`), so that the GTFS object has no
+#'   service outside it. Ignored when `keep` is `FALSE`.
 #'
 #' @return The GTFS object passed to the `gtfs` parameter, after the filtering
 #'   process.
 #'
 #' @section Details:
-#' Filtering by a period is the same as filtering by each of its days with
+#' The services are selected as when filtering by each day of the period with
 #' [filter_by_date()], whose details also apply here: the services that run
-#' on at least one day of the period are kept (or dropped) as a whole, so they
-#' may still run on days outside it.
+#' on at least one day of the period are kept (or dropped).
+#'
+#' With `trim = TRUE`, the kept services are then cut to the period: the
+#' `start_date` and `end_date` of their `calendar` entries are clipped to it
+#' (entries left without any day are removed), and the `calendar_dates`
+#' entries outside it are removed. Each service then runs on exactly the same
+#' days within the period as before, and on no day outside it. The
+#' `feed_info` table is not changed. With `trim = FALSE`, the services are
+#' kept as a whole, so they may still run on days outside the period.
 #'
 #' The period is first clipped to the dates covered by the `calendar` and
 #' `calendar_dates` tables, on which the services can run, so the days of the
@@ -39,8 +49,18 @@
 #' gtfs$calendar
 #' gtfs$calendar_dates
 #'
-#' # keeps the services that run in the first week of july 2006
+#' # keeps the services that run in the first week of july 2006, with their
+#' # calendars cut to that week
 #' smaller_gtfs <- filter_by_period(gtfs, "2006-07-01", "2006-07-07")
+#' smaller_gtfs$calendar
+#'
+#' # keeps the same services, with their whole calendars
+#' smaller_gtfs <- filter_by_period(
+#'   gtfs,
+#'   "2006-07-01",
+#'   "2006-07-07",
+#'   trim = FALSE
+#' )
 #' smaller_gtfs$calendar
 #'
 #' # dates may also be given as Date objects. drops the services that run in
@@ -53,7 +73,11 @@
 #' )
 #' smaller_gtfs$calendar
 #' @export
-filter_by_period <- function(gtfs, start_date, end_date, keep = TRUE) {
+filter_by_period <- function(gtfs,
+                             start_date,
+                             end_date,
+                             keep = TRUE,
+                             trim = TRUE) {
   gtfs <- assert_and_assign_gtfs_object(gtfs)
 
   # lengths are checked before formats, so that two dates raise a length
@@ -70,6 +94,7 @@ filter_by_period <- function(gtfs, start_date, end_date, keep = TRUE) {
     .var.name = "end_date"
   )
   checkmate::assert_logical(keep, len = 1, any.missing = FALSE)
+  checkmate::assert_logical(trim, len = 1, any.missing = FALSE)
 
   start_date <- parse_dates(start_date, arg = "start_date")
   end_date <- parse_dates(end_date, arg = "end_date")
@@ -134,6 +159,37 @@ filter_by_period <- function(gtfs, start_date, end_date, keep = TRUE) {
 
   days <- as.Date(seq(first_day, last_day), origin = "1970-01-01")
   gtfs <- filter_by_date(gtfs, days, keep = keep)
+
+  # the calendars of the kept services are cut to the period. calendar is
+  # copied because it may still be the caller's table, and set() keeps the
+  # class of the date columns (e.g. IDate). rows left without days (or with
+  # missing dates, which never run) are dropped
+
+  if (trim && keep) {
+    if (has_calendar) {
+      calendar <- data.table::copy(gtfs$calendar)
+      data.table::set(
+        calendar,
+        i = which(calendar$start_date < start_date),
+        j = "start_date",
+        value = start_date
+      )
+      data.table::set(
+        calendar,
+        i = which(calendar$end_date > end_date),
+        j = "end_date",
+        value = end_date
+      )
+      keep_row <- calendar$start_date <= calendar$end_date
+      gtfs$calendar <- calendar[!is.na(keep_row) & keep_row]
+    }
+
+    if (has_calendar_dates) {
+      in_period <- gtfs$calendar_dates$date >= start_date &
+        gtfs$calendar_dates$date <= end_date
+      gtfs$calendar_dates <- gtfs$calendar_dates[!is.na(in_period) & in_period]
+    }
+  }
 
   return(gtfs)
 }

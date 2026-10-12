@@ -14,7 +14,7 @@
 
 - New function `get_summary()`, which summarises a feed (its files, agencies, service calendar, totals and the distributions of trip speeds, trip lengths and route headways), optionally restricted to some dates, routes, modes, agencies and a time of day. It returns a list of `data.table`s and writes an HTML report with tables and figures (requires `{ggplot2}`, `{knitr}`, `{rmarkdown}` and Pandoc).
 - New function `filter_by_date()`, which filters a feed by the services that run on the given dates.
-- New function `filter_by_period()`, which filters a feed by the services that run on at least one day of a period, given by its first and last dates.
+- New function `filter_by_period()`, which filters a feed by the services that run on at least one day of a period, given by its first and last dates. By default (`trim = TRUE`), the calendars of the kept services are cut to the period, so the feed has no service outside it.
 - New function `get_stops()`, which returns the stops visited by the given trips and/or routes.
 - New function `get_stop_distances()`, which returns the great-circle distances between each pair of stops visited by the given trips and/or routes.
 - New function `convert_stops_to_shapes()`, which creates shapes that link the consecutive stops of trips along straight lines, for trips not linked to a usable shape (or for the given trips), and assigns them to the trips.

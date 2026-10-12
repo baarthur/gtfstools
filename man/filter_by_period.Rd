@@ -4,7 +4,7 @@
 \alias{filter_by_period}
 \title{Filter GTFS object by period}
 \usage{
-filter_by_period(gtfs, start_date, end_date, keep = TRUE)
+filter_by_period(gtfs, start_date, end_date, keep = TRUE, trim = TRUE)
 }
 \arguments{
 \item{gtfs}{A GTFS object, as created by \code{\link[=read_gtfs]{read_gtfs()}}.}
@@ -16,6 +16,10 @@ period, both included. \code{end_date} must not be earlier than \code{start_date
 \item{keep}{A logical. Whether the entries related to the services that run
 in the specified period should be kept or dropped (defaults to \code{TRUE},
 which keeps the entries).}
+
+\item{trim}{A logical. Whether the calendars of the kept services should be
+cut to the period (defaults to \code{TRUE}), so that the GTFS object has no
+service outside it. Ignored when \code{keep} is \code{FALSE}.}
 }
 \value{
 The GTFS object passed to the \code{gtfs} parameter, after the filtering
@@ -27,10 +31,17 @@ period, keeping (or dropping) the relevant entries in each file.
 }
 \section{Details}{
 
-Filtering by a period is the same as filtering by each of its days with
+The services are selected as when filtering by each day of the period with
 \code{\link[=filter_by_date]{filter_by_date()}}, whose details also apply here: the services that run
-on at least one day of the period are kept (or dropped) as a whole, so they
-may still run on days outside it.
+on at least one day of the period are kept (or dropped).
+
+With \code{trim = TRUE}, the kept services are then cut to the period: the
+\code{start_date} and \code{end_date} of their \code{calendar} entries are clipped to it
+(entries left without any day are removed), and the \code{calendar_dates}
+entries outside it are removed. Each service then runs on exactly the same
+days within the period as before, and on no day outside it. The
+\code{feed_info} table is not changed. With \code{trim = FALSE}, the services are
+kept as a whole, so they may still run on days outside the period.
 
 The period is first clipped to the dates covered by the \code{calendar} and
 \code{calendar_dates} tables, on which the services can run, so the days of the
@@ -49,8 +60,18 @@ gtfs <- read_gtfs(data_path)
 gtfs$calendar
 gtfs$calendar_dates
 
-# keeps the services that run in the first week of july 2006
+# keeps the services that run in the first week of july 2006, with their
+# calendars cut to that week
 smaller_gtfs <- filter_by_period(gtfs, "2006-07-01", "2006-07-07")
+smaller_gtfs$calendar
+
+# keeps the same services, with their whole calendars
+smaller_gtfs <- filter_by_period(
+  gtfs,
+  "2006-07-01",
+  "2006-07-07",
+  trim = FALSE
+)
 smaller_gtfs$calendar
 
 # dates may also be given as Date objects. drops the services that run in
