@@ -87,15 +87,16 @@ filter_by_date <- function(gtfs, date, keep = TRUE) {
 #' @param date The `date` argument to be parsed.
 #' @param call The environment of the function whose `date` argument is
 #'   parsed, in which errors are reported.
+#' @param arg A string. The name of the argument, used in error messages.
 #'
 #' @return A `Date` vector.
 #'
 #' @keywords internal
-parse_dates <- function(date, call = parent.frame()) {
+parse_dates <- function(date, call = parent.frame(), arg = "date") {
   checkmate::assert(
     checkmate::check_date(date, any.missing = FALSE, min.len = 1),
     checkmate::check_character(date, any.missing = FALSE, min.len = 1),
-    .var.name = "date"
+    .var.name = arg
   )
 
   if (is.character(date)) {
@@ -113,7 +114,7 @@ parse_dates <- function(date, call = parent.frame()) {
       bad_dates <- date[is_bad]
       cli::cli_abort(
         c(
-          "{.arg date} must be in the {.val YYYYMMDD} or {.val YYYY-MM-DD}
+          "{.arg {arg}} must be in the {.val YYYYMMDD} or {.val YYYY-MM-DD}
            formats.",
           "x" = "Invalid date{?s}: {.val {bad_dates}}."
         ),

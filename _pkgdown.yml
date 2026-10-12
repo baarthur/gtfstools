@@ -39,6 +39,7 @@ reference:
     - set_dwell_time
     - set_max_speed
     - set_route_frequency
+    - set_route_speed
     - set_trip_speed
     - stop_times_to_frequencies
     - frequencies_to_stop_times

@@ -158,6 +158,7 @@ object.size(smaller_gtfs)
 Other filtering functions:
 \code{\link[=filter_by_agency_id]{filter_by_agency_id()}},
 \code{\link[=filter_by_date]{filter_by_date()}},
+\code{\link[=filter_by_period]{filter_by_period()}},
 \code{\link[=filter_by_route_id]{filter_by_route_id()}},
 \code{\link[=filter_by_service_id]{filter_by_service_id()}},
 \code{\link[=filter_by_shape_id]{filter_by_shape_id()}},

@@ -70,9 +70,11 @@ the days with service), \code{busiest_date} and \code{max_trips_per_day} (the da
 with the most trips and its number of trips) and \code{feed_start_date} and
 \code{feed_end_date} (from \code{feed_info}, \code{NA} if absent);
 \item \code{totals}: the columns \code{indicator}, \code{value} and \code{unit}, with the number
-of agencies, routes, trips and stops, the total length of the shapes
-and of the trips (in km), the total duration of the trips (in hours),
-the mean trip speed (in km/h) and the mean route headway (in minutes);
+of agencies, routes, trips and stops, the total and mean length of the
+shapes and of the trips (in km), the total duration of the trips (in
+hours), the mean duration of the trips (in minutes), the mean trip
+speed (in km/h) and the mean route headway (in minutes). The means are
+taken over the shapes and trips whose value is known;
 \item \code{speed}, \code{distance} and \code{frequency}: summary statistics (\code{n}, \code{min},
 \code{q25}, \code{median}, \code{mean}, \code{q75}, \code{max} and \code{unit}) of the trip speeds
 (in km/h), of the trip lengths (in km) and of the route headways (in
@@ -101,11 +103,13 @@ order. The time-of-day filter keeps the whole trips that run within it
 (see \code{\link[=filter_by_time_of_day]{filter_by_time_of_day()}} with \code{full_trips = TRUE}), so the trip
 speeds and lengths refer to whole trips.
 
-Trip lengths and speeds are calculated with \code{\link[=get_trip_length]{get_trip_length()}} and
-\code{\link[=get_trip_speed]{get_trip_speed()}}. Each trip is counted once, however many days it runs on
-and however many departures the \code{frequencies} table lists for it. The total
-shape length counts each shape used by the selected trips once, and the
-number of stops counts the stops visited by the selected trips.
+Trip lengths, durations and speeds are calculated with \code{\link[=get_trip_length]{get_trip_length()}},
+\code{\link[=get_trip_duration]{get_trip_duration()}} and \code{\link[=get_trip_speed]{get_trip_speed()}}. Each trip is counted once,
+however many days it runs on and however many departures the \code{frequencies}
+table lists for it. Trips with a zero or negative duration count in the
+total and mean durations, but have no speed. The total and mean shape lengths
+count each shape used by the selected trips once, and the number of stops
+counts the stops visited by the selected trips.
 
 The \code{services} summary and the calendar chart in the report describe the
 whole calendar of the selected services: when \code{date} is given, the

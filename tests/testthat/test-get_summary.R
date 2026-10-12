@@ -104,7 +104,8 @@ test_that("returns a list of data.tables and writes the report", {
     result$totals$indicator,
     c(
       "n_agencies", "n_routes", "n_trips", "n_stops", "total_shape_length",
-      "total_trip_length", "total_trip_duration", "mean_trip_speed",
+      "mean_shape_length", "total_trip_length", "mean_trip_length",
+      "total_trip_duration", "mean_trip_duration", "mean_trip_speed",
       "mean_route_headway"
     )
   )
@@ -181,6 +182,20 @@ test_that("totals and services match the feed", {
   expect_equal(
     totals_value(result, "total_trip_duration"),
     sum(get_trip_duration(gtfs, unit = "h")$duration)
+  )
+  expect_equal(
+    totals_value(result, "mean_trip_duration"),
+    mean(get_trip_duration(gtfs, unit = "min")$duration)
+  )
+  expect_equal(
+    totals_value(result, "mean_trip_length"),
+    mean(get_trip_length(gtfs, unit = "km")$length)
+  )
+
+  used_shapes <- unique(gtfs$trips$shape_id)
+  expect_equal(
+    totals_value(result, "mean_shape_length"),
+    mean(get_shape_length(gtfs, shape_id = used_shapes)$length)
   )
 
   service_days <- get_service_days(gtfs)
@@ -277,6 +292,7 @@ test_that("works with missing optional files", {
     class = "gtfstools_shapes_unavailable"
   )
   expect_identical(totals_value(result, "total_shape_length"), NA_real_)
+  expect_identical(totals_value(result, "mean_shape_length"), NA_real_)
 
   no_frequencies <- copy_gtfs_without_file(gtfs, "frequencies")
   result <- tester(no_frequencies)
@@ -332,6 +348,23 @@ test_that("handles blank agency_ids, unused shapes and missing times", {
   no_times$stop_times[, `:=`(arrival_time = "", departure_time = "")]
   result <- suppressWarnings(tester(no_times))
   expect_identical(totals_value(result, "total_trip_duration"), NA_real_)
+  expect_identical(totals_value(result, "mean_trip_duration"), NA_real_)
+
+  # trips without times are left out of the mean duration
+
+  one_blank <- poa_gtfs
+  one_blank$stop_times <- data.table::copy(one_blank$stop_times)
+  blank_trip <- one_blank$stop_times$trip_id[1]
+  one_blank$stop_times[
+    trip_id == blank_trip,
+    `:=`(arrival_time = "", departure_time = "")
+  ]
+  result <- suppressWarnings(tester(one_blank))
+  durations <- get_trip_duration(poa_gtfs, unit = "min")
+  expect_equal(
+    totals_value(result, "mean_trip_duration"),
+    mean(durations[trip_id != blank_trip]$duration, na.rm = TRUE)
+  )
 })
 
 test_that("uses the default output directory", {
@@ -372,6 +405,7 @@ test_that("works with other feeds", {
   )
   expect_identical(nrow(result$agency), 1L)
   expect_identical(totals_value(result, "total_trip_length"), NA_real_)
+  expect_identical(totals_value(result, "mean_trip_length"), NA_real_)
 
   # ggl's feed_info has empty validity dates, so they are NA. given dates are
   # reported as they are
