@@ -26,6 +26,7 @@
 - New function `stop_times_to_frequencies()`, the counterpart of `frequencies_to_stop_times()`, which approximates scheduled trips by frequency-based ones (#69).
 - New function `interpolate_stop_times()`, which fills blank `arrival_time`s and `departure_time`s in `stop_times`, assuming a constant speed between stops with known times.
 - New function `set_route_frequency()`, the editing counterpart of `get_route_frequency()`, which sets the headway of routes within a time of day by replacing their trips in it with a frequency-based template trip. Departures outside the time of day don't change.
+- New function `set_route_speed()`, the route counterpart of `set_trip_speed()`, which sets the average speed of all trips of the given routes (optionally only of a segment between two stops, and only of trips departing within a time of day).
 - New functions `get_dwell_time()` and `set_dwell_time()`, which return and set how long vehicles stay at stops, optionally within a time of day. `set_dwell_time()` shifts the later times of each trip accordingly.
 - New function `set_max_speed()`, which caps the speed of the given trips and/or routes. Each part of a trip faster than the maximum speed is slowed down to it, and the later times of the trip are shifted accordingly.
 - New function `fix_gtfs()`, a wrapper that cleans a feed in one call: it removes duplicated entries and unused ids, optionally caps the speed of trips with `set_max_speed()`, and fills blank stop times with `interpolate_stop_times()`.
