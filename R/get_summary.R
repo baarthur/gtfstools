@@ -51,9 +51,11 @@
 #'     with the most trips and its number of trips) and `feed_start_date` and
 #'     `feed_end_date` (from `feed_info`, `NA` if absent);
 #'   - `totals`: the columns `indicator`, `value` and `unit`, with the number
-#'     of agencies, routes, trips and stops, the total length of the shapes
-#'     and of the trips (in km), the total duration of the trips (in hours),
-#'     the mean trip speed (in km/h) and the mean route headway (in minutes);
+#'     of agencies, routes, trips and stops, the total and mean length of the
+#'     shapes and of the trips (in km), the total duration of the trips (in
+#'     hours), the mean duration of the trips (in minutes), the mean trip
+#'     speed (in km/h) and the mean route headway (in minutes). The means are
+#'     taken over the shapes and trips whose value is known;
 #'   - `speed`, `distance` and `frequency`: summary statistics (`n`, `min`,
 #'     `q25`, `median`, `mean`, `q75`, `max` and `unit`) of the trip speeds
 #'     (in km/h), of the trip lengths (in km) and of the route headways (in
@@ -72,11 +74,13 @@
 #' (see [filter_by_time_of_day()] with `full_trips = TRUE`), so the trip
 #' speeds and lengths refer to whole trips.
 #'
-#' Trip lengths and speeds are calculated with [get_trip_length()] and
-#' [get_trip_speed()]. Each trip is counted once, however many days it runs on
-#' and however many departures the `frequencies` table lists for it. The total
-#' shape length counts each shape used by the selected trips once, and the
-#' number of stops counts the stops visited by the selected trips.
+#' Trip lengths, durations and speeds are calculated with [get_trip_length()],
+#' [get_trip_duration()] and [get_trip_speed()]. Each trip is counted once,
+#' however many days it runs on and however many departures the `frequencies`
+#' table lists for it. Trips with a zero or negative duration count in the
+#' total and mean durations, but have no speed. The total and mean shape lengths
+#' count each shape used by the selected trips once, and the number of stops
+#' counts the stops visited by the selected trips.
 #'
 #' The `services` summary and the calendar chart in the report describe the
 #' whole calendar of the selected services: when `date` is given, the
@@ -362,6 +366,7 @@ get_summary <- function(
   # only the shapes used by the selected trips are summed
 
   total_shape_length <- NA_real_
+  mean_shape_length <- NA_real_
   if (
     gtfsio::check_file_exists(feed, "shapes") &&
       gtfsio::check_field_exists(feed, "trips", "shape_id")
@@ -369,6 +374,7 @@ get_summary <- function(
     shape_lengths <- get_shape_length(feed)
     shape_lengths <- shape_lengths[shape_id %chin% feed$trips$shape_id]
     total_shape_length <- sum_or_na(shape_lengths$length)
+    mean_shape_length <- summarise_distribution(shape_lengths$length, "km")$mean
   }
 
   cli::cli_progress_update(
@@ -403,8 +409,11 @@ get_summary <- function(
       "n_trips",
       "n_stops",
       "total_shape_length",
+      "mean_shape_length",
       "total_trip_length",
+      "mean_trip_length",
       "total_trip_duration",
+      "mean_trip_duration",
       "mean_trip_speed",
       "mean_route_headway"
     ),
@@ -414,12 +423,15 @@ get_summary <- function(
       nrow(feed$trips),
       data.table::uniqueN(feed$stop_times$stop_id),
       total_shape_length,
+      mean_shape_length,
       sum_or_na(trip_stats$length),
+      distance$mean,
       sum_or_na(trip_stats$duration),
+      summarise_distribution(trip_stats$duration * 60, "min")$mean,
       speed$mean,
       frequency$stats$mean
     ),
-    unit = c(NA, NA, NA, NA, "km", "km", "h", "km/h", "min")
+    unit = c(NA, NA, NA, NA, "km", "km", "km", "km", "h", "min", "km/h", "min")
   )
 
   frequency_table <- cbind(
