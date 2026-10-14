@@ -43,8 +43,8 @@
 #' [convert_time_to_seconds()]) are used as-is, not recalculated from the time
 #' strings.
 #'
-#' @seealso [get_trip_length()], [get_trip_duration()],
-#'   [get_trip_segment_duration()]
+#' @seealso [get_route_speed()], [set_trip_speed()], [set_route_speed()],
+#'   [get_trip_length()], [get_trip_duration()], [get_trip_segment_duration()]
 #'
 #' @examples
 #' \dontshow{

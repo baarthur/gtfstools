@@ -152,3 +152,6 @@ gtfs$stop_times |>
 \dontshow{data.table::setDTthreads(old_dt_threads)}
 \dontshow{\}) # examplesIf}
 }
+\seealso{
+\code{\link[=set_route_speed]{set_route_speed()}}, \code{\link[=get_trip_speed]{get_trip_speed()}}, \code{\link[=get_route_speed]{get_route_speed()}}
+}

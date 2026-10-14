@@ -111,5 +111,5 @@ poa_new_speed$stop_times |>
 \dontshow{\}) # examplesIf}
 }
 \seealso{
-\code{\link[=set_trip_speed]{set_trip_speed()}}, \code{\link[=get_trip_speed]{get_trip_speed()}}
+\code{\link[=set_trip_speed]{set_trip_speed()}}, \code{\link[=get_trip_speed]{get_trip_speed()}}, \code{\link[=get_route_speed]{get_route_speed()}}
 }

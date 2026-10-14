@@ -71,5 +71,5 @@ route_speed
 
 }
 \seealso{
-\code{\link[=get_trip_speed]{get_trip_speed()}}
+\code{\link[=get_trip_speed]{get_trip_speed()}}, \code{\link[=set_route_speed]{set_route_speed()}}, \code{\link[=set_trip_speed]{set_trip_speed()}}
 }
