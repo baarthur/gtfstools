@@ -94,7 +94,6 @@ test_that("sets a different speed for each route", {
   new_gtfs <- set_route_speed(gtfs, routes, c(50, 20))
 
   speeds <- get_trip_speed(new_gtfs, route_trips(gtfs, routes))
-  speeds <- merge(speeds, gtfs$trips[, .(trip_id, route_id)], by = "trip_id")
 
   expect_true(all(abs(speeds[route_id == "CPTM L07"]$speed - 50) < 0.5))
   expect_true(all(abs(speeds[route_id == "2105-10"]$speed - 20) < 0.5))

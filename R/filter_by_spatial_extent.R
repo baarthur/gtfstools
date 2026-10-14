@@ -32,7 +32,7 @@
 #' gtfs <- read_gtfs(data_path)
 #'
 #' shape_id <- "68962"
-#' shape_sf <- convert_shapes_to_sf(gtfs, shape_id)
+#' shape_sf <- get_shapes_geometry(gtfs, shape_id)
 #' bbox <- sf::st_bbox(shape_sf)
 #' object.size(gtfs)
 #'
@@ -103,7 +103,7 @@ filter_by_spatial_extent <- function(
   relevant_trips <- character(0)
 
   if (has_shapes) {
-    shapes_sf <- convert_shapes_to_sf(gtfs)
+    shapes_sf <- get_shapes_geometry(gtfs)
     did_succeed_operation <- spatial_operation(geom, shapes_sf, sparse = FALSE)
 
     relevant_shapes <- shapes_sf$shape_id[did_succeed_operation]

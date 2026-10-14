@@ -31,7 +31,7 @@
 #' returned by [get_trip_length()] (when this length is not `NA`, see below),
 #' and the limitations described there apply. Trips whose stops are all
 #' located at the same point of the shape get a zero-length geometry.
-#' Use [convert_shapes_to_sf()] for the geometry of entire shapes.
+#' Use [get_shapes_geometry()] for the geometry of entire shapes.
 #'
 #' With `method = "euclidean"`, the geometry links the consecutive stops of
 #' each trip along straight lines (stops' coordinates are retrieved from the
@@ -47,7 +47,7 @@
 #' latter with a warning). Geometries along shapes that cross the antimeridian
 #' are not handled correctly.
 #'
-#' @seealso [get_trip_length()], [convert_shapes_to_sf()]
+#' @seealso [get_trip_length()], [get_shapes_geometry()]
 #'
 #' @examples
 #' \dontshow{
@@ -95,7 +95,7 @@ get_trip_geometry <- function(gtfs,
       "get_trip_geometry",
       details = paste0(
         "Geometries are now trimmed to the first and last stop of each trip. ",
-        "Use {.fun convert_shapes_to_sf} for the geometry of the entire shapes."
+        "Use {.fun get_shapes_geometry} for the geometry of the entire shapes."
       )
     )
   }

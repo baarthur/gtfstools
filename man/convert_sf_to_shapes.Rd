@@ -35,7 +35,7 @@ data_path <- system.file("extdata/spo_gtfs.zip", package = "gtfstools")
 gtfs <- read_gtfs(data_path)
 
 # first converting existing shapes table into a sf object
-shapes_sf <- convert_shapes_to_sf(gtfs)
+shapes_sf <- get_shapes_geometry(gtfs)
 head(shapes_sf)
 
 # by default converts all shapes

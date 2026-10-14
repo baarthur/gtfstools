@@ -20,10 +20,11 @@
 #' @param file Deprecated. Use `method` instead (`file = "stop_times"`
 #'   corresponds to `method = "euclidean"`).
 #'
-#' @return With `by = "trip"`, a `data.table` with the `trip_id` and the
-#'   average `speed` of each trip. With `by = "segment"`, a `data.table` with
-#'   the `trip_id`, the `segment` number, the `from_stop_id` and `to_stop_id`
-#'   that delimit the segment and its average `speed`.
+#' @return With `by = "trip"`, a `data.table` with the `route_id`, the
+#'   `trip_id` and the average `speed` of each trip. With `by = "segment"`, a
+#'   `data.table` with the `route_id`, the `trip_id`, the `segment` number, the
+#'   `from_stop_id` and `to_stop_id` that delimit the segment and its average
+#'   `speed`.
 #'
 #' @section Details:
 #' The speed is the length calculated by [get_trip_length()] divided by the
@@ -33,6 +34,10 @@
 #' is missing (e.g. blank times at intermediate stops) or not positive. With
 #' `by = "trip"`, trips without any arrival or departure time raise the warning
 #' of [get_trip_duration()].
+#'
+#' The `route_id` of each trip comes from the `trips` table, which is required
+#' (also with `method = "euclidean"`). Trips not listed in `trips` have an `NA`
+#' `route_id`.
 #'
 #' Existing `_secs` columns in `stop_times` (e.g. created with
 #' [convert_time_to_seconds()]) are used as-is, not recalculated from the time
@@ -67,13 +72,15 @@
 #' head(segment_speed)
 #'
 #' @export
-get_trip_speed <- function(gtfs,
-                           trip_id = NULL,
-                           method = "shapes",
-                           by = "trip",
-                           unit = "km/h",
-                           sort_sequence,
-                           file = NULL) {
+get_trip_speed <- function(
+  gtfs,
+  trip_id = NULL,
+  method = "shapes",
+  by = "trip",
+  unit = "km/h",
+  sort_sequence,
+  file = NULL
+) {
   if (!missing(sort_sequence)) {
     check_deprecated_sort_sequence(
       sort_sequence,
@@ -104,15 +111,27 @@ get_trip_speed <- function(gtfs,
     c("trip_id", "arrival_time", "departure_time"),
     rep("character", 3)
   )
+  gtfsio::assert_field_class(
+    gtfs,
+    "trips",
+    c("trip_id", "route_id"),
+    rep("character", 2)
+  )
 
   # speeds in mph are calculated in km/h and converted at the end
 
   length_unit <- ifelse(unit == "m/s", "m", "km")
   duration_unit <- ifelse(unit == "m/s", "s", "h")
 
-  if (!is.null(file)) method <- map_deprecated_file(file, "get_trip_speed")
+  if (!is.null(file)) {
+    method <- map_deprecated_file(file, "get_trip_speed")
+  }
 
   lengths <- get_trip_length(gtfs, trip_id, method, by, length_unit)
+
+  # retrieve route_id col
+  lengths[gtfs$trips, on = "trip_id", route_id := i.route_id]
+  data.table::setcolorder(lengths, "route_id")
 
   if (nrow(lengths) == 0) {
     data.table::setnames(lengths, "length", "speed")
@@ -124,7 +143,9 @@ get_trip_speed <- function(gtfs,
   # get_trip_length())
 
   duration_trips <- NULL
-  if (!is.null(trip_id)) duration_trips <- unique(lengths$trip_id)
+  if (!is.null(trip_id)) {
+    duration_trips <- unique(lengths$trip_id)
+  }
 
   if (by == "trip") {
     durations <- get_trip_duration(gtfs, duration_trips, duration_unit)
@@ -144,7 +165,9 @@ get_trip_speed <- function(gtfs,
 
   # 1 international mile = 1.609344 km
 
-  if (unit == "mph") speeds[, speed := speed / 1.609344]
+  if (unit == "mph") {
+    speeds[, speed := speed / 1.609344]
+  }
 
   speeds[, c("length", "duration") := NULL]
   data.table::setcolorder(speeds, setdiff(names(lengths), "length"))

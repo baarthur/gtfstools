@@ -25,15 +25,18 @@ specifying how the geometry of each trip is generated. Please see
 }
 \value{
 A \verb{LINESTRING sf} with one row per route and distinct trip
-geometry, with the columns \code{route_id}, \code{n_trips} (the number of trips of
-the route with that geometry) and \code{geometry}. Rows are ordered by
+geometry, with the columns \code{route_id}, \code{trip_pattern} (the first
+\code{trip_id}, in alphabetical order, of the route's trips with that geometry,
+which identifies it), \code{n_trips} (the number of trips of the route with
+that geometry) and \code{geometry}. Rows are ordered by
 \code{route_id} (with \code{NA} last) and, within each route, by decreasing
 \code{n_trips}.
 }
 \description{
 Returns the distinct geometries of the trips of each specified \code{route_id}
 (its "variants", e.g. each direction and each short-turn service), with the
-number of trips that follow each of them.
+\code{trip_id} that identifies each of them and the number of trips that follow
+them.
 }
 \section{Details}{
 
@@ -73,5 +76,5 @@ plot(route_geometry["n_trips"])
 
 }
 \seealso{
-\code{\link[=get_trip_geometry]{get_trip_geometry()}}, \code{\link[=convert_shapes_to_sf]{convert_shapes_to_sf()}}
+\code{\link[=get_trip_geometry]{get_trip_geometry()}}, \code{\link[=get_shapes_geometry]{get_shapes_geometry()}}
 }

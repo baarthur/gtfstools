@@ -44,10 +44,11 @@ now always sorted by \code{stop_sequence} and \code{shape_pt_sequence}. Passing
 corresponds to \code{method = "euclidean"}).}
 }
 \value{
-With \code{by = "trip"}, a \code{data.table} with the \code{trip_id} and the
-average \code{speed} of each trip. With \code{by = "segment"}, a \code{data.table} with
-the \code{trip_id}, the \code{segment} number, the \code{from_stop_id} and \code{to_stop_id}
-that delimit the segment and its average \code{speed}.
+With \code{by = "trip"}, a \code{data.table} with the \code{route_id}, the
+\code{trip_id} and the average \code{speed} of each trip. With \code{by = "segment"}, a
+\code{data.table} with the \code{route_id}, the \code{trip_id}, the \code{segment} number, the
+\code{from_stop_id} and \code{to_stop_id} that delimit the segment and its average
+\code{speed}.
 }
 \description{
 Returns the average speed of each specified \code{trip_id}, either from the first
@@ -62,6 +63,10 @@ the length is \code{NA} (e.g. trips not linked to a shape) or when the duration
 is missing (e.g. blank times at intermediate stops) or not positive. With
 \code{by = "trip"}, trips without any arrival or departure time raise the warning
 of \code{\link[=get_trip_duration]{get_trip_duration()}}.
+
+The \code{route_id} of each trip comes from the \code{trips} table, which is required
+(also with \code{method = "euclidean"}). Trips not listed in \code{trips} have an \code{NA}
+\code{route_id}.
 
 Existing \verb{_secs} columns in \code{stop_times} (e.g. created with
 \code{\link[=convert_time_to_seconds]{convert_time_to_seconds()}}) are used as-is, not recalculated from the time

@@ -1,7 +1,7 @@
 data_path <- system.file("extdata/spo_gtfs.zip", package = "gtfstools")
 gtfs <- read_gtfs(data_path)
 
-shapes_sf <- convert_shapes_to_sf(gtfs, shape_id = c("17846", "17847", "17848"))
+shapes_sf <- get_shapes_geometry(gtfs, shape_id = c("17846", "17847", "17848"))
 
 tester <- function(sf_shapes = shapes_sf,
                    shape_id = NULL,
@@ -180,11 +180,11 @@ test_that("keeps extra columns before shape_dist_traveled", {
 })
 
 test_that("doesn't change given sf", {
-  original_sf <- convert_shapes_to_sf(
+  original_sf <- get_shapes_geometry(
     gtfs,
     shape_id = c("17846", "17847", "17848")
   )
-  given_sf <- convert_shapes_to_sf(
+  given_sf <- get_shapes_geometry(
     gtfs,
     shape_id = c("17846", "17847", "17848")
   )

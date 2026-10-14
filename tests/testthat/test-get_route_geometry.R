@@ -14,7 +14,8 @@ tester <- function(gtfs = get("gtfs", envir = parent.frame()),
 }
 
 # the variants of each route, computed from the geometries of all trips listed
-# in 'trips' (only their first entry), with the count of trips of each variant
+# in 'trips' (only their first entry), with the first trip_id (in C-locale
+# order, as data.table sorts) and the count of trips of each variant
 
 oracle <- function(gtfs, method = "shapes") {
   trip_geom <- suppressWarnings(get_trip_geometry(gtfs, method = method))
@@ -23,9 +24,15 @@ oracle <- function(gtfs, method = "shapes") {
 
   variants <- data.table::data.table(
     route_id = trips$route_id[match(trip_geom$trip_id, trips$trip_id)],
-    wkb = sf::st_as_binary(sf::st_geometry(trip_geom), hex = TRUE)
+    wkb = sf::st_as_binary(sf::st_geometry(trip_geom), hex = TRUE),
+    trip_id = trip_geom$trip_id
   )
-  variants <- variants[, .(n_trips = .N), by = .(route_id, wkb)]
+  data.table::setorderv(variants, "trip_id")
+  variants <- variants[
+    ,
+    .(trip_pattern = trip_id[1], n_trips = .N),
+    by = .(route_id, wkb)
+  ]
   data.table::setorderv(variants, c("route_id", "wkb"))
 
   return(variants[])
@@ -37,6 +44,7 @@ as_variants <- function(route_geom) {
   variants <- data.table::data.table(
     route_id = route_geom$route_id,
     wkb = sf::st_as_binary(sf::st_geometry(route_geom), hex = TRUE),
+    trip_pattern = route_geom$trip_pattern,
     n_trips = route_geom$n_trips
   )
   data.table::setorderv(variants, c("route_id", "wkb"))
@@ -114,8 +122,12 @@ test_that("results in a LINESTRING sf with the right columns", {
   result <- tester()
   expect_s3_class(result, "sf")
   expect_s3_class(sf::st_geometry(result), "sfc_LINESTRING")
-  expect_identical(names(result), c("route_id", "n_trips", "geometry"))
+  expect_identical(
+    names(result),
+    c("route_id", "trip_pattern", "n_trips", "geometry")
+  )
   expect_type(result$route_id, "character")
+  expect_type(result$trip_pattern, "character")
   expect_type(result$n_trips, "integer")
   expect_identical(sf::st_crs(result), sf::st_crs(4326))
   expect_false(anyDuplicated(as_variants(result)[, .(route_id, wkb)]) > 0)
@@ -192,8 +204,12 @@ test_that("raises warnings and returns empty sf with non-existent route_ids", {
   )
   expect_s3_class(empty, "sf")
   expect_identical(nrow(empty), 0L)
-  expect_identical(names(empty), c("route_id", "n_trips", "geometry"))
+  expect_identical(
+    names(empty),
+    c("route_id", "trip_pattern", "n_trips", "geometry")
+  )
   expect_type(empty$route_id, "character")
+  expect_type(empty$trip_pattern, "character")
   expect_type(empty$n_trips, "integer")
   expect_s3_class(sf::st_geometry(empty), "sfc_LINESTRING")
   expect_identical(sf::st_crs(empty), sf::st_crs(4674))

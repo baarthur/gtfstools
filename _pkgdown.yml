@@ -17,6 +17,8 @@ reference:
     - starts_with("get_")
     - -get_trip_geometry
     - -get_route_geometry
+    - -get_stops_geometry
+    - -get_shapes_geometry
   - title: "Filter GTFS feeds"
   - contents:
     - starts_with("filter_by_")
@@ -24,11 +26,11 @@ reference:
   - title: "Spatial operations"
   - contents:
     - convert_sf_to_shapes
-    - convert_shapes_to_sf
-    - convert_stops_to_sf
     - filter_by_spatial_extent
     - get_trip_geometry
     - get_route_geometry
+    - get_shapes_geometry
+    - get_stops_geometry
   - title: "Editing GTFS feeds"
   - contents:
     - interpolate_stop_times
@@ -55,6 +57,8 @@ reference:
   - title: "Interoperability between GTFS packages"
   - contents:
     - "as_dt_gtfs"
-  - title: "Defunct"
+  - title: "Deprecated and defunct"
   - contents:
+    - convert_shapes_to_sf
+    - convert_stops_to_sf
     - filter_by_sf

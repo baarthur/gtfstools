@@ -2,7 +2,8 @@
 #'
 #' Returns the distinct geometries of the trips of each specified `route_id`
 #' (its "variants", e.g. each direction and each short-turn service), with the
-#' number of trips that follow each of them.
+#' `trip_id` that identifies each of them and the number of trips that follow
+#' them.
 #'
 #' @template gtfs
 #' @param route_id A character vector including the `route_id`s to have their
@@ -18,8 +19,10 @@
 #'   `crs` object. Defaults to 4326 (WGS 84).
 #'
 #' @return A `LINESTRING sf` with one row per route and distinct trip
-#'   geometry, with the columns `route_id`, `n_trips` (the number of trips of
-#'   the route with that geometry) and `geometry`. Rows are ordered by
+#'   geometry, with the columns `route_id`, `trip_pattern` (the first
+#'   `trip_id`, in alphabetical order, of the route's trips with that geometry,
+#'   which identifies it), `n_trips` (the number of trips of the route with
+#'   that geometry) and `geometry`. Rows are ordered by
 #'   `route_id` (with `NA` last) and, within each route, by decreasing
 #'   `n_trips`.
 #'
@@ -41,7 +44,7 @@
 #' [get_trip_geometry()], and these trips are counted in an empty-geometry row
 #' of their route.
 #'
-#' @seealso [get_trip_geometry()], [convert_shapes_to_sf()]
+#' @seealso [get_trip_geometry()], [get_shapes_geometry()]
 #'
 #' @examples
 #' \dontshow{
@@ -200,8 +203,12 @@ get_route_geometry <- function(gtfs,
   # variants are ordered by route_id and decreasing number of trips. the
   # ordering is stable, so ties keep the order of first appearance
 
+  # trips are sorted by trip_id in 'st', so the first trip of the first group
+  # of each variant is its first trip_id in alphabetical order
+
   variant_order <- data.table::data.table(
     route_id = st_route_id[group_trip][is_variant_first],
+    trip_pattern = group_trip_ids[is_variant_first],
     n_trips = n_trips,
     variant = seq_len(nrow(variants))
   )
@@ -214,6 +221,7 @@ get_route_geometry <- function(gtfs,
 
   routes_sf <- data.table::data.table(
     route_id = variant_order$route_id,
+    trip_pattern = variant_order$trip_pattern,
     n_trips = variant_order$n_trips,
     geometry = geometry[is_variant_first][variant_order$variant]
   )

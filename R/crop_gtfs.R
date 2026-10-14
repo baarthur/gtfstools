@@ -37,7 +37,7 @@
 #   # the cropped shapes. we probably want to keep every shape that is contained
 #   # inside the spatial extent, even if they're not linked to any trips/stops
 
-#   stops_sf <- convert_stops_to_sf(gtfs)
+#   stops_sf <- get_stops_geometry(gtfs)
 #   did_succeed_operation <- sf::st_intersects(geom, stops_sf, sparse = FALSE)
 
 #   stops_sf <- stops_sf[did_succeed_operation, ]
