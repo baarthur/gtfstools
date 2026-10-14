@@ -1,7 +1,7 @@
 spo_path <- system.file("extdata/spo_gtfs.zip", package = "gtfstools")
 spo_gtfs <- read_gtfs(spo_path)
 spo_shape <- "68962"
-bbox <- sf::st_bbox(convert_shapes_to_sf(spo_gtfs, spo_shape))
+bbox <- sf::st_bbox(get_shapes_geometry(spo_gtfs, spo_shape))
 polygon <- sf::st_as_sf(sf::st_buffer(sf::st_as_sfc(bbox), 0))
 
 tester <- function(gtfs = spo_gtfs,
@@ -61,7 +61,7 @@ test_that("supports sf, sfc and bbox objects", {
 test_that("'keep' and 'spatial_operation' arguments work correctly", {
   # st_intersects
 
-  shapes <- convert_shapes_to_sf(spo_gtfs)
+  shapes <- get_shapes_geometry(spo_gtfs)
   shapes_intersected <- sf::st_intersects(polygon, shapes, sparse = FALSE)
   shapes_intersected <- shapes[shapes_intersected, ]$shape_id
 
@@ -112,7 +112,7 @@ test_that("selects the union of trips selected by shapes and by stop_times", {
   # with the polygon. 'keep = FALSE' must drop all of these trips. the western
   # half of the feed's extent selects some trips only through their stops
 
-  shapes <- convert_shapes_to_sf(spo_gtfs)
+  shapes <- get_shapes_geometry(spo_gtfs)
   half_bbox <- sf::st_bbox(shapes)
   half_bbox["xmax"] <- (half_bbox["xmin"] + half_bbox["xmax"]) / 2
   half_polygon <- sf::st_as_sfc(half_bbox)
@@ -150,7 +150,7 @@ test_that("doesn't add attributes to the given stop_times table", {
 
 test_that("works with sf describing two features", {
   another_shape <- "17846"
-  another_bbox <- sf::st_bbox(convert_shapes_to_sf(spo_gtfs, another_shape))
+  another_bbox <- sf::st_bbox(get_shapes_geometry(spo_gtfs, another_shape))
   another_polygon <- sf::st_as_sf(sf::st_as_sfc(another_bbox))
   bigger_polygon <- rbind(polygon, another_polygon)
 
@@ -182,7 +182,7 @@ test_that("ignores stops with missing coordinates", {
 
   # the trip is still selected by its stops with coordinates
 
-  feed_bbox <- sf::st_bbox(convert_stops_to_sf(spo_gtfs))
+  feed_bbox <- sf::st_bbox(get_stops_geometry(spo_gtfs))
   result <- tester(na_gtfs, geom = feed_bbox)
   expect_true("CPTM L07-0" %chin% result$trips$trip_id)
 })

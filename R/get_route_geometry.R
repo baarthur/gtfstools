@@ -41,7 +41,7 @@
 #' [get_trip_geometry()], and these trips are counted in an empty-geometry row
 #' of their route.
 #'
-#' @seealso [get_trip_geometry()], [convert_shapes_to_sf()]
+#' @seealso [get_trip_geometry()], [get_shapes_geometry()]
 #'
 #' @examples
 #' \dontshow{

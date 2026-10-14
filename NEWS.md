@@ -5,16 +5,23 @@
 - `filter_by_sf()`, deprecated in version 1.3.0, is now defunct. Use `filter_by_spatial_extent()`, which takes the same arguments.
 - The `full_trips` argument of `filter_by_stop_id()`, deprecated in version 1.3.0, is now defunct, and the function always filters by the given stops. To keep entire trips, pass the `trip_id`s that serve these stops to `filter_by_trip_id()` (#75).
 - `get_trip_length()` now measures each trip from its first to its last stop, instead of along its entire shape, so lengths are usually shorter. `get_trip_speed()` and `set_trip_speed()` use these lengths, so speeds are usually slightly lower, and they now also require the `stops` table. Use the new `get_shape_length()` for the length of entire shapes.
-- `get_trip_geometry()` now returns, by default, the part of each trip's shape between its first and last stops, matching `get_trip_length()`, and requires the `stop_times` and `stops` tables. Use `convert_shapes_to_sf()` for entire shapes.
+- `get_trip_geometry()` now returns, by default, the part of each trip's shape between its first and last stops, matching `get_trip_length()`, and requires the `stop_times` and `stops` tables. Use `get_shapes_geometry()` for entire shapes.
 - `get_trip_geometry()`, `get_trip_length()` and `get_trip_speed()` now return one result per trip, without the `origin_file` column. Their new `method` argument (and `by`, in the last two) comes right after `trip_id`, so `unit` and `file` must now be passed by name.
 - The `by_reference` argument of `set_trip_speed()` must now be passed by name (#89).
+- `get_trip_speed()` now returns the `route_id` of each trip (or segment) as its first column, so it now also requires the `trips` table.
 - `convert_shapes_to_sf()`, `get_trip_geometry()`, `get_trip_length()`, `get_trip_speed()`, `get_trip_segment_duration()` and `get_stop_times_patterns()` now always order `shapes` and `stop_times` by `shape_pt_sequence`/`stop_sequence`, so these columns are required. Results only change for feeds not ordered by these columns, whose previous results were incorrect. Their `sort_sequence` argument is deprecated: `sort_sequence = TRUE` raises a warning and `sort_sequence = FALSE` raises an error (#94).
+
+## Feature deprecation
+
+- `convert_shapes_to_sf()` and `convert_stops_to_sf()` are deprecated in favour of `get_shapes_geometry()` and `get_stops_geometry()`, which take the same arguments (except the deprecated `sort_sequence`) and return the same results. Calling them raises a warning.
 
 ## New features
 
 - New function `get_summary()`, which summarises a feed (its files, agencies, service calendar, totals and the distributions of trip speeds, trip lengths and route headways), optionally restricted to some dates, routes, modes, agencies and a time of day. It returns a list of `data.table`s and writes an HTML report with tables and figures (requires `{ggplot2}`, `{knitr}`, `{rmarkdown}` and Pandoc).
 - New function `filter_by_date()`, which filters a feed by the services that run on the given dates.
 - New function `filter_by_period()`, which filters a feed by the services that run on at least one day of a period, given by its first and last dates. By default (`trim = TRUE`), the calendars of the kept services are cut to the period, so the feed has no service outside it.
+- New function `get_shapes_geometry()`, which converts the `shapes` table to a `LINESTRING sf` object. It replaces `convert_shapes_to_sf()`.
+- New function `get_stops_geometry()`, which converts the `stops` table to a `POINT sf` object. It replaces `convert_stops_to_sf()`.
 - New function `get_stops()`, which returns the stops visited by the given trips and/or routes.
 - New function `get_stop_distances()`, which returns the great-circle distances between each pair of stops visited by the given trips and/or routes.
 - New function `convert_stops_to_shapes()`, which creates shapes that link the consecutive stops of trips along straight lines, for trips not linked to a usable shape (or for the given trips), and assigns them to the trips.
@@ -42,7 +49,7 @@
 - `write_gtfs()` gains the `compression_level` argument. Its default, 6 (previously always 9), makes writing about 2 to 3 times faster for files of very similar size.
 - New vignette "Editing GTFS feeds", which lists the functions that edit feeds and demonstrates `set_route_frequency()`, `set_trip_speed()`, `stop_times_to_frequencies()` and `interpolate_stop_times()`.
 - New vignette "Querying GTFS feeds", which demonstrates `get_route_frequency()`, `get_stop_frequency()`, `get_stop_timetable()`, `get_trip_length()`, `get_trip_duration()`, `get_trip_speed()` and `get_summary()`.
-- New vignette "Mapping GTFS feeds", which maps the transit network, routes by speed and stops by frequency with `convert_shapes_to_sf()`, `get_route_geometry()` and `convert_stops_to_sf()`.
+- New vignette "Mapping GTFS feeds", which maps the transit network, routes by speed and stops by frequency with `get_shapes_geometry()`, `get_route_geometry()` and `get_stops_geometry()`.
 
 ## Bug fixes
 

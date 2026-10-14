@@ -69,7 +69,7 @@ test_that("works correctly for tidygtfs-classed objects", {
 })
 
 test_that("converts sf shapes in tidygtfs-classed objects, if present", {
-  sf_shapes <- convert_shapes_to_sf(
+  sf_shapes <- get_shapes_geometry(
     gtfstools_gtfs,
     shape_id = c("17846", "17847")
   )

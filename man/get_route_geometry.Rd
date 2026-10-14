@@ -73,5 +73,5 @@ plot(route_geometry["n_trips"])
 
 }
 \seealso{
-\code{\link[=get_trip_geometry]{get_trip_geometry()}}, \code{\link[=convert_shapes_to_sf]{convert_shapes_to_sf()}}
+\code{\link[=get_trip_geometry]{get_trip_geometry()}}, \code{\link[=get_shapes_geometry]{get_shapes_geometry()}}
 }

@@ -1,6 +1,9 @@
-#' Convert `shapes` table to simple feature object
+#' Convert `shapes` table to simple feature object (deprecated)
 #'
-#' Converts the `shapes` table to a `LINESTRING sf` object.
+#' @description
+#' This function is deprecated: calling it raises a warning. Please use
+#' [get_shapes_geometry()] instead, which takes the same arguments (except
+#' `sort_sequence`) and returns the same result.
 #'
 #' @template gtfs
 #' @param shape_id A character vector including the `shape_id`s to be converted.
@@ -13,26 +16,26 @@
 #'
 #' @return A `LINESTRING sf` object.
 #'
-#' @examples
-#' \dontshow{
-#'   old_dt_threads <- data.table::setDTthreads(1)
-#'   on.exit(data.table::setDTthreads(old_dt_threads), add = TRUE)
-#' }
-#' # read gtfs
-#' data_path <- system.file("extdata/spo_gtfs.zip", package = "gtfstools")
-#' gtfs <- read_gtfs(data_path)
-#'
-#' shapes_sf <- convert_shapes_to_sf(gtfs)
-#' head(shapes_sf)
-#'
-#' shapes_sf <- convert_shapes_to_sf(gtfs, shape_id = "17846")
-#' shapes_sf
+#' @seealso [get_shapes_geometry()], which replaces this function.
 #'
 #' @export
-convert_shapes_to_sf <- function(gtfs,
-                                 shape_id = NULL,
-                                 crs = 4326,
-                                 sort_sequence) {
+convert_shapes_to_sf <- function(
+  gtfs,
+  shape_id = NULL,
+  crs = 4326,
+  sort_sequence
+) {
+  cli::cli_warn(
+    class = "deprecated_convert_shapes_to_sf",
+    message = c(
+      "{.fn convert_shapes_to_sf} is deprecated.",
+      "i" = paste0(
+        "Please use {.fn get_shapes_geometry} instead, which takes the same ",
+        "arguments."
+      )
+    )
+  )
+
   if (!missing(sort_sequence)) {
     check_deprecated_sort_sequence(
       sort_sequence,
@@ -41,65 +44,11 @@ convert_shapes_to_sf <- function(gtfs,
     )
   }
 
-  gtfs <- assert_and_assign_gtfs_object(gtfs)
-  checkmate::assert_character(shape_id, null.ok = TRUE, any.missing = FALSE)
-  checkmate::assert(
-    checkmate::check_number(crs),
-    checkmate::check_class(crs, "crs"),
-    combine = "or"
+  shapes_sf <- get_shapes_geometry(
+    gtfs = gtfs,
+    shape_id = shape_id,
+    crs = crs
   )
-
-  gtfsio::assert_field_class(
-    gtfs,
-    "shapes",
-    c("shape_id", "shape_pt_lat", "shape_pt_lon", "shape_pt_sequence"),
-    c("character", "numeric", "numeric", "integer")
-  )
-
-  # select relevant shape_ids and raise warning/error if given shape_ids don't
-  # exist in shapes
-
-  if (!is.null(shape_id)) {
-    relevant_shapes <- shape_id
-
-    warn_missing_ids(shape_id, gtfs$shapes$shape_id, "shapes", "shape_id")
-
-    shapes <- gtfs$shapes[shape_id %chin% relevant_shapes]
-  } else {
-    shapes <- gtfs$shapes
-  }
-
-  if (is.null(shape_id)) shapes <- data.table::copy(shapes)
-  shapes <- data.table::setorderv(shapes, c("shape_id", "shape_pt_sequence"))
-
-  # create an empty LINESTRING sf if shapes is empty
-
-  if (nrow(shapes) == 0) {
-    empty_linestring <- sf::st_sfc()
-    class(empty_linestring)[1] <- "sfc_LINESTRING"
-
-    shapes_sf <- sf::st_sf(
-      shape_id = character(),
-      geometry = empty_linestring,
-      stringsAsFactors = FALSE
-    )
-  } else {
-    shapes_sf <- sfheaders::sf_linestring(
-      shapes,
-      x = "shape_pt_lon",
-      y = "shape_pt_lat",
-      linestring_id = "shape_id"
-    )
-  }
-
-  shapes_sf <- sf::st_set_crs(shapes_sf, 4326)
-
-  # transform crs from 4326 to the one passed to 'crs'
-
-  if (crs != 4326 && crs != sf::st_crs(4326)) {
-    shapes_sf <- sf::st_transform(shapes_sf, crs)
-  }
 
   return(shapes_sf)
-
 }

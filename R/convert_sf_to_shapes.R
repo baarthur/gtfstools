@@ -24,7 +24,7 @@
 #' gtfs <- read_gtfs(data_path)
 #'
 #' # first converting existing shapes table into a sf object
-#' shapes_sf <- convert_shapes_to_sf(gtfs)
+#' shapes_sf <- get_shapes_geometry(gtfs)
 #' head(shapes_sf)
 #'
 #' # by default converts all shapes

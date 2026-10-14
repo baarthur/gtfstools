@@ -33,7 +33,7 @@ test_that("calculates the lengths calculated by sf/s2", {
   expect_identical(names(result), c("shape_id", "length"))
   expect_type(result$length, "double")
 
-  shapes_sf <- convert_shapes_to_sf(spo_gtfs)
+  shapes_sf <- get_shapes_geometry(spo_gtfs)
   expected <- as.numeric(sf::st_length(shapes_sf))
   expect_equal(
     result$length,

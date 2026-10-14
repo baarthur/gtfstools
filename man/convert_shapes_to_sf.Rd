@@ -2,7 +2,7 @@
 % Please edit documentation in R/convert_shapes_to_sf.R
 \name{convert_shapes_to_sf}
 \alias{convert_shapes_to_sf}
-\title{Convert \code{shapes} table to simple feature object}
+\title{Convert \code{shapes} table to simple feature object (deprecated)}
 \usage{
 convert_shapes_to_sf(gtfs, shape_id = NULL, crs = 4326, sort_sequence)
 }
@@ -23,21 +23,10 @@ by \code{shape_pt_sequence}. Passing \code{TRUE} raises a warning, and passing
 A \verb{LINESTRING sf} object.
 }
 \description{
-Converts the \code{shapes} table to a \verb{LINESTRING sf} object.
+This function is deprecated: calling it raises a warning. Please use
+\code{\link[=get_shapes_geometry]{get_shapes_geometry()}} instead, which takes the same arguments (except
+\code{sort_sequence}) and returns the same result.
 }
-\examples{
-\dontshow{
-  old_dt_threads <- data.table::setDTthreads(1)
-  on.exit(data.table::setDTthreads(old_dt_threads), add = TRUE)
-}
-# read gtfs
-data_path <- system.file("extdata/spo_gtfs.zip", package = "gtfstools")
-gtfs <- read_gtfs(data_path)
-
-shapes_sf <- convert_shapes_to_sf(gtfs)
-head(shapes_sf)
-
-shapes_sf <- convert_shapes_to_sf(gtfs, shape_id = "17846")
-shapes_sf
-
+\seealso{
+\code{\link[=get_shapes_geometry]{get_shapes_geometry()}}, which replaces this function.
 }

@@ -53,7 +53,7 @@ part of the shape between them. Thus, its length matches the length
 returned by \code{\link[=get_trip_length]{get_trip_length()}} (when this length is not \code{NA}, see below),
 and the limitations described there apply. Trips whose stops are all
 located at the same point of the shape get a zero-length geometry.
-Use \code{\link[=convert_shapes_to_sf]{convert_shapes_to_sf()}} for the geometry of entire shapes.
+Use \code{\link[=get_shapes_geometry]{get_shapes_geometry()}} for the geometry of entire shapes.
 
 With \code{method = "euclidean"}, the geometry links the consecutive stops of
 each trip along straight lines (stops' coordinates are retrieved from the
@@ -95,5 +95,5 @@ plot(straight_geometry["trip_id"])
 
 }
 \seealso{
-\code{\link[=get_trip_length]{get_trip_length()}}, \code{\link[=convert_shapes_to_sf]{convert_shapes_to_sf()}}
+\code{\link[=get_trip_length]{get_trip_length()}}, \code{\link[=get_shapes_geometry]{get_shapes_geometry()}}
 }

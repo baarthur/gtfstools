@@ -2,7 +2,7 @@
 % Please edit documentation in R/convert_stops_to_sf.R
 \name{convert_stops_to_sf}
 \alias{convert_stops_to_sf}
-\title{Convert \code{stops} table to simple feature object}
+\title{Convert \code{stops} table to simple feature object (deprecated)}
 \usage{
 convert_stops_to_sf(gtfs, stop_id = NULL, crs = 4326)
 }
@@ -19,21 +19,10 @@ If \code{NULL} (the default), all stops are converted.}
 A \verb{POINT sf} object.
 }
 \description{
-Converts the \code{stops} table to a \verb{POINT sf} object.
+This function is deprecated: calling it raises a warning. Please use
+\code{\link[=get_stops_geometry]{get_stops_geometry()}} instead, which takes the same arguments and returns
+the same result.
 }
-\examples{
-\dontshow{
-  old_dt_threads <- data.table::setDTthreads(1)
-  on.exit(data.table::setDTthreads(old_dt_threads), add = TRUE)
-}
-# read gtfs
-data_path <- system.file("extdata/spo_gtfs.zip", package = "gtfstools")
-gtfs <- read_gtfs(data_path)
-
-stops_sf <- convert_stops_to_sf(gtfs)
-head(stops_sf)
-
-stops_sf <- convert_stops_to_sf(gtfs, stop_id = "18848")
-stops_sf
-
+\seealso{
+\code{\link[=get_stops_geometry]{get_stops_geometry()}}, which replaces this function.
 }
