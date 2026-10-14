@@ -171,6 +171,7 @@ utils::globalVariables(
     "i.span_len",
     "delay",
     "last_arrival",
-    "date"
+    "date",
+    "i.route_id"
   )
 )

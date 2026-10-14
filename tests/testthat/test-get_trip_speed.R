@@ -47,19 +47,56 @@ test_that("sort_sequence is deprecated", {
 test_that("outputs data.tables with the right columns and types", {
   trip_speeds <- tester()
   expect_s3_class(trip_speeds, "data.table")
-  expect_identical(names(trip_speeds), c("trip_id", "speed"))
+  expect_identical(names(trip_speeds), c("route_id", "trip_id", "speed"))
   expect_type(trip_speeds$speed, "double")
 
   segment_speeds <- tester(trip_id = trip_id, by = "segment")
   expect_identical(
     names(segment_speeds),
-    c("trip_id", "segment", "from_stop_id", "to_stop_id", "speed")
+    c("route_id", "trip_id", "segment", "from_stop_id", "to_stop_id", "speed")
   )
   expect_type(segment_speeds$segment, "integer")
 
   empty_speeds <- suppressWarnings(tester(trip_id = "nonexistent"))
   expect_identical(nrow(empty_speeds), 0L)
-  expect_identical(names(empty_speeds), c("trip_id", "speed"))
+  expect_identical(names(empty_speeds), c("route_id", "trip_id", "speed"))
+  expect_type(empty_speeds$route_id, "character")
+
+  empty_segments <- suppressWarnings(
+    tester(trip_id = "nonexistent", by = "segment")
+  )
+  expect_identical(nrow(empty_segments), 0L)
+  expect_identical(
+    names(empty_segments),
+    c("route_id", "trip_id", "segment", "from_stop_id", "to_stop_id", "speed")
+  )
+  expect_type(empty_segments$route_id, "character")
+})
+
+test_that("route_id comes from trips, and is NA for trips not in trips", {
+  dropped_trip <- gtfs$trips$trip_id[1]
+  partial_trips_gtfs <- gtfs
+  partial_trips_gtfs$trips <- gtfs$trips[trip_id != dropped_trip]
+
+  trip_speeds <- tester(partial_trips_gtfs, method = "euclidean")
+  expected_route_id <- partial_trips_gtfs$trips$route_id[
+    data.table::chmatch(trip_speeds$trip_id, partial_trips_gtfs$trips$trip_id)
+  ]
+  expect_identical(trip_speeds$route_id, expected_route_id)
+  expect_true(dropped_trip %chin% trip_speeds$trip_id)
+  expect_identical(
+    trip_speeds[trip_id == dropped_trip]$route_id,
+    NA_character_
+  )
+})
+
+test_that("raises an error if trips lacks route_id", {
+  no_route_gtfs <- copy_gtfs_without_field(gtfs, "trips", "route_id")
+  expect_error(tester(no_route_gtfs), class = "missing_required_field")
+  expect_error(
+    tester(no_route_gtfs, method = "euclidean"),
+    class = "missing_required_field"
+  )
 })
 
 test_that("speeds are lengths divided by durations", {
