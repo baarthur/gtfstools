@@ -26,7 +26,7 @@
 #' changed refer to their `trip_id`s. Trips without `stop_times` entries are
 #' ignored.
 #'
-#' @seealso [set_trip_speed()], [get_trip_speed()]
+#' @seealso [set_trip_speed()], [get_trip_speed()], [get_route_speed()]
 #'
 #' @examplesIf requireNamespace("dplyr", quietly = TRUE)
 #' \dontshow{

@@ -27,7 +27,7 @@
 #' with a known speed. Routes without any trip in `stop_times` are not
 #' returned.
 #'
-#' @seealso [get_trip_speed()]
+#' @seealso [get_trip_speed()], [set_route_speed()], [set_trip_speed()]
 #'
 #' @examples
 #' \dontshow{

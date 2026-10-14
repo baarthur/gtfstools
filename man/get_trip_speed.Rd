@@ -100,6 +100,6 @@ head(segment_speed)
 
 }
 \seealso{
-\code{\link[=get_trip_length]{get_trip_length()}}, \code{\link[=get_trip_duration]{get_trip_duration()}},
-\code{\link[=get_trip_segment_duration]{get_trip_segment_duration()}}
+\code{\link[=get_route_speed]{get_route_speed()}}, \code{\link[=set_trip_speed]{set_trip_speed()}}, \code{\link[=set_route_speed]{set_route_speed()}},
+\code{\link[=get_trip_length]{get_trip_length()}}, \code{\link[=get_trip_duration]{get_trip_duration()}}, \code{\link[=get_trip_segment_duration]{get_trip_segment_duration()}}
 }

@@ -54,6 +54,8 @@
 #' For trips listed in `frequencies`, these are template times, not actual
 #' departures. Trips whose departure there is blank are left unchanged.
 #'
+#' @seealso [set_route_speed()], [get_trip_speed()], [get_route_speed()]
+#'
 #' @examplesIf requireNamespace("dplyr", quietly = TRUE)
 #' \dontshow{
 #'   old_dt_threads <- data.table::setDTthreads(1)
