@@ -20,11 +20,11 @@ set_route_speed(
 \item{gtfs}{A GTFS object, as created by \code{\link[=read_gtfs]{read_gtfs()}}.}
 
 \item{route_id}{A character vector including the \code{route_id}s to have the
-average speed of their trips set.}
+average speed of their trips set. \code{route_id}s not listed in \code{trips} are
+ignored, with a warning.}
 
-\item{speed}{A numeric representing the speed to be set. Its length must
-either equal 1, in which case the value is recycled for all \code{route_id}s,
-or equal \code{route_id}'s length. Must be positive and finite.}
+\item{speed}{A number representing the speed to be set for the trips of all
+\code{route_id}s. Must be positive and finite.}
 
 \item{unit}{A string representing the unit in which the speed is given. One
 of \code{"km/h"} (the default), \code{"m/s"} or \code{"mph"} (miles per hour).}
@@ -59,7 +59,7 @@ in \code{stop_times}.
 }
 \section{Details}{
 
-Every trip of each route, as listed in \code{trips}, gets the route's speed, as
+Every trip of each route, as listed in \code{trips}, gets the given speed, as
 in \code{\link[=set_trip_speed]{set_trip_speed()}}, whose details also apply here: the duration of each
 trip's segment (by default, the whole trip) is set to its length divided by
 \code{speed}, the times at stops inside the segment are set to \code{""}, and \code{from}
@@ -79,13 +79,10 @@ library(dplyr)
 data_path <- system.file("extdata/spo_gtfs.zip", package = "gtfstools")
 gtfs <- read_gtfs(data_path)
 
-route_trips <- gtfs$trips |>
-  filter(route_id == "CPTM L07") |>
-  pull(trip_id)
-get_trip_speed(gtfs, route_trips)
+get_route_speed(gtfs, route_id = "CPTM L07")
 
 new_speed_gtfs <- set_route_speed(gtfs, route_id = "CPTM L07", speed = 50)
-get_trip_speed(new_speed_gtfs, route_trips)
+get_route_speed(new_speed_gtfs, route_id = "CPTM L07")
 
 # set the speed only of the trips that depart within a time of day
 poa_path <- system.file("extdata/poa_gtfs.zip", package = "gtfstools")

@@ -11,6 +11,7 @@
 #' @param route_id A character vector including the `route_id`s whose trips
 #'   have their speeds capped. If both `route_id` and `trip_id` are `NULL`
 #'   (the default), the speeds of every trip in the GTFS are capped.
+#'   `route_id`s not listed in `trips` are ignored, with a warning.
 #' @param trip_id A character vector including the `trip_id`s to have their
 #'   speeds capped. When given together with `route_id`, the trips of both are
 #'   capped.

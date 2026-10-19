@@ -14,6 +14,7 @@
 ## Feature deprecation
 
 - `convert_shapes_to_sf()` and `convert_stops_to_sf()` are deprecated in favour of `get_shapes_geometry()` and `get_stops_geometry()`, which take the same arguments (except the deprecated `sort_sequence`) and return the same results. Calling them raises a warning.
+- The `file` argument of `get_trip_geometry()`, `get_trip_length()` and `get_trip_speed()` is deprecated in favour of `method` (`file = "stop_times"` corresponds to `method = "euclidean"`).
 
 ## New features
 
@@ -49,8 +50,8 @@
 - `frequencies_to_stop_times()` gains the `strategy` argument, to shift the departures of frequency-based trips by half the headway or by a random offset (#56).
 - `write_gtfs()` gains the `compression_level` argument. Its default, 6 (previously always 9), makes writing about 2 to 3 times faster for files of very similar size.
 - New vignette "Editing GTFS feeds", which lists the functions that edit feeds and demonstrates `set_route_frequency()`, `set_trip_speed()`, `stop_times_to_frequencies()` and `interpolate_stop_times()`.
-- New vignette "Querying GTFS feeds", which demonstrates `get_route_frequency()`, `get_stop_frequency()`, `get_stop_timetable()`, `get_trip_length()`, `get_trip_duration()`, `get_trip_speed()` and `get_summary()`.
-- New vignette "Mapping GTFS feeds", which maps the transit network, routes by speed and stops by frequency with `get_shapes_geometry()`, `get_route_geometry()` and `get_stops_geometry()`.
+- New vignette "Querying GTFS feeds", which demonstrates `get_route_frequency()`, `get_stop_frequency()`, `get_stop_timetable()`, `get_trip_length()`, `get_trip_duration()`, `get_trip_speed()`, `get_route_speed()` and `get_summary()`.
+- New vignette "Mapping GTFS feeds", which maps the transit network, routes by speed and stops by frequency with `get_shapes_geometry()`, `get_route_geometry()`, `get_route_speed()` and `get_stops_geometry()`.
 
 ## Bug fixes
 
@@ -93,10 +94,6 @@
 - `filter_by_agency_id()` now keeps the `fare_attributes` without an `agency_id`.
 - `set_trip_speed()` now also raises an error when `speed` is infinite, or when the same trip is given different speeds.
 - Documentation: `filter_by_stop_id()` now correctly describes that it keeps (or drops) the `stop_times` entries at the given stops, not entire trips.
-
-## Feature deprecation
-
-- The `file` argument of `get_trip_geometry()`, `get_trip_length()` and `get_trip_speed()` is deprecated in favour of `method` (`file = "stop_times"` corresponds to `method = "euclidean"`).
 
 ## Notes
 

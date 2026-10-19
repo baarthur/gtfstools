@@ -10,7 +10,8 @@ set_route_frequency(gtfs, route_id, headway, from, to)
 \item{gtfs}{A GTFS object, as created by \code{\link[=read_gtfs]{read_gtfs()}}.}
 
 \item{route_id}{A character vector including the \code{route_id}s to have their
-frequency set.}
+frequency set. \code{route_id}s not listed in \code{trips} are ignored, with a
+warning.}
 
 \item{headway}{A number. The headway to be set, in minutes. It is rounded
 to whole seconds and applies to every \code{route_id} (call the function once

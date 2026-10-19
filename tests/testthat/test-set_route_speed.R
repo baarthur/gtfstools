@@ -89,14 +89,17 @@ test_that("only changes the trips that depart within from and to", {
   expect_false(isTRUE(all.equal(by_route$stop_times, poa_gtfs$stop_times)))
 })
 
-test_that("sets a different speed for each route", {
+test_that("sets the same speed for every route", {
   routes <- c("CPTM L07", "2105-10")
-  new_gtfs <- set_route_speed(gtfs, routes, c(50, 20))
+  new_gtfs <- set_route_speed(gtfs, routes, 50)
 
   speeds <- get_trip_speed(new_gtfs, route_trips(gtfs, routes))
 
-  expect_true(all(abs(speeds[route_id == "CPTM L07"]$speed - 50) < 0.5))
-  expect_true(all(abs(speeds[route_id == "2105-10"]$speed - 20) < 0.5))
+  expect_true(all(abs(speeds$speed - 50) < 0.5))
+
+  # one speed per route is not accepted
+
+  expect_error(set_route_speed(gtfs, routes, c(50, 20)))
 })
 
 test_that("warns about invalid route_ids and changes the valid ones", {

@@ -11,7 +11,8 @@ get_route_frequency(gtfs, route_id = NULL, from, to)
 
 \item{route_id}{A character vector including the \code{route_id}s to have their
 frequencies calculated. If \code{NULL} (the default), the function calculates
-the frequency of every \code{route_id} in the GTFS.}
+the frequency of every \code{route_id} in the GTFS. \code{route_id}s not listed in
+\code{trips} are ignored, with a warning.}
 
 \item{from}{A string. The starting point of the time of day, in the
 "HH:MM:SS" format.}

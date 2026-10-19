@@ -52,17 +52,10 @@ ggplot() +
 
 # Mapping routes by speed
 
-Spatial objects become more interesting when combined with other information about the feed. Let's map the routes by their average speed. First, we calculate the speed of each trip with `get_trip_speed()`, and take the simple mean of the speeds of the trips of each route (frequency-based trips count once, regardless of their headway):
+Spatial objects become more interesting when combined with other information about the feed. Let's map the routes by their average speed. First, we calculate summary statistics of the speeds of the trips of each route with `get_route_speed()`. We use `mean_speed`, the simple mean of the speeds of the trips of each route (frequency-based trips count once, regardless of their headway):
 
 ```{r}
-trip_speed <- get_trip_speed(gtfs)
-
-route_speed <- trip_speed |>
-  dplyr::group_by(route_id) |>
-  dplyr::summarise(
-    speed = mean(speed, na.rm = TRUE), 
-    .groups = "drop"
-    )
+route_speed <- get_route_speed(gtfs)
 
 head(route_speed)
 ```
@@ -75,7 +68,7 @@ routes <- get_route_geometry(gtfs) |>
   dplyr::inner_join(route_speed, by = "route_id")
 
 ggplot() +
-  geom_sf(data = routes, aes(color = speed)) +
+  geom_sf(data = routes, aes(color = mean_speed)) +
   scale_color_viridis_c(name = "Speed (km/h)") +
   theme_void()
 ```

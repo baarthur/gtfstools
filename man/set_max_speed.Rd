@@ -14,7 +14,8 @@ set_max_speed(gtfs, max_speed, route_id = NULL, trip_id = NULL, unit = "km/h")
 
 \item{route_id}{A character vector including the \code{route_id}s whose trips
 have their speeds capped. If both \code{route_id} and \code{trip_id} are \code{NULL}
-(the default), the speeds of every trip in the GTFS are capped.}
+(the default), the speeds of every trip in the GTFS are capped.
+\code{route_id}s not listed in \code{trips} are ignored, with a warning.}
 
 \item{trip_id}{A character vector including the \code{trip_id}s to have their
 speeds capped. When given together with \code{route_id}, the trips of both are

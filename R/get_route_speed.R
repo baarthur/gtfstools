@@ -6,7 +6,8 @@
 #' @template gtfs
 #' @param route_id A character vector including the `route_id`s to have their
 #'   speeds summarised. If `NULL` (the default), the function summarises the
-#'   speeds of every `route_id` in the GTFS.
+#'   speeds of every `route_id` in the GTFS. `route_id`s not listed in `trips`
+#'   are ignored, with a warning.
 #' @template method
 #' @inheritParams get_trip_speed
 #'

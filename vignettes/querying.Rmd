@@ -27,6 +27,7 @@ GTFS feeds hold a lot of information about transit services, but much of it is n
 - `get_trip_length()`: the length of trips;
 - `get_trip_duration()`: the duration of trips;
 - `get_trip_speed()`: the average speed of trips;
+- `get_route_speed()`: summary statistics of the speeds of the trips of routes;
 - `get_summary()`: a summary of the whole feed.
 
 The other `get_*()` functions are listed in the [function reference](https://ipea.github.io/gtfstools/reference/index.html). To check which dates have service in several feeds at once, see `get_calendar_overlap()` and the [Checking the calendar overlap of GTFS feeds](calendar_overlap.html) vignette.
@@ -103,6 +104,12 @@ And `get_trip_speed()` divides the length of each trip by its duration:
 ```{r}
 # 'unit' argument defaults to "km/h"
 get_trip_speed(gtfs, trip_ids)
+```
+
+`get_route_speed()` summarises the speeds of the trips of each route, as calculated by `get_trip_speed()` (the standard deviation is `NA` for routes with a single trip, such as 2002-10):
+
+```{r}
+get_route_speed(gtfs, route_id = c("CPTM L07", "2002-10"))
 ```
 
 # Summarising a feed

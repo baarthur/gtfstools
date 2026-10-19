@@ -6,10 +6,10 @@
 #'
 #' @template gtfs
 #' @param route_id A character vector including the `route_id`s to have the
-#'   average speed of their trips set.
-#' @param speed A numeric representing the speed to be set. Its length must
-#'   either equal 1, in which case the value is recycled for all `route_id`s,
-#'   or equal `route_id`'s length. Must be positive and finite.
+#'   average speed of their trips set. `route_id`s not listed in `trips` are
+#'   ignored, with a warning.
+#' @param speed A number representing the speed to be set for the trips of all
+#'   `route_id`s. Must be positive and finite.
 #' @inheritParams set_trip_speed
 #'
 #' @return If `by_reference` is set to `FALSE`, returns a GTFS object with the
@@ -17,7 +17,7 @@
 #'   invisibly (note that in this case the original GTFS object is altered).
 #'
 #' @section Details:
-#' Every trip of each route, as listed in `trips`, gets the route's speed, as
+#' Every trip of each route, as listed in `trips`, gets the given speed, as
 #' in [set_trip_speed()], whose details also apply here: the duration of each
 #' trip's segment (by default, the whole trip) is set to its length divided by
 #' `speed`, the times at stops inside the segment are set to `""`, and `from`
@@ -37,13 +37,10 @@
 #' data_path <- system.file("extdata/spo_gtfs.zip", package = "gtfstools")
 #' gtfs <- read_gtfs(data_path)
 #'
-#' route_trips <- gtfs$trips |>
-#'   filter(route_id == "CPTM L07") |>
-#'   pull(trip_id)
-#' get_trip_speed(gtfs, route_trips)
+#' get_route_speed(gtfs, route_id = "CPTM L07")
 #'
 #' new_speed_gtfs <- set_route_speed(gtfs, route_id = "CPTM L07", speed = 50)
-#' get_trip_speed(new_speed_gtfs, route_trips)
+#' get_route_speed(new_speed_gtfs, route_id = "CPTM L07")
 #'
 #' # set the speed only of the trips that depart within a time of day
 #' poa_path <- system.file("extdata/poa_gtfs.zip", package = "gtfstools")
@@ -81,6 +78,7 @@ set_route_speed <- function(
 ) {
   gtfs <- assert_and_assign_gtfs_object(gtfs)
   checkmate::assert_character(route_id, any.missing = FALSE)
+  checkmate::assert_number(speed, finite = TRUE)
   gtfsio::assert_field_class(
     gtfs,
     "trips",
@@ -97,18 +95,13 @@ set_route_speed <- function(
     trips <- trips[trip_id %chin% gtfs$stop_times$trip_id]
   }
 
-  # one speed per route becomes one speed per trip. speed and the other
-  # arguments are validated by set_trip_speed()
-
-  trip_speed <- speed
-  if (length(speed) > 1 && length(speed) == length(route_id)) {
-    trip_speed <- speed[match(trips$route_id, route_id)]
-  }
+  # every trip gets the same speed. the other arguments, and whether speed is
+  # positive, are validated by set_trip_speed()
 
   result <- set_trip_speed(
     gtfs,
     trip_id = trips$trip_id,
-    speed = trip_speed,
+    speed = speed,
     unit = unit,
     first_stop = first_stop,
     last_stop = last_stop,
@@ -120,7 +113,7 @@ set_route_speed <- function(
   # warn about invalid routes after set_trip_speed() has validated the other
   # arguments, so that errors come first
 
-  invalid_route_id <- unique(route_id[! route_id %chin% gtfs$trips$route_id])
+  invalid_route_id <- unique(route_id[!route_id %chin% gtfs$trips$route_id])
 
   if (!identical(invalid_route_id, character(0))) {
     cli::cli_warn(
