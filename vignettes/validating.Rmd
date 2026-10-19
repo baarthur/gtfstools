@@ -77,7 +77,7 @@ As we can see, the validation generates a few output files:
   formatted HTML page (only available when using validator v3.1.0 or higher);
 - `report.json` summarizes the exact same information, but in JSON format,
   which can be used to easily parse and process the results;
-- `system_errors.json` summarizes eventual system erros that may have happened
+- `system_errors.json` summarizes eventual system errors that may have happened
   during the validation and may compromise the results;
 - `validation_stderr.txt` lists the informative messages sent by the
   command-line tool to the standard error output stream, which includes the

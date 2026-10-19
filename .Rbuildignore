@@ -23,3 +23,4 @@
 ^templates$
 ^quality_reports$
 ^Rplots\.pdf$
+^revdep$

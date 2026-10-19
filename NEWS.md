@@ -192,7 +192,7 @@
   and specify the `trip_id`s included in the output in `filter_by_trip_id()`.
 - `filter_by_sf()` has been deprecated in favor of
   `filter_by_spatial_extent()`. For backwards compatibility reasons, usage of
-  `filter_by_sf()` is still allowed as of the curent version, but the function
+  `filter_by_sf()` is still allowed as of the current version, but the function
   will be removed from the package in version 2.0.0.
 
 ## Notes

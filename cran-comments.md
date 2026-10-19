@@ -22,7 +22,16 @@
       From: inst/doc/gtfstools.html
       Status: 403
       Message: Forbidden
-      
+
+## Reverse dependencies
+
+We checked 5 reverse dependencies (gtfs2emis, gtfs2gps, GTFShift, GTFSwizard
+and r5r), comparing R CMD check results across CRAN and dev versions of this
+package.
+
+ * We saw 0 new problems
+ * We failed to check 0 packages
+
 This is a resubmission.
 
 The package was flagged for having examples and vignettes with CPU time
