@@ -11,7 +11,8 @@ get_route_speed(gtfs, route_id = NULL, method = "shapes", unit = "km/h")
 
 \item{route_id}{A character vector including the \code{route_id}s to have their
 speeds summarised. If \code{NULL} (the default), the function summarises the
-speeds of every \code{route_id} in the GTFS.}
+speeds of every \code{route_id} in the GTFS. \code{route_id}s not listed in \code{trips}
+are ignored, with a warning.}
 
 \item{method}{A string, either \code{"shapes"} (the default) or \code{"euclidean"}.
 \code{"shapes"} measures lengths along the trip's shape, described in the

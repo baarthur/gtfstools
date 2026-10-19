@@ -24,7 +24,7 @@ is altered).
 }
 \description{
 Converts \code{stop_times}' and \code{frequencies}' fields in the "HH:MM:SS" format to
-seconds after midnight. Instead of overwritting the existing fields, creates
+seconds after midnight. Instead of overwriting the existing fields, creates
 new fields with the \verb{_secs} suffix.
 }
 \details{

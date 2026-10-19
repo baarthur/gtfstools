@@ -6,7 +6,8 @@
 #'
 #' @template gtfs
 #' @param route_id A character vector including the `route_id`s to have their
-#'   frequency set.
+#'   frequency set. `route_id`s not listed in `trips` are ignored, with a
+#'   warning.
 #' @param headway A number. The headway to be set, in minutes. It is rounded
 #'   to whole seconds and applies to every `route_id` (call the function once
 #'   per route to set different headways).
