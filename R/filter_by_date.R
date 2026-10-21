@@ -48,6 +48,11 @@
 #' # 2006-07-05 (a wednesday)
 #' smaller_gtfs <- filter_by_date(gtfs, as.Date("2006-07-05"), keep = FALSE)
 #' smaller_gtfs$calendar
+#'
+#' # a vector of dates keeps the services that run on at least one of them
+#' week <- seq(as.Date("2006-07-01"), as.Date("2006-07-07"), by = "day")
+#' smaller_gtfs <- filter_by_date(gtfs, week)
+#' smaller_gtfs$calendar
 #' @export
 filter_by_date <- function(gtfs, date, keep = TRUE) {
   gtfs <- assert_and_assign_gtfs_object(gtfs)
