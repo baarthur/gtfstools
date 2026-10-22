@@ -6,6 +6,7 @@ skip_if_not(rmarkdown::pandoc_available(), "Pandoc is not available")
 spo_path <- system.file("extdata/spo_gtfs.zip", package = "gtfstools")
 poa_path <- system.file("extdata/poa_gtfs.zip", package = "gtfstools")
 ggl_path <- system.file("extdata/ggl_gtfs.zip", package = "gtfstools")
+ber_path <- system.file("extdata/ber_gtfs.zip", package = "gtfstools")
 gtfs <- read_gtfs(spo_path)
 
 tester <- function(gtfs = get("gtfs", envir = parent.frame()),
@@ -16,7 +17,8 @@ tester <- function(gtfs = get("gtfs", envir = parent.frame()),
                    from = NULL,
                    to = NULL,
                    output_dir = tempfile("get_summary"),
-                   open_browser = FALSE) {
+                   open_browser = FALSE,
+                   by_route_type = FALSE) {
   get_summary(
     gtfs,
     date = date,
@@ -26,7 +28,8 @@ tester <- function(gtfs = get("gtfs", envir = parent.frame()),
     from = from,
     to = to,
     output_dir = output_dir,
-    open_browser = open_browser
+    open_browser = open_browser,
+    by_route_type = by_route_type
   )
 }
 
@@ -47,6 +50,8 @@ test_that("raises error due to incorrect input types", {
   expect_error(tester(from = "07:00"))
   expect_error(tester(output_dir = 1))
   expect_error(tester(open_browser = NA))
+  expect_error(tester(by_route_type = NA))
+  expect_error(tester(by_route_type = "yes"))
 
   expect_error(
     tester(from = "07:00:00"),
@@ -272,7 +277,8 @@ test_that("doesn't change given gtfs", {
     list(date = "2008-01-01"),
     list(agency = "1"),
     list(route_id = "CPTM L07"),
-    list(from = "07:00:00", to = "09:00:00")
+    list(from = "07:00:00", to = "09:00:00"),
+    list(by_route_type = TRUE)
   )
   for (call_args in calls) {
     result <- do.call(tester, c(list(gtfs), call_args))
@@ -419,4 +425,144 @@ test_that("works with other feeds", {
   result <- suppressWarnings(tester(ggl_gtfs))
   expect_identical(result$services$feed_start_date, as.Date("2006-01-01"))
   expect_identical(result$services$feed_end_date, as.Date("2006-12-31"))
+})
+
+test_that("breaks down the summary by route_type", {
+  output_dir <- tempfile("get_summary")
+  full <- tester()
+  result <- tester(output_dir = output_dir, by_route_type = TRUE)
+
+  expect_named(
+    result$totals,
+    c("indicator", "subway", "rail", "bus", "all", "unit")
+  )
+  expect_identical(result$totals$indicator, full$totals$indicator)
+  expect_identical(result$totals$all, full$totals$value)
+  expect_identical(result$totals$unit, full$totals$unit)
+
+  # trips and routes are counted independently of get_summary()
+
+  trip_types <- gtfs$routes$route_type[
+    match(gtfs$trips$route_id, gtfs$routes$route_id)
+  ]
+  expected_trips <- as.numeric(table(trip_types)[c("1", "2", "3")])
+  expected_routes <- as.numeric(
+    table(gtfs$routes$route_type)[c("1", "2", "3")]
+  )
+  mode_cols <- c("subway", "rail", "bus")
+  n_trips <- unlist(result$totals[indicator == "n_trips", ..mode_cols])
+  n_routes <- unlist(result$totals[indicator == "n_routes", ..mode_cols])
+  expect_identical(unname(n_trips), expected_trips)
+  expect_identical(unname(n_routes), expected_routes)
+
+  for (element in c("speed", "distance", "frequency")) {
+    expect_identical(
+      result[[element]]$mode,
+      c("subway", "rail", "bus", "all")
+    )
+    expect_identical(
+      as.data.frame(result[[element]][mode == "all", -"mode"]),
+      as.data.frame(full[[element]])
+    )
+  }
+
+  # each mode is described as if it were selected alone, except for the
+  # headways, measured on the day and time of day of the whole selection
+
+  bus <- tester(mode = "bus")
+  expect_identical(
+    result$totals[indicator != "mean_route_headway", bus],
+    bus$totals[indicator != "mean_route_headway", value]
+  )
+  expect_identical(
+    as.data.frame(result$speed[mode == "bus", -"mode"]),
+    as.data.frame(bus$speed)
+  )
+  expect_identical(
+    as.data.frame(result$distance[mode == "bus", -"mode"]),
+    as.data.frame(bus$distance)
+  )
+
+  # the report renders with a row per mode in the frequency table
+
+  expect_true(file.exists(file.path(output_dir, "gtfs_summary.html")))
+  expect_true(file.exists(file.path(output_dir, "gtfs_summary_speed.png")))
+})
+
+test_that("breaks down a time of day by route_type", {
+  window <- tester(from = "07:00:00", to = "09:00:00")
+  result <- tester(from = "07:00:00", to = "09:00:00", by_route_type = TRUE)
+
+  expect_identical(result$totals$all, window$totals$value)
+  expect_identical(unique(result$frequency$from), "07:00:00")
+  expect_identical(unique(result$frequency$to), "09:00:00")
+  expect_identical(
+    sum(result$frequency[mode != "all", n]),
+    result$frequency[mode == "all", n]
+  )
+})
+
+test_that("names extended route_types by their code", {
+  ber_gtfs <- read_gtfs(ber_path)
+  result <- suppressWarnings(tester(ber_gtfs, by_route_type = TRUE))
+
+  expect_named(result$totals, c("indicator", "bus", "700", "all", "unit"))
+  n_agencies <- result$totals[indicator == "n_agencies"]
+  expect_identical(n_agencies$bus, 1)
+  expect_identical(n_agencies$`700`, 1)
+  expect_identical(n_agencies$all, 1)
+
+  # a single mode has the same values as the whole selection
+
+  bus_result <- suppressWarnings(
+    tester(ber_gtfs, mode = 3, by_route_type = TRUE)
+  )
+  expect_named(bus_result$totals, c("indicator", "bus", "all", "unit"))
+  expect_identical(bus_result$totals$bus, bus_result$totals$all)
+})
+
+test_that("handles blank agency_ids, unknown route_types and no shapes", {
+  poa_gtfs <- read_gtfs(poa_path)
+
+  # ber has many agencies, and its routes are all run by one of them. modes
+  # whose routes have blank agency_ids count all the agencies of the selection
+
+  ber_gtfs <- read_gtfs(ber_path)
+  blank_agency <- ber_gtfs
+  blank_agency$routes <- data.table::copy(blank_agency$routes)
+  blank_agency$routes[, agency_id := ""]
+  result <- suppressWarnings(tester(blank_agency, by_route_type = TRUE))
+  n_agencies <- result$totals[indicator == "n_agencies"]
+  n_ber_agencies <- as.numeric(nrow(ber_gtfs$agency))
+  expect_gt(n_ber_agencies, 1)
+  expect_identical(n_agencies$bus, n_ber_agencies)
+  expect_identical(n_agencies$`700`, n_ber_agencies)
+  expect_identical(n_agencies$all, n_ber_agencies)
+
+  blank_bus <- ber_gtfs
+  blank_bus$routes <- data.table::copy(blank_bus$routes)
+  blank_bus$routes[route_type == 3, agency_id := ""]
+  result <- suppressWarnings(tester(blank_bus, by_route_type = TRUE))
+  n_agencies <- result$totals[indicator == "n_agencies"]
+  expect_identical(n_agencies$bus, 1)
+  expect_identical(n_agencies$all, 1)
+
+  unknown_type <- poa_gtfs
+  unknown_type$routes <- data.table::copy(unknown_type$routes)
+  unknown_type$routes[1, route_type := NA]
+  result <- tester(unknown_type, by_route_type = TRUE)
+  expect_named(result$totals, c("indicator", "bus", "unknown", "all", "unit"))
+  n_trips <- result$totals[indicator == "n_trips"]
+  expect_identical(n_trips$bus + n_trips$unknown, n_trips$all)
+
+  no_shapes <- copy_gtfs_without_file(gtfs, "shapes")
+  expect_warning(
+    result <- tester(no_shapes, by_route_type = TRUE),
+    class = "gtfstools_shapes_unavailable"
+  )
+  shape_rows <- result$totals[indicator %chin% c(
+    "total_shape_length",
+    "mean_shape_length"
+  )]
+  expect_true(all(is.na(shape_rows[, c("subway", "rail", "bus", "all")])))
 })

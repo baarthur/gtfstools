@@ -18,7 +18,7 @@
 
 ## New features
 
-- New function `get_summary()`, which summarises a feed (its files, agencies, service calendar, totals and the distributions of trip speeds, trip lengths and route headways), optionally restricted to some dates, routes, modes, agencies and a time of day. It returns a list of `data.table`s and writes an HTML report with tables and figures (requires `{ggplot2}`, `{knitr}`, `{rmarkdown}` and Pandoc).
+- New function `get_summary()`, which summarises a feed (its files, agencies, service calendar, totals and the distributions of trip speeds, trip lengths and route headways), optionally restricted to some dates, routes, modes, agencies and a time of day. It returns a list of `data.table`s and writes an HTML report with tables and figures (requires `{ggplot2}`, `{knitr}`, `{rmarkdown}` and Pandoc). With `by_route_type = TRUE`, the totals, speeds, lengths and headways are also broken down by transport mode (#127).
 - New function `get_route_speed()`, which returns the minimum, mean, median, maximum and standard deviation of the speeds of the trips of each route, as calculated by `get_trip_speed()`.
 - New function `filter_by_date()`, which filters a feed by the services that run on the given dates.
 - New function `filter_by_period()`, which filters a feed by the services that run on at least one day of a period, given by its first and last dates. By default (`trim = TRUE`), the calendars of the kept services are cut to the period, so the feed has no service outside it.

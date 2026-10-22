@@ -20,9 +20,10 @@ hours.}
 }
 \value{
 A list with the elements \code{headways} (the headway of each route and
-direction, in minutes), \code{stats} (their summary, as created by
-\code{\link[=summarise_distribution]{summarise_distribution()}}), \code{date}, \code{from} and \code{to} (the day and time of
-day in which the headways were measured, \code{NA} if there is none).
+direction, in minutes, named by \code{route_id}), \code{stats} (their summary, as
+created by \code{\link[=summarise_distribution]{summarise_distribution()}}), \code{date}, \code{from} and \code{to} (the day
+and time of day in which the headways were measured, \code{NA} if there is
+none).
 }
 \description{
 Calculate the route headways of a feed on its busiest day

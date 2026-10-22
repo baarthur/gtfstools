@@ -175,6 +175,7 @@ utils::globalVariables(
     "trip_share",
     "lower_day",
     "median_day",
-    "upper_day"
+    "upper_day",
+    "i.mode"
   )
 )

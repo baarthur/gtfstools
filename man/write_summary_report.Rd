@@ -10,8 +10,10 @@ write_summary_report(result, values, selection, output_dir)
 \item{result}{The list of diagnostics returned by \code{\link[=get_summary]{get_summary()}}.}
 
 \item{values}{A named list with the numeric vectors to be plotted
-(\code{speed}, \code{distance} and \code{frequency}) and the calendar chart created by
-\code{\link[=get_calendar_overlap]{get_calendar_overlap()}} (\code{calendar}, \code{NULL} if there is none).}
+(\code{speed}, \code{distance} and \code{frequency}), the calendar chart created by
+\code{\link[=get_calendar_overlap]{get_calendar_overlap()}} (\code{calendar}, \code{NULL} if there is none) and a
+named list with the mode of each plotted value, as factors (\code{modes},
+empty if the values are not grouped by mode).}
 
 \item{selection}{A named list with the filters used (\code{NULL} elements mean
 no filter).}

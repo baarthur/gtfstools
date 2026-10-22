@@ -13,7 +13,8 @@ get_summary(
   from = NULL,
   to = NULL,
   output_dir = NULL,
-  open_browser = TRUE
+  open_browser = TRUE,
+  by_route_type = FALSE
 )
 }
 \arguments{
@@ -50,6 +51,10 @@ overwritten.}
 
 \item{open_browser}{A logical. Whether to open the HTML report in the
 browser, in interactive sessions (defaults to \code{TRUE}).}
+
+\item{by_route_type}{A logical. Whether to break down the totals, speeds,
+distances and frequencies by transport mode (\code{route_type}), in addition
+to the whole selection (defaults to \code{FALSE}).}
 }
 \value{
 A named list of \code{data.table}s (invisibly, if the report was opened
@@ -74,12 +79,17 @@ of agencies, routes, trips and stops, the total and mean length of the
 shapes and of the trips (in km), the total duration of the trips (in
 hours), the mean duration of the trips (in minutes), the mean trip
 speed (in km/h) and the mean route headway (in minutes). The means are
-taken over the shapes and trips whose value is known;
+taken over the shapes and trips whose value is known. If
+\code{by_route_type = TRUE}, \code{value} is replaced by one column per mode
+followed by the column \code{all} (codes of extended \code{route_type}s, such as
+\code{"700"}, are non-syntactic names, so they need backticks);
 \item \code{speed}, \code{distance} and \code{frequency}: summary statistics (\code{n}, \code{min},
 \code{q25}, \code{median}, \code{mean}, \code{q75}, \code{max} and \code{unit}) of the trip speeds
 (in km/h), of the trip lengths (in km) and of the route headways (in
 minutes). \code{frequency} also has the columns \code{date}, \code{from} and \code{to}, with
-the day and the time of day in which the headways were measured.
+the day and the time of day in which the headways were measured. If
+\code{by_route_type = TRUE}, these tables start with a \code{mode} column and
+have one row per mode followed by the row \code{all}.
 }
 
 The report is saved as \code{gtfs_summary.md} and \code{gtfs_summary.html}
@@ -126,6 +136,18 @@ are measured within the given time of day or, if \code{from} and \code{to} are
 \code{NULL}, from the first to the last departure of that day, rounded out to
 whole hours. Trips that start on the previous day and run after midnight
 are not counted, and times are in the local time of each agency.
+
+With \code{by_route_type = TRUE}, modes are named as in the \code{mode} argument,
+extended \code{route_type}s by their code, and trips whose \code{route_type} is
+unknown are grouped as \code{"unknown"}. Modes are ordered by \code{route_type}, with
+\code{"unknown"} last. Each mode is described as if it were selected alone
+(except that the headways of all modes are measured on the same day and
+time of day), so stops, shapes and agencies shared by several modes count
+in each of them. Only the numbers of routes and trips and the total trip
+lengths and durations add up to the \code{all} column. Modes whose routes have
+blank \code{agency_id}s count all the agencies of the selection, and trips
+listed in \code{stop_times} but not in \code{trips} only count in \code{all}. In the
+report, the histograms of the modes are overlaid.
 }
 
 \examples{
@@ -158,6 +180,14 @@ if (
     open_browser = FALSE
   )
   feed_summary$frequency
+
+  feed_summary <- get_summary(
+    data_path,
+    output_dir = tempdir(),
+    open_browser = FALSE,
+    by_route_type = TRUE
+  )
+  feed_summary$totals
   }
 }
 

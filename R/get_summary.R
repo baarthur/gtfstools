@@ -33,6 +33,9 @@
 #'   overwritten.
 #' @param open_browser A logical. Whether to open the HTML report in the
 #'   browser, in interactive sessions (defaults to `TRUE`).
+#' @param by_route_type A logical. Whether to break down the totals, speeds,
+#'   distances and frequencies by transport mode (`route_type`), in addition
+#'   to the whole selection (defaults to `FALSE`).
 #'
 #' @return A named list of `data.table`s (invisibly, if the report was opened
 #'   in the browser):
@@ -55,12 +58,17 @@
 #'     shapes and of the trips (in km), the total duration of the trips (in
 #'     hours), the mean duration of the trips (in minutes), the mean trip
 #'     speed (in km/h) and the mean route headway (in minutes). The means are
-#'     taken over the shapes and trips whose value is known;
+#'     taken over the shapes and trips whose value is known. If
+#'     `by_route_type = TRUE`, `value` is replaced by one column per mode
+#'     followed by the column `all` (codes of extended `route_type`s, such as
+#'     `"700"`, are non-syntactic names, so they need backticks);
 #'   - `speed`, `distance` and `frequency`: summary statistics (`n`, `min`,
 #'     `q25`, `median`, `mean`, `q75`, `max` and `unit`) of the trip speeds
 #'     (in km/h), of the trip lengths (in km) and of the route headways (in
 #'     minutes). `frequency` also has the columns `date`, `from` and `to`, with
-#'     the day and the time of day in which the headways were measured.
+#'     the day and the time of day in which the headways were measured. If
+#'     `by_route_type = TRUE`, these tables start with a `mode` column and
+#'     have one row per mode followed by the row `all`.
 #'
 #'   The report is saved as `gtfs_summary.md` and `gtfs_summary.html`
 #'   (together with its figures) in `output_dir`.
@@ -98,6 +106,18 @@
 #' whole hours. Trips that start on the previous day and run after midnight
 #' are not counted, and times are in the local time of each agency.
 #'
+#' With `by_route_type = TRUE`, modes are named as in the `mode` argument,
+#' extended `route_type`s by their code, and trips whose `route_type` is
+#' unknown are grouped as `"unknown"`. Modes are ordered by `route_type`, with
+#' `"unknown"` last. Each mode is described as if it were selected alone
+#' (except that the headways of all modes are measured on the same day and
+#' time of day), so stops, shapes and agencies shared by several modes count
+#' in each of them. Only the numbers of routes and trips and the total trip
+#' lengths and durations add up to the `all` column. Modes whose routes have
+#' blank `agency_id`s count all the agencies of the selection, and trips
+#' listed in `stop_times` but not in `trips` only count in `all`. In the
+#' report, the histograms of the modes are overlaid.
+#'
 #' @examples
 #' \dontshow{
 #'   old_dt_threads <- data.table::setDTthreads(1)
@@ -128,6 +148,14 @@
 #'     open_browser = FALSE
 #'   )
 #'   feed_summary$frequency
+#'
+#'   feed_summary <- get_summary(
+#'     data_path,
+#'     output_dir = tempdir(),
+#'     open_browser = FALSE,
+#'     by_route_type = TRUE
+#'   )
+#'   feed_summary$totals
 #'   }
 #' }
 #'
@@ -141,7 +169,8 @@ get_summary <- function(
   from = NULL,
   to = NULL,
   output_dir = NULL,
-  open_browser = TRUE
+  open_browser = TRUE,
+  by_route_type = FALSE
 ) {
   if (!report_deps_available()) {
     cli::cli_abort(
@@ -176,6 +205,7 @@ get_summary <- function(
   checkmate::assert_character(agency, any.missing = FALSE, null.ok = TRUE)
   checkmate::assert_string(output_dir, null.ok = TRUE)
   checkmate::assert_flag(open_browser)
+  checkmate::assert_flag(by_route_type)
 
   time_pattern <- "^\\d{2}:[0-5]\\d:[0-5]\\d$"
   checkmate::assert_string(from, pattern = time_pattern, null.ok = TRUE)
@@ -365,6 +395,7 @@ get_summary <- function(
 
   # only the shapes used by the selected trips are summed
 
+  shape_lengths <- NULL
   total_shape_length <- NA_real_
   mean_shape_length <- NA_real_
   if (
@@ -441,6 +472,157 @@ get_summary <- function(
     to = frequency$to
   )
 
+  plot_modes <- list()
+  if (by_route_type) {
+    # each trip is labelled with the mode of its route. trips whose route_type
+    # is unknown (missing route, field or value) are grouped as "unknown",
+    # after the modes, which are ordered by route_type
+
+    trip_ids <- feed$trips$trip_id
+    trip_routes <- feed$trips$route_id
+    trip_codes <- rep(NA_integer_, length(trip_ids))
+    if (gtfsio::check_field_exists(feed, "routes", "route_type")) {
+      trip_codes <- suppressWarnings(
+        as.integer(
+          feed$routes$route_type[match(trip_routes, feed$routes$route_id)]
+        )
+      )
+    }
+
+    trip_labels <- names(mode_route_types)[match(trip_codes, mode_route_types)]
+    is_extended <- is.na(trip_labels) & !is.na(trip_codes)
+    trip_labels[is_extended] <- as.character(trip_codes[is_extended])
+    trip_labels[is.na(trip_labels)] <- "unknown"
+    mode_labels <- unique(trip_labels[order(trip_codes, na.last = TRUE)])
+
+    # stops are counted in a single grouped pass, which only reads the
+    # 'stop_id' column of 'stop_times'
+
+    trip_modes <- data.table::data.table(trip_id = trip_ids, mode = trip_labels)
+    stop_counts <- feed$stop_times[
+      trip_modes,
+      on = "trip_id",
+      nomatch = NULL,
+      .(stop_id, mode = i.mode)
+    ][, .(n_stops = data.table::uniqueN(stop_id)), by = "mode"]
+
+    # agencies are narrowed as in the 'agency' table above: modes whose routes
+    # have blank agency_ids count all the agencies
+
+    narrow_agencies <- gtfsio::check_field_exists(
+      feed,
+      "routes",
+      "agency_id"
+    ) &&
+      "agency_id" %chin% names(agency_table)
+    trip_shapes <- feed$trips$shape_id
+
+    mode_stats <- lapply(
+      mode_labels,
+      function(group_label) {
+        in_mode <- trip_labels == group_label
+        mode_trips <- trip_ids[in_mode]
+        mode_routes <- unique(trip_routes[in_mode])
+
+        n_agencies <- nrow(agency_table)
+        if (narrow_agencies) {
+          mode_agencies <- feed$routes$agency_id[
+            feed$routes$route_id %chin% mode_routes
+          ]
+          mode_agencies <- mode_agencies[!is.na(mode_agencies)]
+          mode_agencies <- mode_agencies[mode_agencies != ""]
+
+          if (length(mode_agencies) > 0) {
+            n_agencies <- sum(agency_table$agency_id %chin% mode_agencies)
+          }
+        }
+
+        n_stops <- stop_counts$n_stops[stop_counts$mode == group_label]
+        if (length(n_stops) == 0) {
+          n_stops <- 0L
+        }
+
+        mode_shape_lengths <- NA_real_
+        if (!is.null(shape_lengths)) {
+          mode_shape_lengths <- shape_lengths$length[
+            shape_lengths$shape_id %chin% trip_shapes[in_mode]
+          ]
+        }
+
+        in_stats <- trip_stats$trip_id %chin% mode_trips
+        mode_lengths <- trip_stats$length[in_stats]
+        mode_durations <- trip_stats$duration[in_stats]
+        mode_headways <- frequency$headways[
+          names(frequency$headways) %chin% mode_routes
+        ]
+
+        mode_speed <- summarise_distribution(trip_stats$speed[in_stats], "km/h")
+        mode_distance <- summarise_distribution(mode_lengths, "km")
+        mode_frequency <- summarise_distribution(mode_headways, "min")
+
+        mode_totals <- c(
+          n_agencies,
+          length(mode_routes),
+          length(mode_trips),
+          n_stops,
+          sum_or_na(mode_shape_lengths),
+          summarise_distribution(mode_shape_lengths, "km")$mean,
+          sum_or_na(mode_lengths),
+          mode_distance$mean,
+          sum_or_na(mode_durations),
+          summarise_distribution(mode_durations * 60, "min")$mean,
+          mode_speed$mean,
+          mode_frequency$mean
+        )
+
+        return(
+          list(
+            totals = mode_totals,
+            speed = mode_speed,
+            distance = mode_distance,
+            frequency = mode_frequency
+          )
+        )
+      }
+    )
+    names(mode_stats) <- mode_labels
+
+    totals <- data.table::as.data.table(
+      c(
+        list(indicator = totals$indicator),
+        lapply(mode_stats, `[[`, "totals"),
+        list(all = totals$value, unit = totals$unit)
+      )
+    )
+
+    stats_by_mode <- function(stat, all_stats) {
+      mode_rows <- c(lapply(mode_stats, `[[`, stat), list(all = all_stats))
+      return(data.table::rbindlist(mode_rows, idcol = "mode"))
+    }
+
+    speed <- stats_by_mode("speed", speed)
+    distance <- stats_by_mode("distance", distance)
+    frequency_table <- cbind(
+      stats_by_mode("frequency", frequency$stats),
+      date = frequency$date,
+      from = frequency$from,
+      to = frequency$to
+    )
+
+    # the plotted values are labelled by mode with all the modes as levels, so
+    # that each mode has the same colour in every figure
+
+    stats_labels <- trip_labels[match(trip_stats$trip_id, trip_ids)]
+    headway_labels <- trip_labels[
+      match(names(frequency$headways), trip_routes)
+    ]
+    plot_modes <- list(
+      distance = factor(stats_labels, levels = mode_labels),
+      speed = factor(stats_labels, levels = mode_labels),
+      frequency = factor(headway_labels, levels = mode_labels)
+    )
+  }
+
   result <- list(
     files = files,
     agency = agency_table,
@@ -462,7 +644,8 @@ get_summary <- function(
     speed = trip_stats$speed,
     distance = trip_stats$length,
     frequency = frequency$headways,
-    calendar = calendar_plot
+    calendar = calendar_plot,
+    modes = plot_modes
   )
   report_path <- write_summary_report(result, values, selection, output_dir)
 
@@ -620,9 +803,10 @@ summarise_services <- function(feed, service_days) {
 #'   hours.
 #'
 #' @return A list with the elements `headways` (the headway of each route and
-#'   direction, in minutes), `stats` (their summary, as created by
-#'   [summarise_distribution()]), `date`, `from` and `to` (the day and time of
-#'   day in which the headways were measured, `NA` if there is none).
+#'   direction, in minutes, named by `route_id`), `stats` (their summary, as
+#'   created by [summarise_distribution()]), `date`, `from` and `to` (the day
+#'   and time of day in which the headways were measured, `NA` if there is
+#'   none).
 #'
 #' @keywords internal
 summarise_route_frequency <- function(feed, service_days, date, from, to) {
@@ -680,6 +864,7 @@ summarise_route_frequency <- function(feed, service_days, date, from, to) {
 
       window_minutes <- (string_to_seconds(to) - string_to_seconds(from)) / 60
       headways <- window_minutes / route_frequency$departures
+      names(headways) <- route_frequency$route_id
     }
   }
 
@@ -700,8 +885,10 @@ summarise_route_frequency <- function(feed, service_days, date, from, to) {
 #'
 #' @param result The list of diagnostics returned by [get_summary()].
 #' @param values A named list with the numeric vectors to be plotted
-#'   (`speed`, `distance` and `frequency`) and the calendar chart created by
-#'   [get_calendar_overlap()] (`calendar`, `NULL` if there is none).
+#'   (`speed`, `distance` and `frequency`), the calendar chart created by
+#'   [get_calendar_overlap()] (`calendar`, `NULL` if there is none) and a
+#'   named list with the mode of each plotted value, as factors (`modes`,
+#'   empty if the values are not grouped by mode).
 #' @param selection A named list with the filters used (`NULL` elements mean
 #'   no filter).
 #' @param output_dir A string. The directory in which the report is saved.
@@ -764,9 +951,31 @@ write_summary_report <- function(result, values, selection, output_dir) {
     return(c("", paste0("![](", plot_file, ")"), ""))
   }
 
-  # each distribution is plotted as a histogram, unless it has no values
+  # each distribution is plotted as a histogram, unless it has no values. with
+  # modes, the histograms of the modes are overlaid
 
-  md_plot <- function(x, label, name) {
+  md_plot <- function(x, label, name, mode = NULL) {
+    if (!is.null(mode)) {
+      keep <- !is.na(x)
+      if (!any(keep)) {
+        return(c("", "No data to plot.", ""))
+      }
+
+      plot <- ggplot2::ggplot(
+        data.frame(value = x[keep], mode = mode[keep]),
+        ggplot2::aes(x = value, fill = mode)
+      ) +
+        ggplot2::geom_histogram(
+          bins = 30,
+          position = "identity",
+          alpha = 0.4
+        ) +
+        ggplot2::scale_fill_viridis_d(drop = FALSE, end = 0.85) +
+        ggplot2::labs(x = label, y = "Count", fill = "Mode")
+
+      return(md_saved_plot(plot, name))
+    }
+
     x <- x[!is.na(x)]
     if (length(x) == 0) {
       return(c("", "No data to plot.", ""))
@@ -801,17 +1010,20 @@ write_summary_report <- function(result, values, selection, output_dir) {
     character(1)
   )
 
+  # the frequency table has a row per mode when grouped by route_type, all
+  # measured on the same day and time of day
+
   frequency <- result$frequency
-  frequency_note <- if (is.na(frequency$from)) {
+  frequency_note <- if (is.na(frequency$from[1])) {
     "Route frequencies could not be calculated."
   } else {
     paste0(
       "Headways by route (and direction) on ",
-      format(frequency$date),
+      format(frequency$date[1]),
       ", between ",
-      frequency$from,
+      frequency$from[1],
       " and ",
-      frequency$to,
+      frequency$to[1],
       "."
     )
   }
@@ -837,15 +1049,25 @@ write_summary_report <- function(result, values, selection, output_dir) {
     md_table(result$totals),
     "## Trip speed",
     md_table(result$speed),
-    md_plot(values$speed, "Trip speed (km/h)", "speed"),
+    md_plot(values$speed, "Trip speed (km/h)", "speed", values$modes$speed),
     "## Trip distance",
     md_table(result$distance),
-    md_plot(values$distance, "Trip length (km)", "distance"),
+    md_plot(
+      values$distance,
+      "Trip length (km)",
+      "distance",
+      values$modes$distance
+    ),
     "## Route frequency",
     "",
     frequency_note,
     md_table(result$frequency),
-    md_plot(values$frequency, "Route headway (min)", "frequency")
+    md_plot(
+      values$frequency,
+      "Route headway (min)",
+      "frequency",
+      values$modes$frequency
+    )
   )
 
   md_path <- file.path(output_dir, "gtfs_summary.md")
