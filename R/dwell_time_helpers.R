@@ -65,9 +65,9 @@ select_dwell_time_calls <- function(stop_times, trip_id, stop_id) {
 
 
 
-# validates the 'from' and 'to' arguments of get_dwell_time() and
-# set_dwell_time() as in set_trip_speed(), and returns them in seconds. a NULL
-# end means no limit
+# validates the 'from' and 'to' arguments of get_dwell_time(),
+# set_dwell_time() and the trip duration, length and speed functions as in
+# set_trip_speed(), and returns them in seconds. a NULL end means no limit
 
 dwell_time_window <- function(from, to) {
   checkmate::assert_string(
@@ -96,6 +96,33 @@ dwell_time_window <- function(from, to) {
   }
 
   return(c(from_secs, to_secs))
+}
+
+
+
+# returns the trip_ids whose departure from their first stop, in
+# stop_sequence order, is within the time of day. 'departure' is either in
+# seconds or a time string, in which case only the first stops' departures are
+# converted. the stable sort, as in prepare_trip_stops(), picks the same first
+# stop of trips with duplicated stop_sequences
+
+trips_departing_within <- function(trip_id, stop_sequence, departure, window) {
+  first_stops <- data.table::data.table(
+    trip_id = trip_id,
+    stop_sequence = stop_sequence,
+    departure = departure
+  )
+  data.table::setorderv(first_stops, c("trip_id", "stop_sequence"))
+  first_stops <- first_stops[!duplicated(first_stops$trip_id)]
+
+  departure <- first_stops$departure
+  if (is.character(departure)) departure <- string_to_seconds(departure)
+
+  in_window <- !is.na(departure) &
+    departure >= window[1] &
+    departure <= window[2]
+
+  return(first_stops$trip_id[in_window])
 }
 
 

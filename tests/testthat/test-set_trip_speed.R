@@ -701,3 +701,62 @@ test_that("raises an error with infinite or conflicting speeds", {
     set_trip_speed(gtfs, "CPTM L07-0", 30)
   )
 })
+
+test_that("route_type restricts the changed trips", {
+  rail_trips <- gtfs$trips[startsWith(route_id, "CPTM")]$trip_id
+
+  expect_identical(
+    set_trip_speed(gtfs, speed = 50, route_type = 2),
+    set_trip_speed(gtfs, rail_trips, 50)
+  )
+
+  # trips of other types among the given ones are left unchanged, and each
+  # trip keeps its own speed
+  expect_identical(
+    set_trip_speed(
+      gtfs,
+      c("CPTM L07-0", "2105-10-0"),
+      c(50, 60),
+      route_type = 3
+    ),
+    set_trip_speed(gtfs, "2105-10-0", 60)
+  )
+
+  # types not listed in 'routes' are ignored
+  expect_no_warning(result <- set_trip_speed(gtfs, speed = 50, route_type = 4))
+  expect_identical(result$stop_times, gtfs$stop_times)
+})
+
+test_that("warns about trips without the segment only if given in trip_id", {
+  expect_no_warning(
+    set_trip_speed(gtfs, speed = 50, first_stop = "18917", route_type = 2),
+    class = "gtfstools_trips_without_segment"
+  )
+  expect_warning(
+    set_trip_speed(
+      gtfs,
+      c("CPTM L07-0", "CPTM L08-0"),
+      50,
+      first_stop = "18917",
+      route_type = 2
+    ),
+    class = "gtfstools_trips_without_segment"
+  )
+})
+
+test_that("raises errors due to incorrect route_type and selection", {
+  expect_error(
+    set_trip_speed(gtfs, speed = 50),
+    class = "gtfstools_missing_selection_error"
+  )
+  expect_error(set_trip_speed(gtfs, speed = c(50, 60), route_type = 2))
+  expect_error(set_trip_speed(gtfs, "CPTM L07-0", 50, route_type = "3"))
+  expect_error(set_trip_speed(gtfs, speed = 50, route_type = integer(0)))
+
+  no_routes_gtfs <- copy_gtfs_without_file(gtfs, "routes")
+  no_trips_routeid_gtfs <- copy_gtfs_without_field(gtfs, "trips", "route_id")
+  expect_error(set_trip_speed(no_routes_gtfs, speed = 50, route_type = 2))
+  expect_error(
+    set_trip_speed(no_trips_routeid_gtfs, speed = 50, route_type = 2)
+  )
+})

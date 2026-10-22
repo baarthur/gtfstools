@@ -19,6 +19,7 @@
 #'   `TRUE` raises a warning, and passing `FALSE` raises an error.
 #' @param file Deprecated. Use `method` instead (`file = "stop_times"`
 #'   corresponds to `method = "euclidean"`).
+#' @inheritParams get_trip_length
 #'
 #' @return With `by = "trip"`, a `data.table` with the `route_id`, the
 #'   `trip_id` and the average `speed` of each trip. With `by = "segment"`, a
@@ -42,6 +43,9 @@
 #' Existing `_secs` columns in `stop_times` (e.g. created with
 #' [convert_time_to_seconds()]) are used as-is, not recalculated from the time
 #' strings.
+#'
+#' `from` and `to` select the trips (or segments) as in [get_trip_length()],
+#' from the `departure_time` strings, even if `_secs` columns exist.
 #'
 #' @seealso [get_route_speed()], [set_trip_speed()], [set_route_speed()],
 #'   [get_trip_length()], [get_trip_duration()], [get_trip_segment_duration()]
@@ -71,6 +75,10 @@
 #' segment_speed <- get_trip_speed(gtfs, "CPTM L07-0", by = "segment")
 #' head(segment_speed)
 #'
+#' # speed of the trips that depart within a time of day
+#' peak_speed <- get_trip_speed(gtfs, from = "07:00:00", to = "09:00:00")
+#' head(peak_speed)
+#'
 #' @export
 get_trip_speed <- function(
   gtfs,
@@ -79,7 +87,9 @@ get_trip_speed <- function(
   by = "trip",
   unit = "km/h",
   sort_sequence,
-  file = NULL
+  file = NULL,
+  from = NULL,
+  to = NULL
 ) {
   if (!missing(sort_sequence)) {
     check_deprecated_sort_sequence(
@@ -101,6 +111,7 @@ get_trip_speed <- function(
     checkmate::check_names(unit, subset.of = c("km/h", "m/s", "mph")),
     combine = "and"
   )
+  window <- dwell_time_window(from, to)
 
   # check the fields required to calculate durations before calculating
   # lengths, so errors are not thrown very late
@@ -127,7 +138,18 @@ get_trip_speed <- function(
     method <- map_deprecated_file(file, "get_trip_speed")
   }
 
-  lengths <- get_trip_length(gtfs, trip_id, method, by, length_unit)
+  # get_trip_length() keeps only the trips or segments within the time of
+  # day, so the durations joined to them below are filtered too
+
+  lengths <- get_trip_length(
+    gtfs,
+    trip_id,
+    method,
+    by,
+    length_unit,
+    from = from,
+    to = to
+  )
 
   # retrieve route_id col
   lengths[gtfs$trips, on = "trip_id", route_id := i.route_id]
@@ -140,10 +162,10 @@ get_trip_speed <- function(
 
   # durations are calculated only for the trips whose lengths were calculated,
   # so a warning about a trip_id that doesn't exist is raised only once (by
-  # get_trip_length())
+  # get_trip_length()), and only for the trips within the time of day
 
   duration_trips <- NULL
-  if (!is.null(trip_id)) {
+  if (!is.null(trip_id) || any(is.finite(window))) {
     duration_trips <- unique(lengths$trip_id)
   }
 

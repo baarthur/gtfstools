@@ -185,3 +185,65 @@ test_that("sort_sequence is deprecated", {
     class = "gtfstools_defunct_sort_sequence_error"
   )
 })
+
+segment_departures <- function(gtfs) {
+  st <- data.table::copy(gtfs$stop_times)
+  data.table::setorderv(st, c("trip_id", "stop_sequence"))
+  segments <- st[
+    ,
+    .(segment = seq_len(.N - 1L), departure_time = departure_time[-.N]),
+    by = trip_id
+  ]
+  return(segments)
+}
+
+test_that("from and to select the segments by their departure", {
+  segments <- segment_departures(gtfs)
+  expected <- segments[
+    segments$departure_time >= "04:00:00" &
+      segments$departure_time <= "04:30:00",
+    .(trip_id, segment)
+  ]
+  expect_true(nrow(expected) > 0 && nrow(expected) < nrow(segments))
+
+  result <- get_trip_segment_duration(
+    gtfs,
+    from = "04:00:00",
+    to = "04:30:00"
+  )
+  expect_identical(result[, .(trip_id, segment)], expected)
+  expect_identical(
+    result,
+    tester()[expected, on = c("trip_id", "segment")]
+  )
+
+  empty <- get_trip_segment_duration(gtfs, from = "99:00:00")
+  expect_identical(nrow(empty), 0L)
+  expect_type(empty$segment, "integer")
+
+  expect_error(
+    get_trip_segment_duration(gtfs, from = "09:00:00", to = "08:00:00"),
+    class = "gtfstools_invalid_time_of_day"
+  )
+})
+
+test_that("from and to don't change the given gtfs", {
+  original_gtfs <- read_gtfs(data_path)
+  given_gtfs <- read_gtfs(data_path)
+
+  result <- get_trip_segment_duration(given_gtfs, from = "04:00:00")
+  expect_equal(original_gtfs, given_gtfs, ignore_attr = TRUE)
+})
+
+test_that("from and to handle stop_times entries without trip_id", {
+  na_gtfs <- read_gtfs(data_path)
+  na_gtfs$stop_times[1:2, trip_id := NA_character_]
+  stop_times_names <- names(na_gtfs$stop_times)
+
+  result <- get_trip_segment_duration(na_gtfs, from = "04:00:00")
+  expected <- get_trip_segment_duration(na_gtfs)[
+    segment_departures(na_gtfs)$departure_time >= "04:00:00"
+  ]
+  expect_identical(result, expected)
+  expect_identical(names(na_gtfs$stop_times), stop_times_names)
+})

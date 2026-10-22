@@ -29,11 +29,14 @@ per feed and service day, and the columns \code{feed}, \code{date}, \code{n_trip
 number of trips that run on the day) and \code{overlap} (whether all feeds have
 service on the day).
 
-If \code{plot = TRUE}, a \code{ggplot} object. With \code{resolution = "periods"}, it
-shows one bar per feed (top to bottom in the given order) spanning its
-service days. With \code{resolution = "daily"}, it shows the density of each
-feed's trips over time (weighted by the number of trips per day), one
-panel per feed. In both, the overlap periods are shaded.
+If \code{plot = TRUE}, a \code{ggplot} object with dates on the x axis and one row
+per feed (top to bottom in the given order). With
+\code{resolution = "periods"}, it shows a bar spanning each feed's service
+days. With \code{resolution = "daily"}, it shows a box plot of when each
+feed's trips run: the box spans the days by which a quarter and three
+quarters of its trips have run, with a line on the day by which half
+have, and the whiskers reach its first and last service days. In both,
+the overlap periods are shaded.
 }
 \description{
 Returns the periods in which all the given GTFS feeds have service, or the
@@ -52,7 +55,8 @@ in \code{calendar_dates} (\code{exception_type} 2), plus the days added to it
 addition wins. Either table may be missing. If the feed has a \code{trips}
 table with a \code{service_id} field, services not used by any trip are ignored.
 \code{feed_info} dates are not used. A warning is raised for feeds without any
-service day.
+service day, and a message when two or more feeds have no day with service
+in all of them.
 
 The number of trips on a day is the number of trips of the services that
 run on it. A trip listed in \code{frequencies} counts once per departure, every
@@ -65,7 +69,7 @@ which keeps only their unique departures. A trip with an invalid
 service day, so departures after midnight (with times later than
 \code{"24:00:00"}) count on the previous day. If the feed
 has no \code{trips} table with a \code{service_id} field, \code{n_trips} is \code{NA}, and the
-daily plot shows the density of its service days instead.
+daily plot shows no box for it.
 
 Feeds are named after their file names (without the extension) or after the
 list names. Unnamed feeds are named after their position (\code{"feed_1"},

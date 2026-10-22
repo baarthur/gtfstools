@@ -6,13 +6,14 @@
 \usage{
 set_trip_speed(
   gtfs,
-  trip_id,
+  trip_id = NULL,
   speed,
   unit = "km/h",
   first_stop = NULL,
   last_stop = NULL,
   from = NULL,
   to = NULL,
+  route_type = NULL,
   by_reference = FALSE
 )
 }
@@ -20,12 +21,14 @@ set_trip_speed(
 \item{gtfs}{A GTFS object, as created by \code{\link[=read_gtfs]{read_gtfs()}}.}
 
 \item{trip_id}{A string vector including the \code{trip_id}s to have their
-average speed set.}
+average speed set. If \code{NULL} (the default), \code{route_type} must be given,
+and the speed of every trip of these types is set.}
 
 \item{speed}{A numeric representing the speed to be set. Its length must
 either equal 1, in which case the value is recycled for all
 \code{trip_id}s, or equal \code{trip_id}'s length. Must be positive and finite. A
-\code{trip_id} listed more than once must be given the same speed.}
+\code{trip_id} listed more than once must be given the same speed. Must be a
+single number when \code{trip_id} is \code{NULL}.}
 
 \item{unit}{A string representing the unit in which the speed is given. One
 of \code{"km/h"} (the default), \code{"m/s"} or \code{"mph"} (miles per hour).}
@@ -44,6 +47,12 @@ default), there is no lower limit.}
 \item{to}{A string, in the "HH:MM:SS" format. Only trips that depart from
 the segment's first stop at or before \code{to} are changed. If \code{NULL} (the
 default), there is no upper limit.}
+
+\item{route_type}{An integer vector of \code{route_type}s (see
+\code{\link[=filter_by_route_type]{filter_by_route_type()}}). If given, only trips of routes of these types
+are changed; together with the other selection arguments, it restricts
+their selection. \code{route_type}s not listed in \code{routes} are ignored. If
+\code{NULL} (the default), trips of any type are changed.}
 
 \item{by_reference}{Whether to update \code{stop_times}' \code{data.table} by
 reference. Defaults to \code{FALSE}.}
@@ -76,8 +85,9 @@ these times from the average speed.
 after \code{last_stop} are shifted by the change in the segment's duration. Dwell
 times at \code{first_stop} and \code{last_stop} are kept, except at the trip's first
 and last stops. Trips that don't visit \code{first_stop} and then \code{last_stop}, or
-that have blank times there, are left unchanged with a warning. \code{from} and
-\code{to} are compared with the \code{departure_time} at \code{first_stop} as written in
+that have blank times there, are left unchanged, with a warning if they were
+given in \code{trip_id} (not if they were selected only by \code{route_type}). \code{from}
+and \code{to} are compared with the \code{departure_time} at \code{first_stop} as written in
 \code{stop_times}, so use times past \code{"24:00:00"} for departures after midnight.
 For trips listed in \code{frequencies}, these are template times, not actual
 departures. Trips whose departure there is blank are left unchanged.

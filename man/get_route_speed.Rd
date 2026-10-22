@@ -4,7 +4,14 @@
 \alias{get_route_speed}
 \title{Get route speed}
 \usage{
-get_route_speed(gtfs, route_id = NULL, method = "shapes", unit = "km/h")
+get_route_speed(
+  gtfs,
+  route_id = NULL,
+  method = "shapes",
+  unit = "km/h",
+  from = NULL,
+  to = NULL
+)
 }
 \arguments{
 \item{gtfs}{A GTFS object, as created by \code{\link[=read_gtfs]{read_gtfs()}}.}
@@ -23,6 +30,14 @@ doesn't have a \code{shapes} table, or if its \code{trips} table doesn't have a
 
 \item{unit}{A string representing the unit in which the speeds are desired.
 One of \code{"km/h"} (the default), \code{"m/s"} or \code{"mph"} (miles per hour).}
+
+\item{from}{A string, in the "HH:MM:SS" format. Only trips that depart from
+their first stop at or after \code{from} are included. If \code{NULL} (the
+default), there is no lower limit.}
+
+\item{to}{A string, in the "HH:MM:SS" format. Only trips that depart from
+their first stop at or before \code{to} are included. If \code{NULL} (the default),
+there is no upper limit.}
 }
 \value{
 A \code{data.table} with the \code{route_id} and the minimum (\code{min_speed}),
@@ -44,8 +59,9 @@ Trips listed in \code{frequencies} count once, regardless of their headways.
 
 Trips with \code{NA} speeds are ignored. Routes whose trips all have \code{NA} speeds
 get \code{NA} statistics, and \code{sd_speed} is \code{NA} for routes with a single trip
-with a known speed. Routes without any trip in \code{stop_times} are not
-returned.
+with a known speed. Routes without any trip in \code{stop_times} (or, if \code{from}
+or \code{to} is given, without any trip departing within the time of day) are
+not returned.
 }
 
 \examples{

@@ -12,6 +12,7 @@ set_dwell_time(
   unit = "s",
   from = NULL,
   to = NULL,
+  route_type = NULL,
   by_reference = FALSE
 )
 }
@@ -20,7 +21,8 @@ set_dwell_time(
 
 \item{trip_id}{A character vector including the \code{trip_id}s to have their
 dwell times set. If \code{NULL} (the default), the dwell times of every
-\code{trip_id} in the GTFS are set.}
+\code{trip_id} in the GTFS (or of every trip of the given \code{route_type}s) are
+set.}
 
 \item{stop_id}{A character vector including the \code{stop_id}s at which the
 dwell times are set. If \code{NULL} (the default), the dwell times are set at
@@ -42,6 +44,12 @@ no lower limit.}
 \item{to}{A string, in the "HH:MM:SS" format. Only visits whose arrival time
 is at or before \code{to} are changed. If \code{NULL} (the default), there is no
 upper limit.}
+
+\item{route_type}{An integer vector of \code{route_type}s (see
+\code{\link[=filter_by_route_type]{filter_by_route_type()}}). If given, only trips of routes of these types
+are changed; together with the other selection arguments, it restricts
+their selection. \code{route_type}s not listed in \code{routes} are ignored. If
+\code{NULL} (the default), trips of any type are changed.}
 
 \item{by_reference}{Whether to update \code{stop_times}' \code{data.table} by
 reference. Defaults to \code{FALSE}.}

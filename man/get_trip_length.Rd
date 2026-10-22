@@ -11,7 +11,9 @@ get_trip_length(
   by = "trip",
   unit = "km",
   sort_sequence,
-  file = NULL
+  file = NULL,
+  from = NULL,
+  to = NULL
 )
 }
 \arguments{
@@ -41,6 +43,16 @@ now always sorted by \code{stop_sequence} and \code{shape_pt_sequence}. Passing
 
 \item{file}{Deprecated. Use \code{method} instead (\code{file = "stop_times"}
 corresponds to \code{method = "euclidean"}).}
+
+\item{from}{A string, in the "HH:MM:SS" format. With \code{by = "trip"}, only
+trips that depart from their first stop at or after \code{from} are included.
+With \code{by = "segment"}, only segments that depart from their first stop at
+or after \code{from} are included. If \code{NULL} (the default), there is no lower
+limit.}
+
+\item{to}{A string, in the "HH:MM:SS" format. Only trips (or segments) that
+depart from their first stop at or before \code{to} are included. If \code{NULL}
+(the default), there is no upper limit.}
 }
 \value{
 With \code{by = "trip"}, a \code{data.table} with the \code{trip_id} and the
@@ -82,6 +94,13 @@ two distinct points have \code{NA} lengths, with a warning. Use
 Lengths are great-circle (haversine) distances on the sphere used by
 \code{{s2}}. Stops with missing coordinates, or not listed in \code{stops}, result in
 \code{NA} lengths for their segments and trips.
+
+\code{from} and \code{to} are compared with the \code{departure_time} of the first stop of
+each trip (in \code{stop_sequence} order) or segment, as written in
+\code{stop_times}, so use times past \code{"24:00:00"} for departures after midnight.
+For trips listed in \code{frequencies}, these are template times, not the times
+of each departure. Trips and segments whose departure is blank are never
+included when \code{from} or \code{to} is given.
 }
 
 \examples{

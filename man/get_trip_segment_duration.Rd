@@ -4,7 +4,14 @@
 \alias{get_trip_segment_duration}
 \title{Get trip segments' duration}
 \usage{
-get_trip_segment_duration(gtfs, trip_id = NULL, unit = "min", sort_sequence)
+get_trip_segment_duration(
+  gtfs,
+  trip_id = NULL,
+  unit = "min",
+  sort_sequence,
+  from = NULL,
+  to = NULL
+)
 }
 \arguments{
 \item{gtfs}{A GTFS object, as created by \code{\link[=read_gtfs]{read_gtfs()}}.}
@@ -20,6 +27,14 @@ desired. One of \code{"s"} (seconds), \code{"min"} (minutes, the default),
 \item{sort_sequence}{Deprecated; do not supply. Timetables are now always
 sorted by \code{stop_sequence}. Passing \code{TRUE} raises a warning, and passing
 \code{FALSE} raises an error.}
+
+\item{from}{A string, in the "HH:MM:SS" format. Only segments that depart
+from their first stop at or after \code{from} are included. If \code{NULL} (the
+default), there is no lower limit.}
+
+\item{to}{A string, in the "HH:MM:SS" format. Only segments that depart from
+their first stop at or before \code{to} are included. If \code{NULL} (the default),
+there is no upper limit.}
 }
 \value{
 A \code{data.table} containing the segments' duration of each specified
@@ -38,6 +53,13 @@ between its arrival time and its departure time, as specified in the
 Existing \verb{_secs} columns in \code{stop_times} (e.g. created with
 \code{\link[=convert_time_to_seconds]{convert_time_to_seconds()}}) are used as-is, not recalculated from the time
 strings.
+
+\code{from} and \code{to} are compared with the departure time of the first stop of
+each segment, read as the durations are (from \code{departure_time_secs}, if
+present), so use times past \code{"24:00:00"} for departures after midnight.
+For trips listed in \code{frequencies}, these are template times, not the times
+of each departure. Segments whose departure is blank are never included
+when \code{from} or \code{to} is given.
 }
 
 \examples{
@@ -59,5 +81,14 @@ trip_segment_dur
 # use the unit argument to control in which unit the durations are calculated
 trip_segment_dur <- get_trip_segment_duration(gtfs, "CPTM L07-0", unit = "s")
 trip_segment_dur
+
+# use the from and to arguments to keep only the segments that depart
+# within a time of day
+trip_segment_dur <- get_trip_segment_duration(
+  gtfs,
+  from = "07:00:00",
+  to = "09:00:00"
+)
+head(trip_segment_dur)
 
 }

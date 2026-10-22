@@ -5,11 +5,13 @@
 #'
 #' @template gtfs
 #' @param trip_id A string vector including the `trip_id`s to have their
-#'   average speed set.
+#'   average speed set. If `NULL` (the default), `route_type` must be given,
+#'   and the speed of every trip of these types is set.
 #' @param speed A numeric representing the speed to be set. Its length must
 #'   either equal 1, in which case the value is recycled for all
 #'   `trip_id`s, or equal `trip_id`'s length. Must be positive and finite. A
-#'   `trip_id` listed more than once must be given the same speed.
+#'   `trip_id` listed more than once must be given the same speed. Must be a
+#'   single number when `trip_id` is `NULL`.
 #' @param unit A string representing the unit in which the speed is given. One
 #'   of `"km/h"` (the default), `"m/s"` or `"mph"` (miles per hour).
 #' @param first_stop A string. The `stop_id` where the segment whose speed is
@@ -23,6 +25,11 @@
 #' @param to A string, in the "HH:MM:SS" format. Only trips that depart from
 #'   the segment's first stop at or before `to` are changed. If `NULL` (the
 #'   default), there is no upper limit.
+#' @param route_type An integer vector of `route_type`s (see
+#'   [filter_by_route_type()]). If given, only trips of routes of these types
+#'   are changed; together with the other selection arguments, it restricts
+#'   their selection. `route_type`s not listed in `routes` are ignored. If
+#'   `NULL` (the default), trips of any type are changed.
 #' @param by_reference Whether to update `stop_times`' `data.table` by
 #'   reference. Defaults to `FALSE`.
 #'
@@ -48,8 +55,9 @@
 #' after `last_stop` are shifted by the change in the segment's duration. Dwell
 #' times at `first_stop` and `last_stop` are kept, except at the trip's first
 #' and last stops. Trips that don't visit `first_stop` and then `last_stop`, or
-#' that have blank times there, are left unchanged with a warning. `from` and
-#' `to` are compared with the `departure_time` at `first_stop` as written in
+#' that have blank times there, are left unchanged, with a warning if they were
+#' given in `trip_id` (not if they were selected only by `route_type`). `from`
+#' and `to` are compared with the `departure_time` at `first_stop` as written in
 #' `stop_times`, so use times past `"24:00:00"` for departures after midnight.
 #' For trips listed in `frequencies`, these are template times, not actual
 #' departures. Trips whose departure there is blank are left unchanged.
@@ -126,22 +134,37 @@
 #' @export
 set_trip_speed <- function(
   gtfs,
-  trip_id,
+  trip_id = NULL,
   speed,
   unit = "km/h",
   first_stop = NULL,
   last_stop = NULL,
   from = NULL,
   to = NULL,
+  route_type = NULL,
   by_reference = FALSE
 ) {
   gtfs <- assert_and_assign_gtfs_object(gtfs)
-  checkmate::assert_character(trip_id, any.missing = FALSE)
-  checkmate::assert(
-    checkmate::check_number(speed),
-    checkmate::check_numeric(speed, len = length(trip_id), any.missing = FALSE),
-    combine = "or"
-  )
+  if (is.null(trip_id) && is.null(route_type)) {
+    cli::cli_abort(
+      "At least one of {.arg trip_id} and {.arg route_type} must be given.",
+      class = "gtfstools_missing_selection_error"
+    )
+  }
+  checkmate::assert_character(trip_id, null.ok = TRUE, any.missing = FALSE)
+  if (is.null(trip_id)) {
+    checkmate::assert_number(speed)
+  } else {
+    checkmate::assert(
+      checkmate::check_number(speed),
+      checkmate::check_numeric(
+        speed,
+        len = length(trip_id),
+        any.missing = FALSE
+      ),
+      combine = "or"
+    )
+  }
   if (any(speed <= 0 | !is.finite(speed))) {
     cli::cli_abort(
       "{.arg speed} must be positive and finite.",
@@ -178,6 +201,12 @@ set_trip_speed <- function(
     pattern = "^\\d{2}:[0-5]\\d:[0-5]\\d$",
     null.ok = TRUE
   )
+  checkmate::assert_integerish(
+    route_type,
+    min.len = 1,
+    any.missing = FALSE,
+    null.ok = TRUE
+  )
   checkmate::assert_logical(by_reference, any.missing = FALSE, len = 1)
 
   from_secs <- if (is.null(from)) -Inf else string_to_seconds(from)
@@ -199,6 +228,22 @@ set_trip_speed <- function(
     c("trip_id", "arrival_time", "departure_time", "stop_sequence"),
     c("character", "character", "character", "integer")
   )
+
+  # with route_type, only trips of these types are changed. without trip_id,
+  # these are the selected trips (only those with stop times, so that
+  # get_trip_length() doesn't warn about the others). warnings about trips
+  # without the segment are only raised for trips the user listed
+
+  selected_by_id <- !is.null(trip_id)
+
+  if (!is.null(route_type)) {
+    type_routes <- route_type_ids(gtfs, route_type)
+    type_trips <- gtfs$trips$trip_id[gtfs$trips$route_id %chin% type_routes]
+
+    if (is.null(trip_id)) {
+      trip_id <- unique(type_trips[type_trips %chin% gtfs$stop_times$trip_id])
+    }
+  }
 
   # calculate the length of each segment between consecutive stops of the
   # given trip_ids. trips whose length couldn't be calculated (e.g. trips not
@@ -242,6 +287,7 @@ set_trip_speed <- function(
   # would number the rows of the subset instead)
 
   ids <- trip_id
+  if (!is.null(route_type)) ids <- ids[ids %chin% type_trips]
   rows <- stop_times[trip_id %chin% ids, which = TRUE]
 
   st <- stop_times[
@@ -310,7 +356,9 @@ set_trip_speed <- function(
     }
     without_segment[is.na(without_segment)] <- TRUE
 
-    to_warn <- without_segment & (in_window | is.na(trips$dep_secs))
+    to_warn <- without_segment &
+      (in_window | is.na(trips$dep_secs)) &
+      selected_by_id
     if (any(to_warn)) {
       trips_without_segment <- trips$trip_id[to_warn]
       cli::cli_warn(

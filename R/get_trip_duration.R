@@ -9,6 +9,12 @@
 #' @param unit A string representing the time unit in which the duration is
 #'   desired. One of `"s"` (seconds), `"min"` (minutes, the default), `"h"`
 #'   (hours) or `"d"` (days).
+#' @param from A string, in the "HH:MM:SS" format. Only trips that depart from
+#'   their first stop at or after `from` are included. If `NULL` (the
+#'   default), there is no lower limit.
+#' @param to A string, in the "HH:MM:SS" format. Only trips that depart from
+#'   their first stop at or before `to` are included. If `NULL` (the default),
+#'   there is no upper limit.
 #'
 #' @return A `data.table` containing the duration of each specified trip.
 #'
@@ -21,6 +27,14 @@
 #' Existing `_secs` columns in `stop_times` (e.g. created with
 #' [convert_time_to_seconds()]) are used as-is, not recalculated from the time
 #' strings.
+#'
+#' `from` and `to` are compared with the departure time of the first stop of
+#' each trip, in `stop_sequence` order (which must then be an integer column).
+#' The time is read as the durations are: from `departure_time_secs`, if
+#' present, or else from `departure_time`, so use times past `"24:00:00"` for
+#' departures after midnight. For trips listed in `frequencies`, these are
+#' template times, not the times of each departure. Trips whose first
+#' departure is blank are never included when `from` or `to` is given.
 #'
 #' @examples
 #' \dontshow{
@@ -42,7 +56,11 @@
 #' trip_duration
 #'
 #' @export
-get_trip_duration <- function(gtfs, trip_id = NULL, unit = "min") {
+get_trip_duration <- function(gtfs,
+                              trip_id = NULL,
+                              unit = "min",
+                              from = NULL,
+                              to = NULL) {
   gtfs <- assert_and_assign_gtfs_object(gtfs)
   checkmate::assert_character(trip_id, null.ok = TRUE, any.missing = FALSE)
   checkmate::assert(
@@ -50,6 +68,8 @@ get_trip_duration <- function(gtfs, trip_id = NULL, unit = "min") {
     checkmate::check_names(unit, subset.of = c("s", "min", "h", "d")),
     combine = "and"
   )
+  window <- dwell_time_window(from, to)
+  is_windowed <- any(is.finite(window))
 
   # check if required fields and files exist
 
@@ -59,6 +79,10 @@ get_trip_duration <- function(gtfs, trip_id = NULL, unit = "min") {
     c("trip_id", "arrival_time", "departure_time"),
     rep("character", 3)
   )
+
+  if (is_windowed) {
+    gtfsio::assert_field_class(gtfs, "stop_times", "stop_sequence", "integer")
+  }
 
   # select trip_ids to get duration of and raise warning if a given trip_id
   # doesn't exist in 'stop_times'
@@ -76,6 +100,25 @@ get_trip_duration <- function(gtfs, trip_id = NULL, unit = "min") {
     }
   } else {
     durations <- gtfs$stop_times
+  }
+
+  # keep only the trips that depart from their first stop within the time of
+  # day, read as the durations are (from the '_secs' column, if any)
+
+  if (is_windowed) {
+    if (gtfsio::check_field_exists(gtfs, "stop_times", "departure_time_secs")) {
+      departure <- durations$departure_time_secs
+    } else {
+      departure <- durations$departure_time
+    }
+
+    kept_trips <- trips_departing_within(
+      durations$trip_id,
+      durations$stop_sequence,
+      departure,
+      window
+    )
+    durations <- durations[durations$trip_id %chin% kept_trips]
   }
 
   if (nrow(durations) == 0) {
