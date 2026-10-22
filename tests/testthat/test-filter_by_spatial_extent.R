@@ -18,6 +18,7 @@ test_that("raises error due to incorrect input types", {
 
   expect_error(tester(geom = unclass(bbox)))
   expect_error(tester(geom = sf::st_transform(polygon, 4674)))
+  expect_error(tester(geom = sf::st_bbox(sf::st_transform(polygon, 4674))))
 
   expect_error(tester(spatial_operation = "sf::st_intersect"))
   expect_error(tester(spatial_operation = sf::st_crop))
@@ -225,7 +226,8 @@ test_that("a bbox is treated as a rectangle in longitude and latitude", {
   north <- box(cx - 0.5, sb[["ymax"]] + 0.0001, cx + 0.5, sb[["ymax"]] + 0.01)
   expect_false("68962" %chin% kept_shapes(north))
 
-  # a shape touching the box's edges is covered, but not properly contained
+  # a shape touching the box's edges is covered (a control: holds under both
+  # s2 and planar geometry), but not properly contained
 
   expect_true("68962" %chin% kept_shapes(sb, sf::st_covers))
   expect_false("68962" %chin% kept_shapes(sb, sf::st_contains_properly))
