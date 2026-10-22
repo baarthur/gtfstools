@@ -15,7 +15,9 @@ filter_by_spatial_extent(
 \item{gtfs}{A GTFS object, as created by \code{\link[=read_gtfs]{read_gtfs()}}.}
 
 \item{geom}{An \code{sf}, \code{sfc} or \code{bbox} object, in WGS 84 (EPSG 4326).
-Describes the spatial extent used to filter the data.}
+Describes the spatial extent used to filter the data. A \code{bbox} is treated
+as a rectangle in longitude and latitude (unlike \code{sf::st_as_sfc(bbox)},
+whose edges are geodesics when \code{{s2}} is used).}
 
 \item{spatial_operation}{A spatial operation function from the set of
 options listed in \link[sf:geos_binary_pred]{geos_binary_pred}. Defaults to \code{\link[sf:st_intersects]{sf::st_intersects}}, which

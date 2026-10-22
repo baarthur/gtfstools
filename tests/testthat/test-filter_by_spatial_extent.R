@@ -50,6 +50,7 @@ test_that("doesn't change given gtfs", {
 })
 
 test_that("supports sf, sfc and bbox objects", {
+  # identical only because no geometry lies near this bbox's edges
   result1 <- tester(spo_gtfs, polygon)
   result2 <- tester(spo_gtfs, sf::st_geometry(polygon))
   result3 <- tester(spo_gtfs, bbox)
@@ -185,6 +186,76 @@ test_that("ignores stops with missing coordinates", {
   feed_bbox <- sf::st_bbox(get_stops_geometry(spo_gtfs))
   result <- tester(na_gtfs, geom = feed_bbox)
   expect_true("CPTM L07-0" %chin% result$trips$trip_id)
+})
+
+test_that("a bbox is treated as a rectangle in longitude and latitude", {
+  # each box is 0.0001 degree (about 11 m) from the geometry tested. a polygon
+  # with geodesic edges or enlarged by a zero buffer gets these cases wrong.
+  # shapes are tested without stop_times, so that trips are not selected by
+  # their stops
+
+  box <- function(xmin, ymin, xmax, ymax) {
+    sf::st_bbox(
+      c(xmin = xmin, ymin = ymin, xmax = xmax, ymax = ymax),
+      crs = 4326
+    )
+  }
+  shape_bbox <- function(id) sf::st_bbox(get_shapes_geometry(spo_gtfs, id))
+  kept_shapes <- function(geom, op = sf::st_intersects) {
+    no_stop_times_gtfs <- spo_gtfs
+    no_stop_times_gtfs$stop_times <- NULL
+    tester(no_stop_times_gtfs, geom, op)$shapes$shape_id
+  }
+
+  # narrow box just west of the shape
+
+  sb <- shape_bbox("17844")
+  west <- box(
+    sb[["xmin"]] - 0.01,
+    sb[["ymin"]],
+    sb[["xmin"]] - 0.0001,
+    sb[["ymax"]]
+  )
+  expect_false("17844" %chin% kept_shapes(west))
+
+  # wide box just north of the shape
+
+  sb <- shape_bbox("68962")
+  cx <- (sb[["xmin"]] + sb[["xmax"]]) / 2
+  north <- box(cx - 0.5, sb[["ymax"]] + 0.0001, cx + 0.5, sb[["ymax"]] + 0.01)
+  expect_false("68962" %chin% kept_shapes(north))
+
+  # a shape touching the box's edges is covered, but not properly contained
+
+  expect_true("68962" %chin% kept_shapes(sb, sf::st_covers))
+  expect_false("68962" %chin% kept_shapes(sb, sf::st_contains_properly))
+
+  # wide box containing the shape
+
+  sb <- shape_bbox("17856")
+  cx <- (sb[["xmin"]] + sb[["xmax"]]) / 2
+  around <- box(
+    cx - 0.5,
+    sb[["ymin"]] - 0.0001,
+    cx + 0.5,
+    sb[["ymax"]] + 0.0001
+  )
+  expect_true("17856" %chin% kept_shapes(around, sf::st_contains))
+
+  # trips are tested through their stops when the feed has no shapes
+
+  no_shapes_gtfs <- spo_gtfs
+  no_shapes_gtfs$shapes <- NULL
+  trip_stops <- spo_gtfs$stop_times[trip_id == "6450-51-0"]$stop_id
+  sb <- sf::st_bbox(get_stops_geometry(spo_gtfs, trip_stops))
+  west <- box(
+    sb[["xmin"]] - 0.01,
+    sb[["ymin"]],
+    sb[["xmin"]] - 0.0001,
+    sb[["ymax"]]
+  )
+  result <- tester(no_shapes_gtfs, west)
+  expect_false("6450-51-0" %chin% result$trips$trip_id)
 })
 
 test_that("predicates that require additional arguments are not accepted", {

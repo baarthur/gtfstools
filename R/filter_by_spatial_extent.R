@@ -6,7 +6,9 @@
 #'
 #' @template gtfs
 #' @param geom An `sf`, `sfc` or `bbox` object, in WGS 84 (EPSG 4326).
-#'   Describes the spatial extent used to filter the data.
+#'   Describes the spatial extent used to filter the data. A `bbox` is treated
+#'   as a rectangle in longitude and latitude (unlike `sf::st_as_sfc(bbox)`,
+#'   whose edges are geodesics when `{s2}` is used).
 #' @param spatial_operation A spatial operation function from the set of
 #'   options listed in [geos_binary_pred][sf::geos_binary_pred]. Defaults to [`sf::st_intersects`], which
 #'   tests if the shapes and trips have ANY intersection with the object
@@ -68,14 +70,19 @@ filter_by_spatial_extent <- function(
   )
   assert_spatial_operation(spatial_operation)
 
-  # convert 'geom' to polygon if a bounding box was given
-
-  if (inherits(geom, "bbox")) {
-    geom <- sf::st_buffer(sf::st_as_sfc(geom), 0)
-  }
-
   if (sf::st_crs(geom) != sf::st_crs(4326)) {
     stop("'geom' CRS must be WGS 84 (EPSG 4326).")
+  }
+
+  # a bbox is a rectangle in longitude/latitude, so it's tested with planar
+  # geometry: {s2} would turn its edges into geodesics
+
+  if (inherits(geom, "bbox")) {
+    geom <- sf::st_set_crs(sf::st_as_sfc(geom), NA)
+    operation <- spatial_operation
+    spatial_operation <- function(x, y, ...) {
+      operation(x, sf::st_set_crs(y, NA), ...)
+    }
   }
 
   if (

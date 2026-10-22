@@ -77,6 +77,7 @@
   - with `keep = FALSE`, drops a departure at `to`: entries crossing `to` now start one second after it, or at the next departure with `exact_times = 1`. Entries left without any departure are removed;
   - no longer modifies the `frequencies` table of the given feed when all of its entries are selected.
 - `filter_by_spatial_extent()` no longer errors when stops have missing coordinates, and with `keep = FALSE` drops every selected trip. It now filters the feed only once, so shapes not used by any trip are no longer kept and duplicated rows are no longer removed.
+- Fixed a bug in `filter_by_spatial_extent()` in which a `bbox` passed to `geom` was converted to a slightly larger polygon with curved edges, so shapes and trips near its edges could be wrongly kept or dropped. A `bbox` is now treated as a rectangle in longitude and latitude.
 - `filter_by_stop_id()` no longer adds a `.flagged` column to the `fare_rules` table of the given feed.
 - `frequencies_to_stop_times()` treats `end_time` as exclusive, as required by the GTFS specification: an entry from 08:00 to 09:00 with a 30-minute headway now yields trips at 08:00 and 08:30 only.
 - Functions that convert times to seconds now convert malformed times (e.g. `"5:30"`, `"12:60:00"`) to `NA` with a warning, instead of silently returning wrong values. `convert_time_to_seconds()` also no longer skips `arrival_time` and `end_time` when only one column of a pair is present.
