@@ -25,11 +25,14 @@
 #'   number of trips that run on the day) and `overlap` (whether all feeds have
 #'   service on the day).
 #'
-#'   If `plot = TRUE`, a `ggplot` object. With `resolution = "periods"`, it
-#'   shows one bar per feed (top to bottom in the given order) spanning its
-#'   service days. With `resolution = "daily"`, it shows the density of each
-#'   feed's trips over time (weighted by the number of trips per day), one
-#'   panel per feed. In both, the overlap periods are shaded.
+#'   If `plot = TRUE`, a `ggplot` object with dates on the x axis and one row
+#'   per feed (top to bottom in the given order). With
+#'   `resolution = "periods"`, it shows a bar spanning each feed's service
+#'   days. With `resolution = "daily"`, it shows a box plot of when each
+#'   feed's trips run: the box spans the days by which a quarter and three
+#'   quarters of its trips have run, with a line on the day by which half
+#'   have, and the whiskers reach its first and last service days. In both,
+#'   the overlap periods are shaded.
 #'
 #' @section Details:
 #' A feed has service on a day if at least one of its services runs on it. A
@@ -40,7 +43,8 @@
 #' addition wins. Either table may be missing. If the feed has a `trips`
 #' table with a `service_id` field, services not used by any trip are ignored.
 #' `feed_info` dates are not used. A warning is raised for feeds without any
-#' service day.
+#' service day, and a message when two or more feeds have no day with service
+#' in all of them.
 #'
 #' The number of trips on a day is the number of trips of the services that
 #' run on it. A trip listed in `frequencies` counts once per departure, every
@@ -53,7 +57,7 @@
 #' service day, so departures after midnight (with times later than
 #' `"24:00:00"`) count on the previous day. If the feed
 #' has no `trips` table with a `service_id` field, `n_trips` is `NA`, and the
-#' daily plot shows the density of its service days instead.
+#' daily plot shows no box for it.
 #'
 #' Feeds are named after their file names (without the extension) or after the
 #' list names. Unnamed feeds are named after their position (`"feed_1"`,
@@ -110,7 +114,9 @@ get_calendar_overlap <- function(gtfs, resolution = "daily", plot = FALSE) {
     feeds <- lapply(gtfs, read_gtfs, skip = c("shapes", "stop_times"))
   } else {
     feed_names <- names(gtfs)
-    if (is.null(feed_names)) feed_names <- character(length(gtfs))
+    if (is.null(feed_names)) {
+      feed_names <- character(length(gtfs))
+    }
     feeds <- lapply(gtfs, assert_and_assign_gtfs_object)
   }
 
@@ -141,7 +147,16 @@ get_calendar_overlap <- function(gtfs, resolution = "daily", plot = FALSE) {
   )
   overlap <- dates_to_periods(as.Date(overlap_days, origin = "1970-01-01"))
 
-  if (resolution == "periods" && !plot) return(overlap)
+  if (length(feeds) > 1L && nrow(overlap) == 0L) {
+    cli::cli_inform(
+      "No day has service in all feeds.",
+      class = "gtfstools_no_calendar_overlap"
+    )
+  }
+
+  if (resolution == "periods" && !plot) {
+    return(overlap)
+  }
 
   if (resolution == "daily") {
     daily_trips <- data.table::rbindlist(service_days, idcol = "feed")
@@ -177,18 +192,25 @@ get_calendar_overlap <- function(gtfs, resolution = "daily", plot = FALSE) {
         height = 0.6,
         fill = "#0072B2"
       ) +
-      ggplot2::scale_y_discrete(limits = rev(feed_names)) +
       ggplot2::labs(x = "Date", y = NULL)
   } else {
-    # each feed's density weighs its days by their number of trips. days of
-    # feeds without trip counts weigh 1
+    # each feed's box shows when its trips run: its quartiles are the days by
+    # which a quarter, half and three quarters of its trips have run, and its
+    # whiskers its first and last service days. they are computed here because
+    # weighted boxes in ggplot2 require {quantreg}. days are sorted within
+    # each feed, as returned by get_service_days()
 
-    daily_trips[
-      ,
-      `:=`(
-        feed = factor(feed, levels = feed_names),
-        density_weight = data.table::fifelse(is.na(n_trips), 1, n_trips)
-      )
+    trip_counts <- daily_trips[!is.na(n_trips)]
+    trip_counts[, trip_share := cumsum(n_trips) / sum(n_trips), by = feed]
+    trip_quartiles <- trip_counts[,
+      .(
+        first_day = date[1L],
+        lower_day = date[match(TRUE, trip_share >= 0.25)],
+        median_day = date[match(TRUE, trip_share >= 0.5)],
+        upper_day = date[match(TRUE, trip_share >= 0.75)],
+        last_day = date[.N]
+      ),
+      by = feed
     ]
 
     overlap_plot <- ggplot2::ggplot() +
@@ -200,29 +222,37 @@ get_calendar_overlap <- function(gtfs, resolution = "daily", plot = FALSE) {
         fill = "#E69F00",
         alpha = 0.4
       ) +
-      ggplot2::geom_density(
-        data = daily_trips,
-        ggplot2::aes(x = date, weight = density_weight),
+      ggplot2::geom_boxplot(
+        data = trip_quartiles,
+        ggplot2::aes(
+          y = feed,
+          xmin = first_day,
+          xlower = lower_day,
+          xmiddle = median_day,
+          xupper = upper_day,
+          xmax = last_day
+        ),
+        stat = "identity",
         colour = "#0072B2",
         fill = "#0072B2",
-        alpha = 0.6
+        alpha = 0.3,
+        width = 0.6
       ) +
-      ggplot2::facet_wrap(
-        ggplot2::vars(feed),
-        ncol = 1,
-        scales = "free_y",
-        drop = FALSE
-      ) +
-      ggplot2::labs(x = "Date", y = "Density of trips")
+      ggplot2::scale_x_date() +
+      ggplot2::labs(x = "Date", y = NULL)
   }
 
+  # feeds without trip counts or service days keep their place on the axis
+
   overlap_plot <- overlap_plot +
-    ggplot2::labs(subtitle = "Shaded: days on which all feeds have service") +
+    ggplot2::scale_y_discrete(limits = rev(feed_names)) +
+    ggplot2::labs(
+      subtitle = "Shaded area in yellow: days on which all feeds have service"
+    ) +
     ggplot2::theme_minimal()
 
   return(overlap_plot)
 }
-
 
 
 #' Get the service days of a GTFS object and their number of trips
@@ -298,8 +328,7 @@ get_service_days <- function(gtfs, count_trips = TRUE) {
       c("character", rep("integer", 7), "Date", "Date")
     )
 
-    calendar <- gtfs$calendar[
-      ,
+    calendar <- gtfs$calendar[,
       c("service_id", weekday_cols, "start_date", "end_date"),
       with = FALSE
     ]
@@ -335,19 +364,16 @@ get_service_days <- function(gtfs, count_trips = TRUE) {
 
   changes <- data.table::rbindlist(
     list(
-      service_intervals[
-        ,
+      service_intervals[,
         .(weekday, day = first_day, change = service_weights$weight[sid])
       ],
-      service_intervals[
-        ,
+      service_intervals[,
         .(weekday, day = last_day + 1L, change = -service_weights$weight[sid])
       ]
     )
   )
   changes <- changes[, .(change = sum(change)), keyby = .(weekday, day)]
-  changes[
-    ,
+  changes[,
     `:=`(
       weight = cumsum(change),
       next_day = data.table::shift(day, type = "lead")
@@ -383,8 +409,7 @@ get_service_days <- function(gtfs, count_trips = TRUE) {
       c("character", "Date", "integer")
     )
 
-    exceptions <- gtfs$calendar_dates[
-      ,
+    exceptions <- gtfs$calendar_dates[,
       .(
         sid = match(service_id, service_weights$service_id),
         date = as.integer(date),
@@ -397,19 +422,17 @@ get_service_days <- function(gtfs, count_trips = TRUE) {
       # max() over plain columns is used instead of any() because data.table
       # optimises it
 
-      exceptions[
-        ,
+      exceptions[,
         `:=`(
           is_added = exception_type %in% 1L,
           is_removed = exception_type %in% 2L
         )
       ]
-      exception_days <- exceptions[
-        ,
+      exception_days <- exceptions[,
         .(is_added = max(is_added), is_removed = max(is_removed)),
         keyby = .(sid, date)
       ]
-      exception_days[, weekday := (date + 3L) %% 7L + 1L]  # as above
+      exception_days[, weekday := (date + 3L) %% 7L + 1L] # as above
 
       # the intervals of a service on a weekday don't overlap, so each exception
       # day falls within at most one of them
@@ -422,8 +445,7 @@ get_service_days <- function(gtfs, count_trips = TRUE) {
       ]
       exception_days[, is_covered := !is.na(covering_interval)]
 
-      exception_days[
-        ,
+      exception_days[,
         weight := service_weights$weight[sid] *
           ((is_added | (is_covered & !is_removed)) - is_covered)
       ]
@@ -436,7 +458,9 @@ get_service_days <- function(gtfs, count_trips = TRUE) {
   service_days <- service_days[weight > 0]
 
   n_trips <- rep(NA_integer_, nrow(service_days))
-  if (uses_trip_counts) n_trips <- as.integer(service_days$weight)
+  if (uses_trip_counts) {
+    n_trips <- as.integer(service_days$weight)
+  }
 
   service_days <- data.table::data.table(
     date = as.Date(service_days$date, origin = "1970-01-01"),
@@ -445,7 +469,6 @@ get_service_days <- function(gtfs, count_trips = TRUE) {
 
   return(service_days)
 }
-
 
 
 #' Get the service days of a GTFS object
@@ -464,7 +487,6 @@ get_service_period <- function(gtfs) {
 
   return(service_days$date)
 }
-
 
 
 #' Get the number of trips each service runs on a day
@@ -488,7 +510,9 @@ get_service_weights <- function(gtfs) {
   )
 
   trips <- gtfs$trips[!is.na(service_id), .(trip_id, service_id)]
-  if (anyDuplicated(trips$trip_id) > 0L) trips <- unique(trips)
+  if (anyDuplicated(trips$trip_id) > 0L) {
+    trips <- unique(trips)
+  }
   trips[, weight := 1]
 
   if (gtfsio::check_file_exists(gtfs, "frequencies")) {
@@ -514,8 +538,7 @@ get_service_weights <- function(gtfs) {
     # malformed times are reported below, as invalid entries
 
     withCallingHandlers(
-      frequencies[
-        ,
+      frequencies[,
         `:=`(
           start_secs = string_to_seconds(start_time),
           end_secs = string_to_seconds(end_time)
@@ -528,10 +551,11 @@ get_service_weights <- function(gtfs) {
     # (but not including) end_time, as in get_frequencies_departures(). an
     # entry whose start and end times are equal departs once
 
-    frequencies[
-      ,
-      is_invalid := is.na(start_secs) | is.na(end_secs) |
-        is.na(headway_secs) | end_secs < start_secs |
+    frequencies[,
+      is_invalid := is.na(start_secs) |
+        is.na(end_secs) |
+        is.na(headway_secs) |
+        end_secs < start_secs |
         (headway_secs <= 0L & end_secs != start_secs)
     ]
     frequencies[
@@ -581,7 +605,6 @@ get_service_weights <- function(gtfs) {
 }
 
 
-
 #' Merge the overlapping calendar intervals of each service and weekday
 #'
 #' @param service_intervals A `data.table` with the columns `sid`, `weekday`,
@@ -603,7 +626,8 @@ merge_service_intervals <- function(service_intervals) {
   base_day <- min(service_intervals$first_day)
   span <- as.numeric(max(service_intervals$last_day)) - base_day + 2
   group_offset <- data.table::rleidv(service_intervals, c("sid", "weekday")) *
-    span - base_day
+    span -
+    base_day
 
   first_key <- group_offset + service_intervals$first_day
   last_key <- cummax(group_offset + service_intervals$last_day)
@@ -612,14 +636,12 @@ merge_service_intervals <- function(service_intervals) {
   ends <- c(starts[-1L] - 1L, nrow(service_intervals))
 
   merged_intervals <- service_intervals[starts, .(sid, weekday, first_day)]
-  merged_intervals[
-    ,
+  merged_intervals[,
     last_day := as.integer(last_key[ends] - group_offset[ends])
   ]
 
   return(merged_intervals)
 }
-
 
 
 #' Collapse days into periods of consecutive days

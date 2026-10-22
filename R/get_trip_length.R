@@ -20,6 +20,14 @@
 #'   `TRUE` raises a warning, and passing `FALSE` raises an error.
 #' @param file Deprecated. Use `method` instead (`file = "stop_times"`
 #'   corresponds to `method = "euclidean"`).
+#' @param from A string, in the "HH:MM:SS" format. With `by = "trip"`, only
+#'   trips that depart from their first stop at or after `from` are included.
+#'   With `by = "segment"`, only segments that depart from their first stop at
+#'   or after `from` are included. If `NULL` (the default), there is no lower
+#'   limit.
+#' @param to A string, in the "HH:MM:SS" format. Only trips (or segments) that
+#'   depart from their first stop at or before `to` are included. If `NULL`
+#'   (the default), there is no upper limit.
 #'
 #' @return With `by = "trip"`, a `data.table` with the `trip_id` and the
 #'   `length` of each trip. With `by = "segment"`, a `data.table` with the
@@ -52,6 +60,13 @@
 #' Lengths are great-circle (haversine) distances on the sphere used by
 #' `{s2}`. Stops with missing coordinates, or not listed in `stops`, result in
 #' `NA` lengths for their segments and trips.
+#'
+#' `from` and `to` are compared with the `departure_time` of the first stop of
+#' each trip (in `stop_sequence` order) or segment, as written in
+#' `stop_times`, so use times past `"24:00:00"` for departures after midnight.
+#' For trips listed in `frequencies`, these are template times, not the times
+#' of each departure. Trips and segments whose departure is blank are never
+#' included when `from` or `to` is given.
 #'
 #' @seealso [get_shape_length()], [get_trip_speed()],
 #'   [get_trip_segment_duration()]
@@ -89,7 +104,9 @@ get_trip_length <- function(gtfs,
                             by = "trip",
                             unit = "km",
                             sort_sequence,
-                            file = NULL) {
+                            file = NULL,
+                            from = NULL,
+                            to = NULL) {
   if (!missing(sort_sequence)) {
     check_deprecated_sort_sequence(
       sort_sequence,
@@ -116,6 +133,8 @@ get_trip_length <- function(gtfs,
     checkmate::check_names(unit, subset.of = c("km", "m")),
     combine = "and"
   )
+  window <- dwell_time_window(from, to)
+  is_windowed <- any(is.finite(window))
 
   gtfsio::assert_field_class(
     gtfs,
@@ -123,6 +142,14 @@ get_trip_length <- function(gtfs,
     c("trip_id", "stop_id", "stop_sequence"),
     c("character", "character", "integer")
   )
+  if (is_windowed) {
+    gtfsio::assert_field_class(
+      gtfs,
+      "stop_times",
+      "departure_time",
+      "character"
+    )
+  }
   gtfsio::assert_field_class(
     gtfs,
     "stops",
@@ -166,7 +193,25 @@ get_trip_length <- function(gtfs,
     )
   }
 
-  st <- prepare_trip_stops(gtfs, trip_id)
+  if (is_windowed) {
+    st <- prepare_trip_stops(gtfs, trip_id, with_departure = TRUE)
+  } else {
+    st <- prepare_trip_stops(gtfs, trip_id)
+  }
+
+  # with by = "trip", only the trips that depart from their first stop within
+  # the time of day are measured. with by = "segment", the segments are
+  # filtered after being numbered, below
+
+  if (is_windowed && by == "trip") {
+    kept_trips <- trips_departing_within(
+      st$trip_id,
+      st$stop_sequence,
+      st$departure_time,
+      window
+    )
+    st <- st[st$trip_id %chin% kept_trips]
+  }
 
   n_rows <- nrow(st)
   if (n_rows == 0) return(empty_trip_length(by))
@@ -208,6 +253,14 @@ get_trip_length <- function(gtfs,
       to_stop_id = st$stop_id[which(is_segment) + 1L],
       length = distance[is_segment]
     )
+
+    if (is_windowed) {
+      departure <- string_to_seconds(st$departure_time[is_segment])
+      in_window <- !is.na(departure) &
+        departure >= window[1] &
+        departure <= window[2]
+      lengths <- lengths[in_window]
+    }
   } else {
     distance[is_last_stop] <- 0
 
@@ -257,14 +310,17 @@ empty_trip_length <- function(by) {
 #' @param gtfs A GTFS object.
 #' @param trip_id The `trip_id`s whose stop_times should be selected, or `NULL`
 #'   to select every trip.
+#' @param with_departure Whether to also select the `departure_time`.
 #'
 #' @return A new `data.table` with the `trip_id`, `stop_id` and
-#'   `stop_sequence` of the selected stop_times, sorted by `trip_id` and
+#'   `stop_sequence` (and, if `with_departure` is `TRUE`, the
+#'   `departure_time`) of the selected stop_times, sorted by `trip_id` and
 #'   `stop_sequence`, plus the `stop_lat` and `stop_lon` of each stop.
 #'
 #' @keywords internal
-prepare_trip_stops <- function(gtfs, trip_id) {
+prepare_trip_stops <- function(gtfs, trip_id, with_departure = FALSE) {
   stop_times_cols <- c("trip_id", "stop_id", "stop_sequence")
+  if (with_departure) stop_times_cols <- c(stop_times_cols, "departure_time")
 
   # select the relevant stop_times rows into a new table, so the tables of the
   # given gtfs are never modified. the selection index is created outside of

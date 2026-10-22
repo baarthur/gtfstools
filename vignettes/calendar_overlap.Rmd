@@ -60,14 +60,13 @@ daily_trips |>
 
 A feed has service on a day when at least one of its services runs on it, according to the weekdays and dates in `calendar` and the exceptions in `calendar_dates`. Services not used by any trip are ignored. Feeds already read with `read_gtfs()` (and possibly edited afterwards) can also be given as a list, whose names are used as feed names, e.g. `get_calendar_overlap(list(spo = spo_gtfs, poa = poa_gtfs))`.
 
-With `plot = TRUE`, the density of each feed's trips over time is plotted in a panel of its own, weighting each day by its number of trips. The days on which all feeds have service are shaded:
+With `plot = TRUE`, a box plot shows when each feed's trips run. The box spans the days by which a quarter and three quarters of the feed's trips have run, with a line on the day by which half have, and the whiskers reach its first and last service days. The days on which all feeds have service are shaded:
 
 ```{r, eval = has_dplyr && requireNamespace("ggplot2", quietly = TRUE), fig.width = 7, fig.height = 4, dpi = 96}
-get_calendar_overlap(c(spo_path, poa_path), plot = TRUE) +
-  coord_cartesian(xlim = as.Date(c("2019-01-01", "2019-05-01")))
+get_calendar_overlap(c(spo_path, poa_path), plot = TRUE)
 ```
 
-The result is a regular `ggplot` object, so it can be customised with `{ggplot2}` functions, e.g. to zoom in on a period, as above.
+The result is a regular `ggplot` object, so it can be customised with `{ggplot2}` functions, e.g. to zoom in on a period, as in the timeline below.
 
 The daily trips help pick a departure date on which every feed runs its usual level of service, such as a regular weekday away from holidays. For example, the trips each feed runs on the first Wednesday on which both have service (`format(x, "%u")` numbers weekdays from 1, Monday, regardless of the locale):
 
@@ -87,7 +86,7 @@ When only the dates matter, `resolution = "periods"` summarises the days on whic
 get_calendar_overlap(c(spo_path, poa_path), resolution = "periods")
 ```
 
-The São Paulo and Porto Alegre feeds overlap for 91 days, from January 18 to April 18, 2019. When the feeds don't overlap, the result has no rows:
+The São Paulo and Porto Alegre feeds overlap for 91 days, from January 18 to April 18, 2019. When the feeds don't overlap, a message is printed and the result has no rows:
 
 ```{r}
 ber_path <- system.file("extdata/ber_gtfs.zip", package = "gtfstools")

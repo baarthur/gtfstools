@@ -179,6 +179,11 @@ test_that("doesn't change the given gtfs", {
       expect_identical(original_gtfs, gtfs)
     }
   }
+
+  for (by in c("trip", "segment")) {
+    result <- get_trip_length(gtfs, by = by, from = "07:00:00")
+    expect_identical(original_gtfs, gtfs)
+  }
 })
 
 test_that("euclidean distances match the distances calculated by sf/s2", {
@@ -535,4 +540,85 @@ test_that("ignores stop_times entries with a blank trip_id", {
 
   result <- tester(blank_gtfs, by = "segment", method = "euclidean")
   expect_false("" %chin% result$trip_id)
+})
+
+# departure time of the first stop of each trip, and of each segment, as
+# written in stop_times
+
+first_departures <- function(gtfs) {
+  st <- data.table::copy(gtfs$stop_times)
+  data.table::setorderv(st, c("trip_id", "stop_sequence"))
+  return(st[!duplicated(st$trip_id), .(trip_id, departure_time)])
+}
+
+segment_departures <- function(gtfs) {
+  st <- data.table::copy(gtfs$stop_times)
+  data.table::setorderv(st, c("trip_id", "stop_sequence"))
+  segments <- st[
+    ,
+    .(segment = seq_len(.N - 1L), departure_time = departure_time[-.N]),
+    by = trip_id
+  ]
+  return(segments)
+}
+
+test_that("from and to select the trips and segments by their departure", {
+  first <- first_departures(spo_gtfs)
+  expected <- first$trip_id[
+    first$departure_time >= "07:00:00" & first$departure_time <= "10:59:59"
+  ]
+
+  result <- get_trip_length(spo_gtfs, from = "07:00:00", to = "10:59:59")
+  expect_identical(result, tester(trip_id = expected))
+
+  segments <- segment_departures(spo_gtfs)
+  expected_segments <- segments[
+    segments$departure_time >= "04:00:00" &
+      segments$departure_time <= "04:30:00",
+    .(trip_id, segment)
+  ]
+
+  result <- get_trip_length(
+    spo_gtfs,
+    by = "segment",
+    from = "04:00:00",
+    to = "04:30:00"
+  )
+  expect_identical(result[, .(trip_id, segment)], expected_segments)
+  expect_identical(
+    result,
+    tester(by = "segment")[expected_segments, on = c("trip_id", "segment")]
+  )
+
+  for (by in c("trip", "segment")) {
+    empty <- get_trip_length(spo_gtfs, by = by, from = "99:00:00")
+    expect_identical(empty, empty_trip_length(by))
+  }
+
+  expect_error(
+    get_trip_length(spo_gtfs, from = "09:00:00", to = "08:00:00"),
+    class = "gtfstools_invalid_time_of_day"
+  )
+
+  no_departure_gtfs <- copy_gtfs_without_field(
+    spo_gtfs,
+    "stop_times",
+    "departure_time"
+  )
+  expect_error(get_trip_length(no_departure_gtfs, from = "07:00:00"))
+  expect_no_error(tester(no_departure_gtfs))
+})
+
+test_that("from and to select single-stop trips by their only stop", {
+  one_stop_gtfs <- read_gtfs(spo_path)
+  one_stop_gtfs$stop_times <- one_stop_gtfs$stop_times[
+    trip_id != "CPTM L07-0" | stop_sequence == 1L
+  ]
+  departure <- one_stop_gtfs$stop_times[trip_id == "CPTM L07-0"]$departure_time
+
+  result <- get_trip_length(one_stop_gtfs, from = departure, to = departure)
+  expect_identical(result[trip_id == "CPTM L07-0"]$length, 0)
+
+  result <- get_trip_length(one_stop_gtfs, from = "12:00:00")
+  expect_false("CPTM L07-0" %chin% result$trip_id)
 })

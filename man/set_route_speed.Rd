@@ -6,13 +6,14 @@
 \usage{
 set_route_speed(
   gtfs,
-  route_id,
+  route_id = NULL,
   speed,
   unit = "km/h",
   first_stop = NULL,
   last_stop = NULL,
   from = NULL,
   to = NULL,
+  route_type = NULL,
   by_reference = FALSE
 )
 }
@@ -21,7 +22,8 @@ set_route_speed(
 
 \item{route_id}{A character vector including the \code{route_id}s to have the
 average speed of their trips set. \code{route_id}s not listed in \code{trips} are
-ignored, with a warning.}
+ignored, with a warning. If \code{NULL} (the default), \code{route_type} must be
+given, and the speed of every trip of these types is set.}
 
 \item{speed}{A number representing the speed to be set for the trips of all
 \code{route_id}s. Must be positive and finite.}
@@ -43,6 +45,12 @@ default), there is no lower limit.}
 \item{to}{A string, in the "HH:MM:SS" format. Only trips that depart from
 the segment's first stop at or before \code{to} are changed. If \code{NULL} (the
 default), there is no upper limit.}
+
+\item{route_type}{An integer vector of \code{route_type}s (see
+\code{\link[=filter_by_route_type]{filter_by_route_type()}}). If given, only trips of routes of these types
+are changed; together with the other selection arguments, it restricts
+their selection. \code{route_type}s not listed in \code{routes} are ignored. If
+\code{NULL} (the default), trips of any type are changed.}
 
 \item{by_reference}{Whether to update \code{stop_times}' \code{data.table} by
 reference. Defaults to \code{FALSE}.}

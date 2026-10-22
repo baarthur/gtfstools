@@ -357,3 +357,48 @@ test_that("works without direction_id", {
   expect_false("direction_id" %chin% names(frequency))
   expect_true(all(frequency$departures == 12L))
 })
+
+test_that("route_type restricts the changed routes", {
+  rail_routes <- gtfs$routes[route_type == 2]$route_id
+
+  expect_no_warning(
+    result <- set_route_frequency(
+      gtfs,
+      headway = 10,
+      from = "07:00:00",
+      to = "09:00:00",
+      route_type = 2
+    ),
+    class = "gtfstools_invalid_route_id"
+  )
+  expect_identical(result, tester(route_id = rail_routes))
+
+  expect_identical(
+    set_route_frequency(
+      gtfs,
+      c("CPTM L07", "2105-10"),
+      10,
+      "07:00:00",
+      "09:00:00",
+      route_type = 2
+    ),
+    tester(route_id = "CPTM L07")
+  )
+
+  expect_warning(
+    set_route_frequency(
+      gtfs,
+      c("CPTM L07", "nonexistent"),
+      10,
+      "07:00:00",
+      "09:00:00",
+      route_type = 2
+    ),
+    class = "gtfstools_invalid_route_id"
+  )
+
+  expect_error(
+    set_route_frequency(gtfs, headway = 10, from = "07:00:00", to = "09:00:00"),
+    class = "gtfstools_missing_selection_error"
+  )
+})

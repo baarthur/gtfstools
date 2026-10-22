@@ -201,4 +201,28 @@ test_that("doesn't change given gtfs", {
 
   result <- tester(gtfs, route_id = route_id)
   expect_equal(original_gtfs, gtfs, ignore_attr = TRUE)
+
+  # a time of day doesn't add an index to the given stop_times
+
+  result <- get_route_speed(gtfs, from = "07:00:00")
+  expect_null(data.table::indices(gtfs$stop_times))
+})
+
+test_that("from and to are passed to get_trip_speed()", {
+  expect_equal(
+    get_route_speed(gtfs, from = "07:00:00", to = "10:59:59"),
+    manual_route_speed(
+      get_trip_speed(gtfs, from = "07:00:00", to = "10:59:59")
+    )
+  )
+
+  # routes without trips in the time of day are not returned
+
+  result <- get_route_speed(gtfs, route_id, from = "99:00:00")
+  expect_identical(nrow(result), 0L)
+
+  expect_error(
+    get_route_speed(gtfs, from = "09:00:00", to = "08:00:00"),
+    class = "gtfstools_invalid_time_of_day"
+  )
 })

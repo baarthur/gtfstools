@@ -5,8 +5,9 @@ tester <- function(gtfs = hand_gtfs,
                    max_speed = 30,
                    route_id = NULL,
                    trip_id = NULL,
-                   unit = "km/h") {
-  set_max_speed(gtfs, max_speed, route_id, trip_id, unit)
+                   unit = "km/h",
+                   ...) {
+  set_max_speed(gtfs, max_speed, route_id, trip_id, unit, ...)
 }
 
 # creates a feed whose trips serve the same stops on the equator, along a
@@ -106,6 +107,14 @@ test_that("raises error due to incorrect input types", {
   expect_error(tester(trip_id = 1))
   expect_error(tester(route_id = NA_character_))
   expect_error(tester(route_id = 1))
+  expect_error(tester(first_stop = ""))
+  expect_error(tester(last_stop = c("s1", "s2")))
+  expect_error(tester(from = "8:00:00"))
+  expect_error(tester(to = "8:00"))
+  expect_error(
+    tester(from = "09:00:00", to = "08:00:00"),
+    class = "gtfstools_invalid_time_of_day"
+  )
 })
 
 test_that("raises errors if gtfs doesn't have required files/fields", {
@@ -116,6 +125,16 @@ test_that("raises errors if gtfs doesn't have required files/fields", {
   )
   expect_error(tester(no_sequence))
   expect_error(tester(copy_gtfs_without_file(hand_gtfs, "stops")))
+
+  # 'stop_id' is only checked to find the segment's stops
+
+  factor_stop_id <- copy_gtfs_diff_field_class(
+    hand_gtfs,
+    "stop_times",
+    "stop_id",
+    "factor"
+  )
+  expect_error(tester(factor_stop_id, first_stop = "s1"))
 
   # without shapes, lengths are calculated along straight lines
 
@@ -162,6 +181,15 @@ test_that("doesn't change given gtfs", {
   expect_identical(original_gtfs, gtfs)
 
   result <- tester(gtfs, max_speed = 20)
+  expect_false(identical(result$stop_times, gtfs$stop_times))
+  expect_equal(original_gtfs, gtfs, ignore_attr = TRUE)
+
+  result <- tester(
+    gtfs,
+    max_speed = 20,
+    first_stop = "18917",
+    from = "00:00:00"
+  )
   expect_false(identical(result$stop_times, gtfs$stop_times))
   expect_equal(original_gtfs, gtfs, ignore_attr = TRUE)
 
@@ -449,4 +477,169 @@ test_that("updates pre-existing *_secs columns", {
     result$stop_times$departure_time_secs,
     secs(result$stop_times$departure_time)
   )
+})
+
+test_that("caps only the spans between first_stop and last_stop", {
+  # the fast first span is before the segment and the fast last span is in it
+
+  result <- tester(trip_id = "t1", first_stop = "s2", last_stop = "s5")
+  times <- times_of(result, "t1")
+  extra_last <- min_one - 30L
+
+  expect_identical(
+    secs(times$arrival_time),
+    secs(c("08:00:00", "08:01:00", NA, "08:10:00", "08:11:00")) +
+      c(0L, 0L, NA, 0L, extra_last)
+  )
+  expect_identical(times$departure_time[3], "")
+
+  # the fast last span is after the segment. the times at and after its last
+  # stop are shifted
+
+  result <- tester(trip_id = "t1", first_stop = "s1", last_stop = "s4")
+  times <- times_of(result, "t1")
+  extra_first <- min_one - 60L
+
+  expect_identical(
+    secs(times$departure_time),
+    secs(c("08:00:00", "08:02:00", NA, "08:10:30", "08:11:00")) +
+      c(0L, extra_first, NA, extra_first, extra_first)
+  )
+  expect_identical(times$arrival_time[3], "")
+
+  # the trip's first and last stops are the defaults
+
+  expect_identical(
+    tester(trip_id = "t1", first_stop = "s1"),
+    tester(trip_id = "t1")
+  )
+  expect_identical(
+    tester(trip_id = "t1", first_stop = "s1", last_stop = "s5"),
+    tester(trip_id = "t1")
+  )
+})
+
+test_that("matches last_stop at its next visit after first_stop", {
+  # a loop trip with fast spans, measured along straight lines
+
+  loop_times <- c("08:00:00", "08:01:00", "08:02:00", "08:03:00", "08:04:00")
+  feed <- synthetic_feed(
+    list(list(arr = loop_times, dep = loop_times)),
+    route_id = "r1",
+    stop_id = c("s2", "s3", "s4", "s3", "s2")
+  )
+  feed <- copy_gtfs_without_file(feed, "shapes")
+
+  result <- suppressWarnings(
+    tester(feed, trip_id = "t1", first_stop = "s3", last_stop = "s3")
+  )
+  original_speeds <- suppressWarnings(
+    get_trip_speed(feed, "t1", by = "segment")$speed
+  )
+  speeds <- suppressWarnings(get_trip_speed(result, "t1", by = "segment")$speed)
+
+  expect_true(all(original_speeds > 30))
+  expect_true(all(speeds[2:3] <= 30 + 1e-8))
+  expect_identical(speeds[c(1, 4)], original_speeds[c(1, 4)])
+  expect_identical(
+    result$stop_times$arrival_time[1:2],
+    feed$stop_times$arrival_time[1:2]
+  )
+
+  # a stop visited only once doesn't make a segment with itself
+
+  expect_warning(
+    result <- tester(trip_id = "t1", first_stop = "s1", last_stop = "s1"),
+    class = "gtfstools_trips_without_segment"
+  )
+  expect_identical(result, hand_gtfs)
+})
+
+test_that("leaves trips without the segment unchanged, with a warning", {
+  # the stop isn't visited, has blank times or is the trip's last stop
+
+  for (stop in c("ola", "s3", "s5")) {
+    expect_warning(
+      result <- tester(trip_id = "t1", first_stop = stop),
+      class = "gtfstools_trips_without_segment"
+    )
+    expect_identical(result, hand_gtfs)
+  }
+
+  # the other selected trips are still capped
+
+  expect_warning(
+    result <- tester(route_id = "r1", first_stop = "s3"),
+    class = "gtfstools_trips_without_segment"
+  )
+  expect_identical(times_of(result, "t1"), times_of(hand_gtfs, "t1"))
+  expect_false(identical(times_of(result, "t2"), times_of(hand_gtfs, "t2")))
+
+  # trips not explicitly selected are not reported
+
+  expect_no_warning(result <- tester(first_stop = "s3"))
+  expect_identical(times_of(result, "t1"), times_of(hand_gtfs, "t1"))
+  expect_false(identical(times_of(result, "t2"), times_of(hand_gtfs, "t2")))
+})
+
+test_that("caps only the trips departing within from and to", {
+  t1_times <- list(
+    arr = c("08:00:00", "08:01:00", "", "08:10:00", "08:11:00"),
+    dep = c("08:00:00", "08:02:00", "", "08:10:30", "08:11:00")
+  )
+  shift <- function(x) {
+    ifelse(x == "", "", seconds_to_string(secs(x) + 17L * 3600L))
+  }
+  late_times <- lapply(t1_times, shift)
+  feed <- synthetic_feed(list(t1_times, late_times), route_id = "r1")
+  capped <- tester(feed)
+
+  result <- tester(feed, from = "08:00:00", to = "08:00:00")
+  expect_identical(times_of(result, "t1"), times_of(capped, "t1"))
+  expect_identical(times_of(result, "t2"), times_of(feed, "t2"))
+
+  # times past midnight are given as written
+
+  result <- tester(feed, from = "24:00:00")
+  expect_identical(times_of(result, "t1"), times_of(feed, "t1"))
+  expect_identical(times_of(result, "t2"), times_of(capped, "t2"))
+
+  expect_identical(tester(feed, from = "10:00:00", to = "11:00:00"), feed)
+})
+
+test_that("doesn't warn about backwards spans outside the segment", {
+  times <- c("23:58:00", "23:59:00", "00:01:00", "00:30:00", "00:31:00")
+  feed <- synthetic_feed(list(list(arr = times, dep = times)), route_id = "r1")
+
+  expect_no_warning(tester(feed, first_stop = "s3"))
+  expect_warning(
+    tester(feed, first_stop = "s2"),
+    class = "gtfstools_backwards_times"
+  )
+})
+
+test_that("route_type restricts the capped trips", {
+  rail_trips <- spo_gtfs$trips[startsWith(route_id, "CPTM")]$trip_id
+
+  expect_identical(
+    set_max_speed(spo_gtfs, 30, route_type = 2),
+    set_max_speed(spo_gtfs, 30, trip_id = rail_trips)
+  )
+  expect_identical(
+    set_max_speed(
+      spo_gtfs,
+      30,
+      route_id = c("CPTM L07", "2105-10"),
+      route_type = 3
+    ),
+    set_max_speed(spo_gtfs, 30, route_id = "2105-10")
+  )
+
+  # trips selected only by route_type are not reported
+  expect_no_warning(
+    set_max_speed(spo_gtfs, 30, first_stop = "18917", route_type = 2),
+    class = "gtfstools_trips_without_segment"
+  )
+
+  expect_error(set_max_speed(spo_gtfs, 30, route_type = "2"))
 })

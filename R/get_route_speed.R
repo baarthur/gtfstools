@@ -9,6 +9,12 @@
 #'   speeds of every `route_id` in the GTFS. `route_id`s not listed in `trips`
 #'   are ignored, with a warning.
 #' @template method
+#' @param from A string, in the "HH:MM:SS" format. Only trips that depart from
+#'   their first stop at or after `from` are included. If `NULL` (the
+#'   default), there is no lower limit.
+#' @param to A string, in the "HH:MM:SS" format. Only trips that depart from
+#'   their first stop at or before `to` are included. If `NULL` (the default),
+#'   there is no upper limit.
 #' @inheritParams get_trip_speed
 #'
 #' @return A `data.table` with the `route_id` and the minimum (`min_speed`),
@@ -25,8 +31,9 @@
 #'
 #' Trips with `NA` speeds are ignored. Routes whose trips all have `NA` speeds
 #' get `NA` statistics, and `sd_speed` is `NA` for routes with a single trip
-#' with a known speed. Routes without any trip in `stop_times` are not
-#' returned.
+#' with a known speed. Routes without any trip in `stop_times` (or, if `from`
+#' or `to` is given, without any trip departing within the time of day) are
+#' not returned.
 #'
 #' @seealso [get_trip_speed()], [set_route_speed()], [set_trip_speed()]
 #'
@@ -56,9 +63,12 @@
 get_route_speed <- function(gtfs,
                             route_id = NULL,
                             method = "shapes",
-                            unit = "km/h") {
+                            unit = "km/h",
+                            from = NULL,
+                            to = NULL) {
   gtfs <- assert_and_assign_gtfs_object(gtfs)
   checkmate::assert_character(route_id, null.ok = TRUE, any.missing = FALSE)
+  dwell_time_window(from, to)
 
   gtfsio::assert_field_class(
     gtfs,
@@ -97,7 +107,14 @@ get_route_speed <- function(gtfs,
     }
   }
 
-  speeds <- get_trip_speed(gtfs, trip_id, method = method, unit = unit)
+  speeds <- get_trip_speed(
+    gtfs,
+    trip_id,
+    method = method,
+    unit = unit,
+    from = from,
+    to = to
+  )
 
   # drops trips not listed in 'trips' (NA route_id) and, with route_id given,
   # routes not requested (a trip_id listed more than once in 'trips' gets the

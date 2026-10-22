@@ -154,3 +154,25 @@ test_that("'by_reference' parameter works adequately", {
   expect_false(result$visible)
   expect_equal(gtfs$stop_times, expected$stop_times, ignore_attr = TRUE)
 })
+
+test_that("route_type restricts the changed routes", {
+  rail_routes <- gtfs$routes[route_type == 2]$route_id
+
+  expect_no_warning(result <- set_route_speed(gtfs, speed = 50, route_type = 2))
+  expect_identical(result, set_route_speed(gtfs, rail_routes, 50))
+
+  expect_identical(
+    set_route_speed(gtfs, c("CPTM L07", "2105-10"), 50, route_type = 3),
+    set_route_speed(gtfs, "2105-10", 50)
+  )
+
+  expect_no_warning(
+    set_route_speed(gtfs, speed = 50, first_stop = "18917", route_type = 2),
+    class = "gtfstools_trips_without_segment"
+  )
+
+  expect_error(
+    set_route_speed(gtfs, speed = 50),
+    class = "gtfstools_missing_selection_error"
+  )
+})

@@ -287,14 +287,29 @@ test_that("returns the number of trips per day by default", {
 })
 
 test_that("returns an empty table when feeds don't overlap", {
-  expect_silent(overlap <- tester(c(spo_path, poa_path, ber_path)))
+  expect_message(
+    overlap <- tester(c(spo_path, poa_path, ber_path)),
+    class = "gtfstools_no_calendar_overlap"
+  )
   expect_identical(nrow(overlap), 0L)
   expect_named(overlap, c("start_date", "end_date", "n_days"))
   expect_s3_class(overlap$start_date, "Date")
   expect_type(overlap$n_days, "integer")
 
-  daily_trips <- tester(c(spo_path, poa_path, ber_path), resolution = "daily")
+  expect_message(
+    daily_trips <- tester(
+      c(spo_path, poa_path, ber_path),
+      resolution = "daily"
+    ),
+    class = "gtfstools_no_calendar_overlap"
+  )
   expect_false(any(daily_trips$overlap))
+
+  # no message when the feeds overlap. a single feed always overlaps with
+  # itself
+
+  expect_silent(tester())
+  expect_silent(tester(list(ber_gtfs)))
 })
 
 test_that("splits the overlap into periods of consecutive days", {
@@ -319,7 +334,7 @@ test_that("only counts services used by trips", {
   no_used_services$trips <- ggl_gtfs$trips[0]
   expect_identical(nrow(get_service_days(no_used_services)), 0L)
   expect_warning(
-    tester(list(ggl_gtfs, no_used_services)),
+    suppressMessages(tester(list(ggl_gtfs, no_used_services))),
     class = "gtfstools_no_service_days"
   )
 })
@@ -437,7 +452,9 @@ test_that("works when calendar or calendar_dates are missing", {
   expect_identical(nrow(service_days), 0L)
 
   expect_warning(
-    overlap <- tester(list(ggl = ggl_gtfs, empty = no_calendars)),
+    overlap <- suppressMessages(
+      tester(list(ggl = ggl_gtfs, empty = no_calendars))
+    ),
     class = "gtfstools_no_service_days"
   )
   expect_identical(nrow(overlap), 0L)
@@ -568,22 +585,24 @@ test_that("returns a timeline plot", {
 
   # builds without overlap and with feeds without service days
 
-  timeline_plot <- tester(list(spo_gtfs, ber_gtfs), plot = TRUE)
+  timeline_plot <- suppressMessages(
+    tester(list(spo_gtfs, ber_gtfs), plot = TRUE)
+  )
   expect_error(ggplot2::ggplot_build(timeline_plot), NA)
 
   no_calendars <- copy_gtfs_without_file(ggl_gtfs, "calendar")
   no_calendars <- copy_gtfs_without_file(no_calendars, "calendar_dates")
-  timeline_plot <- suppressWarnings(
+  timeline_plot <- suppressMessages(suppressWarnings(
     tester(list(ggl_gtfs, no_calendars), plot = TRUE)
-  )
+  ))
   expect_error(ggplot2::ggplot_build(timeline_plot), NA)
 })
 
 test_that("returns a plot of the trips per day", {
   skip_if_not_installed("ggplot2")
 
-  # feeds without trip counts are drawn by their service days, without
-  # warnings
+  # feeds without trip counts keep their place on the axis, without a box,
+  # and without warnings. one shaded window per overlap period, on a date axis
 
   daily_plot <- tester(
     list(ggl_gtfs, ggl_no_trips),
@@ -595,18 +614,39 @@ test_that("returns a plot of the trips per day", {
     testthat::capture_warnings(ggplot2::ggplot_build(daily_plot)),
     0
   )
-  expect_identical(nrow(ggplot2::layer_data(daily_plot, 1)), 10L)
-
-  densities <- ggplot2::layer_data(daily_plot, 2)
-  expect_identical(sort(unique(as.integer(densities$PANEL))), 1:2)
-  expect_true(all(densities$density >= 0))
-
-  # builds without overlap
-
-  daily_plot <- tester(
-    list(spo_gtfs, ber_gtfs),
-    resolution = "daily",
-    plot = TRUE
+  expect_identical(nrow(ggplot2::layer_data(daily_plot, 1)), 5L)
+  expect_identical(nrow(ggplot2::layer_data(daily_plot, 2)), 1L)
+  expect_identical(
+    ggplot2::layer_scales(daily_plot)$y$get_limits(),
+    c("feed_2", "feed_1")
   )
-  expect_error(ggplot2::ggplot_build(daily_plot), NA)
+  expect_s3_class(ggplot2::layer_scales(daily_plot)$x, "ScaleContinuousDate")
+
+  # the box spans the trip-weighted quartiles of the days, and the whiskers
+  # the first and last service days
+
+  daily_plot <- tester(list(poa_gtfs), resolution = "daily", plot = TRUE)
+  box <- ggplot2::layer_data(daily_plot, 2)
+  service_days <- get_service_days(poa_gtfs)
+  trip_days <- rep(service_days$date, service_days$n_trips)
+  expect_equal(
+    c(box$xmin, box$xlower, box$xmiddle, box$xupper, box$xmax),
+    as.numeric(stats::quantile(trip_days, c(0, 0.25, 0.5, 0.75, 1), type = 1))
+  )
+
+  # builds without overlap and without warnings
+
+  expect_message(
+    daily_plot <- tester(
+      list(spo_gtfs, ber_gtfs),
+      resolution = "daily",
+      plot = TRUE
+    ),
+    class = "gtfstools_no_calendar_overlap"
+  )
+  expect_length(
+    testthat::capture_warnings(ggplot2::ggplot_build(daily_plot)),
+    0
+  )
+  expect_identical(nrow(ggplot2::layer_data(daily_plot, 1)), 0L)
 })

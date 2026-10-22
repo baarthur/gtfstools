@@ -161,7 +161,6 @@ utils::globalVariables(
     "end_secs",
     "is_invalid",
     "n_departures",
-    "density_weight",
     "value",
     "t_dep",
     "t_arr",
@@ -172,6 +171,10 @@ utils::globalVariables(
     "delay",
     "last_arrival",
     "date",
-    "i.route_id"
+    "i.route_id",
+    "trip_share",
+    "lower_day",
+    "median_day",
+    "upper_day"
   )
 )

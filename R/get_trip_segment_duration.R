@@ -12,6 +12,12 @@
 #' @param sort_sequence Deprecated; do not supply. Timetables are now always
 #'   sorted by `stop_sequence`. Passing `TRUE` raises a warning, and passing
 #'   `FALSE` raises an error.
+#' @param from A string, in the "HH:MM:SS" format. Only segments that depart
+#'   from their first stop at or after `from` are included. If `NULL` (the
+#'   default), there is no lower limit.
+#' @param to A string, in the "HH:MM:SS" format. Only segments that depart from
+#'   their first stop at or before `to` are included. If `NULL` (the default),
+#'   there is no upper limit.
 #'
 #' @return A `data.table` containing the segments' duration of each specified
 #'   trip.
@@ -25,6 +31,13 @@
 #' Existing `_secs` columns in `stop_times` (e.g. created with
 #' [convert_time_to_seconds()]) are used as-is, not recalculated from the time
 #' strings.
+#'
+#' `from` and `to` are compared with the departure time of the first stop of
+#' each segment, read as the durations are (from `departure_time_secs`, if
+#' present), so use times past `"24:00:00"` for departures after midnight.
+#' For trips listed in `frequencies`, these are template times, not the times
+#' of each departure. Segments whose departure is blank are never included
+#' when `from` or `to` is given.
 #'
 #' @examples
 #' \dontshow{
@@ -46,11 +59,22 @@
 #' trip_segment_dur <- get_trip_segment_duration(gtfs, "CPTM L07-0", unit = "s")
 #' trip_segment_dur
 #'
+#' # use the from and to arguments to keep only the segments that depart
+#' # within a time of day
+#' trip_segment_dur <- get_trip_segment_duration(
+#'   gtfs,
+#'   from = "07:00:00",
+#'   to = "09:00:00"
+#' )
+#' head(trip_segment_dur)
+#'
 #' @export
 get_trip_segment_duration <- function(gtfs,
                                       trip_id = NULL,
                                       unit = "min",
-                                      sort_sequence) {
+                                      sort_sequence,
+                                      from = NULL,
+                                      to = NULL) {
   if (!missing(sort_sequence)) {
     check_deprecated_sort_sequence(
       sort_sequence,
@@ -66,6 +90,7 @@ get_trip_segment_duration <- function(gtfs,
     checkmate::check_names(unit, subset.of = c("s", "min", "h", "d")),
     combine = "and"
   )
+  window <- dwell_time_window(from, to)
 
   gtfsio::assert_field_class(
     gtfs,
@@ -82,7 +107,11 @@ get_trip_segment_duration <- function(gtfs,
 
     warn_missing_ids(trip_id, gtfs$stop_times$trip_id, "stop_times", "trip_id")
 
-    durations <- gtfs$stop_times[trip_id %chin% relevant_trips]
+    # the selection index is created outside of `[` so that {data.table}
+    # doesn't add an index to the original table
+
+    is_relevant <- gtfs$stop_times$trip_id %chin% relevant_trips
+    durations <- gtfs$stop_times[is_relevant]
   } else {
     durations <- gtfs$stop_times
   }
@@ -102,6 +131,17 @@ get_trip_segment_duration <- function(gtfs,
   if (is.null(trip_id)) durations <- data.table::copy(durations)
   durations <- data.table::setorderv(durations, c("trip_id", "stop_sequence"))
 
+  # each stop but the last of each trip starts a segment, in the order the
+  # segments are returned below. the rows of each trip are contiguous after
+  # sorting, so the last stop is the last row with its trip_id (NAs included)
+
+  is_windowed <- any(is.finite(window))
+
+  if (is_windowed) {
+    is_last_stop <- !duplicated(durations$trip_id, fromLast = TRUE)
+    segment_departure <- durations$departure_time_secs[!is_last_stop]
+  }
+
   # compute per trip, so rows of interleaved trips are never mixed up
   durations <- durations[
     ,
@@ -111,6 +151,16 @@ get_trip_segment_duration <- function(gtfs,
     ),
     by = trip_id
   ]
+
+  # keep only the segments that depart from their first stop within the time
+  # of day
+
+  if (is_windowed) {
+    in_window <- !is.na(segment_departure) &
+      segment_departure >= window[1] &
+      segment_departure <= window[2]
+    durations <- durations[in_window]
+  }
 
   # select desired columns and convert duration to desired unit
 

@@ -8,7 +8,8 @@
 #' @template gtfs
 #' @param trip_id A character vector including the `trip_id`s to have their
 #'   dwell times set. If `NULL` (the default), the dwell times of every
-#'   `trip_id` in the GTFS are set.
+#'   `trip_id` in the GTFS (or of every trip of the given `route_type`s) are
+#'   set.
 #' @param stop_id A character vector including the `stop_id`s at which the
 #'   dwell times are set. If `NULL` (the default), the dwell times are set at
 #'   every `stop_id` in the GTFS.
@@ -25,6 +26,7 @@
 #' @param to A string, in the "HH:MM:SS" format. Only visits whose arrival time
 #'   is at or before `to` are changed. If `NULL` (the default), there is no
 #'   upper limit.
+#' @inheritParams set_trip_speed
 #' @param by_reference Whether to update `stop_times`' `data.table` by
 #'   reference. Defaults to `FALSE`.
 #'
@@ -154,6 +156,7 @@ set_dwell_time <- function(gtfs,
                            unit = "s",
                            from = NULL,
                            to = NULL,
+                           route_type = NULL,
                            by_reference = FALSE) {
   gtfs <- assert_and_assign_gtfs_object(gtfs)
   checkmate::assert_character(trip_id, null.ok = TRUE, any.missing = FALSE)
@@ -166,6 +169,12 @@ set_dwell_time <- function(gtfs,
     upper = max_time_secs / dwell_unit_factors[[unit]]
   )
   window <- dwell_time_window(from, to)
+  checkmate::assert_integerish(
+    route_type,
+    min.len = 1,
+    any.missing = FALSE,
+    null.ok = TRUE
+  )
   checkmate::assert_logical(by_reference, any.missing = FALSE, len = 1)
 
   gtfsio::assert_field_class(
@@ -179,6 +188,11 @@ set_dwell_time <- function(gtfs,
   # written. the accumulated changes are checked further below
 
   dwell_secs <- as.integer(round(dwell_time * dwell_unit_factors[[unit]]))
+
+  if (!is.null(route_type)) {
+    type_routes <- route_type_ids(gtfs, route_type)
+    type_trips <- gtfs$trips$trip_id[gtfs$trips$route_id %chin% type_routes]
+  }
 
   if (by_reference) {
     stop_times <- gtfs$stop_times
@@ -202,7 +216,18 @@ set_dwell_time <- function(gtfs,
         class = "gtfstools_no_calls_selected"
       )
     }
-  } else {
+  }
+
+  # route_type restricts the selected calls to trips of these types. it's
+  # applied after the warning above, which is about the given ids only
+
+  if (!is.null(route_type)) {
+    selected_rows <- selected_rows[
+      stop_times$trip_id[selected_rows] %chin% type_trips
+    ]
+  }
+
+  if (length(selected_rows) > 0) {
     # all the calls of the affected trips are needed to order them and
     # accumulate the shifts. with no stop filter, every call of the selected
     # trips is itself selected

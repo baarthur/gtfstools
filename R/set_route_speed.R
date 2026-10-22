@@ -7,7 +7,8 @@
 #' @template gtfs
 #' @param route_id A character vector including the `route_id`s to have the
 #'   average speed of their trips set. `route_id`s not listed in `trips` are
-#'   ignored, with a warning.
+#'   ignored, with a warning. If `NULL` (the default), `route_type` must be
+#'   given, and the speed of every trip of these types is set.
 #' @param speed A number representing the speed to be set for the trips of all
 #'   `route_id`s. Must be positive and finite.
 #' @inheritParams set_trip_speed
@@ -67,17 +68,24 @@
 #' @export
 set_route_speed <- function(
   gtfs,
-  route_id,
+  route_id = NULL,
   speed,
   unit = "km/h",
   first_stop = NULL,
   last_stop = NULL,
   from = NULL,
   to = NULL,
+  route_type = NULL,
   by_reference = FALSE
 ) {
   gtfs <- assert_and_assign_gtfs_object(gtfs)
-  checkmate::assert_character(route_id, any.missing = FALSE)
+  if (is.null(route_id) && is.null(route_type)) {
+    cli::cli_abort(
+      "At least one of {.arg route_id} and {.arg route_type} must be given.",
+      class = "gtfstools_missing_selection_error"
+    )
+  }
+  checkmate::assert_character(route_id, null.ok = TRUE, any.missing = FALSE)
   checkmate::assert_number(speed, finite = TRUE)
   gtfsio::assert_field_class(
     gtfs,
@@ -87,12 +95,19 @@ set_route_speed <- function(
   )
 
   # select the trips of the given routes that have stop times, so that
-  # set_trip_speed() doesn't warn about trips without them
+  # set_trip_speed() doesn't warn about trips without them. without route_id,
+  # set_trip_speed() selects the trips of the given route types itself (and
+  # doesn't warn about those that don't visit the segment)
 
-  ids <- route_id
-  trips <- unique(gtfs$trips[route_id %chin% ids, .(trip_id, route_id)])
-  if (is.character(gtfs$stop_times$trip_id)) {
-    trips <- trips[trip_id %chin% gtfs$stop_times$trip_id]
+  trip_ids <- NULL
+
+  if (!is.null(route_id)) {
+    ids <- route_id
+    trips <- unique(gtfs$trips[route_id %chin% ids, .(trip_id, route_id)])
+    if (is.character(gtfs$stop_times$trip_id)) {
+      trips <- trips[trip_id %chin% gtfs$stop_times$trip_id]
+    }
+    trip_ids <- trips$trip_id
   }
 
   # every trip gets the same speed. the other arguments, and whether speed is
@@ -100,13 +115,14 @@ set_route_speed <- function(
 
   result <- set_trip_speed(
     gtfs,
-    trip_id = trips$trip_id,
+    trip_id = trip_ids,
     speed = speed,
     unit = unit,
     first_stop = first_stop,
     last_stop = last_stop,
     from = from,
     to = to,
+    route_type = route_type,
     by_reference = by_reference
   )
 
@@ -115,7 +131,7 @@ set_route_speed <- function(
 
   invalid_route_id <- unique(route_id[!route_id %chin% gtfs$trips$route_id])
 
-  if (!identical(invalid_route_id, character(0))) {
+  if (length(invalid_route_id) > 0) {
     cli::cli_warn(
       paste0(
         "{.file trips} doesn't contain the following route_id{?s}: ",

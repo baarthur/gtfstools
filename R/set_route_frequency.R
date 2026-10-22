@@ -7,7 +7,8 @@
 #' @template gtfs
 #' @param route_id A character vector including the `route_id`s to have their
 #'   frequency set. `route_id`s not listed in `trips` are ignored, with a
-#'   warning.
+#'   warning. If `NULL` (the default), `route_type` must be given, and the
+#'   frequency of every route of these types is set.
 #' @param headway A number. The headway to be set, in minutes. It is rounded
 #'   to whole seconds and applies to every `route_id` (call the function once
 #'   per route to set different headways).
@@ -15,6 +16,11 @@
 #'   "HH:MM:SS" format.
 #' @param to A string. The ending point of the time of day, in the "HH:MM:SS"
 #'   format. Must be later than `from`.
+#' @param route_type An integer vector of `route_type`s (see
+#'   [filter_by_route_type()]). If given, only routes of these types are
+#'   changed; together with `route_id`, it restricts the given routes.
+#'   `route_type`s not listed in `routes` are ignored. If `NULL` (the
+#'   default), routes of any type are changed.
 #'
 #' @return A GTFS object with updated `frequencies`, `trips` and `stop_times`
 #'   tables (and `transfers`, when present). If the given GTFS object has no
@@ -94,9 +100,20 @@
 #' new_gtfs <- frequencies_to_stop_times(new_gtfs)
 #'
 #' @export
-set_route_frequency <- function(gtfs, route_id, headway, from, to) {
+set_route_frequency <- function(gtfs,
+                                route_id = NULL,
+                                headway,
+                                from,
+                                to,
+                                route_type = NULL) {
   gtfs <- assert_and_assign_gtfs_object(gtfs)
-  checkmate::assert_character(route_id, any.missing = FALSE)
+  if (is.null(route_id) && is.null(route_type)) {
+    cli::cli_abort(
+      "At least one of {.arg route_id} and {.arg route_type} must be given.",
+      class = "gtfstools_missing_selection_error"
+    )
+  }
+  checkmate::assert_character(route_id, null.ok = TRUE, any.missing = FALSE)
   checkmate::assert_number(
     headway,
     lower = 1 / 60,
@@ -104,6 +121,12 @@ set_route_frequency <- function(gtfs, route_id, headway, from, to) {
   )
   checkmate::assert_string(from, pattern = "^\\d{2}:[0-5]\\d:[0-5]\\d$")
   checkmate::assert_string(to, pattern = "^\\d{2}:[0-5]\\d:[0-5]\\d$")
+  checkmate::assert_integerish(
+    route_type,
+    min.len = 1,
+    any.missing = FALSE,
+    null.ok = TRUE
+  )
 
   from_secs <- string_to_seconds(from)
   to_secs <- string_to_seconds(to)
@@ -141,7 +164,7 @@ set_route_frequency <- function(gtfs, route_id, headway, from, to) {
 
   invalid_route_id <- route_id[! route_id %chin% gtfs$trips$route_id]
 
-  if (!identical(invalid_route_id, character(0))) {
+  if (length(invalid_route_id) > 0) {
     cli::cli_warn(
       paste0(
         "{.file trips} doesn't contain the following route_id{?s}: ",
@@ -151,7 +174,18 @@ set_route_frequency <- function(gtfs, route_id, headway, from, to) {
     )
   }
 
+  # route_type restricts the given routes (or selects all the routes of these
+  # types)
+
   relevant_routes <- route_id
+  if (!is.null(route_type)) {
+    type_routes <- route_type_ids(gtfs, route_type)
+    relevant_routes <- if (is.null(route_id)) {
+      type_routes
+    } else {
+      intersect(route_id, type_routes)
+    }
+  }
   trips <- gtfs$trips[
     route_id %chin% relevant_routes,
     c("trip_id", group_cols),

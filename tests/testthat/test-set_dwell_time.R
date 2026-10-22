@@ -562,3 +562,35 @@ test_that("visits with a blank arrival are not selected by a time of day", {
   )
   expect_identical(new_gtfs$stop_times, half_blank_gtfs$stop_times)
 })
+
+test_that("route_type restricts the changed visits", {
+  rail_trips <- gtfs$trips[startsWith(route_id, "CPTM")]$trip_id
+
+  expect_identical(
+    set_dwell_time(gtfs, dwell_time = 30, route_type = 2),
+    tester(trip_id = rail_trips)
+  )
+  expect_identical(
+    set_dwell_time(
+      gtfs,
+      trip_id = c("CPTM L07-0", "2105-10-0"),
+      dwell_time = 30,
+      route_type = 3
+    ),
+    tester(trip_id = "2105-10-0")
+  )
+
+  # the given trip visits the given stop, but is of another type
+  expect_no_warning(
+    result <- set_dwell_time(
+      gtfs,
+      trip_id = "CPTM L07-0",
+      stop_id = "18917",
+      dwell_time = 30,
+      route_type = 3
+    )
+  )
+  expect_identical(result$stop_times, gtfs$stop_times)
+
+  expect_error(set_dwell_time(gtfs, dwell_time = 30, route_type = "2"))
+})

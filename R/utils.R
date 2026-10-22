@@ -249,3 +249,33 @@ check_deprecated_sort_sequence <- function(sort_sequence, fn_name, columns) {
 
   return(invisible(NULL))
 }
+
+#' Get the `route_id`s of the given `route_type`s
+#'
+#' Returns the `route_id`s listed in `routes` with any of the given
+#' `route_type`s. Types not listed in `routes` are ignored. Also checks the
+#' `trips` table, which the callers use to get the trips of these routes, so
+#' that a feed without it raises an error instead of selecting nothing.
+#'
+#' @template gtfs
+#' @param route_type An integer vector of `route_type`s.
+#'
+#' @return A character vector of `route_id`s.
+#'
+#' @keywords internal
+route_type_ids <- function(gtfs, route_type) {
+  gtfsio::assert_field_class(
+    gtfs,
+    "routes",
+    c("route_id", "route_type"),
+    c("character", "integer")
+  )
+  gtfsio::assert_field_class(
+    gtfs,
+    "trips",
+    c("trip_id", "route_id"),
+    c("character", "character")
+  )
+
+  return(gtfs$routes$route_id[gtfs$routes$route_type %in% route_type])
+}

@@ -219,5 +219,98 @@ test_that("doesn't change the given gtfs", {
   for (by in c("trip", "segment")) {
     result <- tester(test_gtfs, by = by)
     expect_identical(original_gtfs, test_gtfs)
+
+    result <- get_trip_speed(test_gtfs, by = by, from = "07:00:00")
+    expect_identical(original_gtfs, test_gtfs)
+    expect_null(data.table::indices(test_gtfs$stop_times))
+  }
+})
+
+# departure time of the first stop of each trip, and of each segment, as
+# written in stop_times
+
+first_departures <- function(gtfs) {
+  st <- data.table::copy(gtfs$stop_times)
+  data.table::setorderv(st, c("trip_id", "stop_sequence"))
+  return(st[!duplicated(st$trip_id), .(trip_id, departure_time)])
+}
+
+test_that("from and to select the trips and segments as get_trip_length()", {
+  first <- first_departures(gtfs)
+  expected <- first$trip_id[
+    first$departure_time >= "07:00:00" & first$departure_time <= "10:59:59"
+  ]
+
+  result <- get_trip_speed(gtfs, from = "07:00:00", to = "10:59:59")
+  expect_identical(result, tester(trip_id = expected))
+
+  # the segments of the three functions agree, also when stop_times is not
+  # ordered
+
+  unordered_gtfs <- read_gtfs(data_path)
+  unordered_gtfs$stop_times <- unordered_gtfs$stop_times[
+    rev(seq_len(nrow(unordered_gtfs$stop_times)))
+  ]
+
+  speeds <- get_trip_speed(
+    unordered_gtfs,
+    by = "segment",
+    from = "04:00:00",
+    to = "04:30:00"
+  )
+  lengths <- get_trip_length(
+    unordered_gtfs,
+    by = "segment",
+    from = "04:00:00",
+    to = "04:30:00"
+  )
+  durations <- get_trip_segment_duration(
+    unordered_gtfs,
+    from = "04:00:00",
+    to = "04:30:00"
+  )
+  expect_true(nrow(speeds) > 0)
+  expect_identical(
+    speeds[, .(trip_id, segment)],
+    lengths[, .(trip_id, segment)]
+  )
+  expect_identical(
+    speeds[, .(trip_id, segment)],
+    durations[, .(trip_id, segment)]
+  )
+  expect_identical(
+    speeds,
+    tester(unordered_gtfs, by = "segment")[
+      speeds[, .(trip_id, segment)],
+      on = c("trip_id", "segment")
+    ]
+  )
+
+  empty <- get_trip_speed(gtfs, from = "99:00:00")
+  expect_identical(nrow(empty), 0L)
+  expect_identical(names(empty), c("route_id", "trip_id", "speed"))
+
+  expect_error(
+    get_trip_speed(gtfs, from = "09:00:00", to = "08:00:00"),
+    class = "gtfstools_invalid_time_of_day"
+  )
+})
+
+test_that("from and to raise the warnings only once", {
+  for (by in c("trip", "segment")) {
+    warnings <- character(0)
+    withCallingHandlers(
+      get_trip_speed(
+        gtfs,
+        c(trip_id, "nonexistent"),
+        by = by,
+        from = "00:00:00"
+      ),
+      warning = function(w) {
+        warnings <<- c(warnings, conditionMessage(w))
+        invokeRestart("muffleWarning")
+      }
+    )
+    expect_length(warnings, 1)
   }
 })

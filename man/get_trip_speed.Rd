@@ -11,7 +11,9 @@ get_trip_speed(
   by = "trip",
   unit = "km/h",
   sort_sequence,
-  file = NULL
+  file = NULL,
+  from = NULL,
+  to = NULL
 )
 }
 \arguments{
@@ -42,6 +44,16 @@ now always sorted by \code{stop_sequence} and \code{shape_pt_sequence}. Passing
 
 \item{file}{Deprecated. Use \code{method} instead (\code{file = "stop_times"}
 corresponds to \code{method = "euclidean"}).}
+
+\item{from}{A string, in the "HH:MM:SS" format. With \code{by = "trip"}, only
+trips that depart from their first stop at or after \code{from} are included.
+With \code{by = "segment"}, only segments that depart from their first stop at
+or after \code{from} are included. If \code{NULL} (the default), there is no lower
+limit.}
+
+\item{to}{A string, in the "HH:MM:SS" format. Only trips (or segments) that
+depart from their first stop at or before \code{to} are included. If \code{NULL}
+(the default), there is no upper limit.}
 }
 \value{
 With \code{by = "trip"}, a \code{data.table} with the \code{route_id}, the
@@ -71,6 +83,9 @@ The \code{route_id} of each trip comes from the \code{trips} table, which is req
 Existing \verb{_secs} columns in \code{stop_times} (e.g. created with
 \code{\link[=convert_time_to_seconds]{convert_time_to_seconds()}}) are used as-is, not recalculated from the time
 strings.
+
+\code{from} and \code{to} select the trips (or segments) as in \code{\link[=get_trip_length]{get_trip_length()}},
+from the \code{departure_time} strings, even if \verb{_secs} columns exist.
 }
 
 \examples{
@@ -97,6 +112,10 @@ trip_speed
 
 segment_speed <- get_trip_speed(gtfs, "CPTM L07-0", by = "segment")
 head(segment_speed)
+
+# speed of the trips that depart within a time of day
+peak_speed <- get_trip_speed(gtfs, from = "07:00:00", to = "09:00:00")
+head(peak_speed)
 
 }
 \seealso{

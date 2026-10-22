@@ -4,7 +4,18 @@
 \alias{set_max_speed}
 \title{Set trip maximum speed}
 \usage{
-set_max_speed(gtfs, max_speed, route_id = NULL, trip_id = NULL, unit = "km/h")
+set_max_speed(
+  gtfs,
+  max_speed,
+  route_id = NULL,
+  trip_id = NULL,
+  unit = "km/h",
+  first_stop = NULL,
+  last_stop = NULL,
+  from = NULL,
+  to = NULL,
+  route_type = NULL
+)
 }
 \arguments{
 \item{gtfs}{A GTFS object, as created by \code{\link[=read_gtfs]{read_gtfs()}}.}
@@ -13,8 +24,8 @@ set_max_speed(gtfs, max_speed, route_id = NULL, trip_id = NULL, unit = "km/h")
 \code{unit}.}
 
 \item{route_id}{A character vector including the \code{route_id}s whose trips
-have their speeds capped. If both \code{route_id} and \code{trip_id} are \code{NULL}
-(the default), the speeds of every trip in the GTFS are capped.
+have their speeds capped. If \code{route_id}, \code{trip_id} and \code{route_type} are
+all \code{NULL} (the default), the speeds of every trip in the GTFS are capped.
 \code{route_id}s not listed in \code{trips} are ignored, with a warning.}
 
 \item{trip_id}{A character vector including the \code{trip_id}s to have their
@@ -23,6 +34,27 @@ capped.}
 
 \item{unit}{A string representing the unit in which the speed is given. One
 of \code{"km/h"} (the default), \code{"m/s"} or \code{"mph"} (miles per hour).}
+
+\item{first_stop}{A string. The \code{stop_id} where the segment whose speeds
+are capped starts. If \code{NULL} (the default), the segment starts at each
+trip's first stop.}
+
+\item{last_stop}{A string. The \code{stop_id} where the segment ends. If \code{NULL}
+(the default), the segment ends at each trip's last stop.}
+
+\item{from}{A string, in the "HH:MM:SS" format. Only trips that depart from
+the segment's first stop at or after \code{from} are changed. If \code{NULL} (the
+default), there is no lower limit.}
+
+\item{to}{A string, in the "HH:MM:SS" format. Only trips that depart from
+the segment's first stop at or before \code{to} are changed. If \code{NULL} (the
+default), there is no upper limit.}
+
+\item{route_type}{An integer vector of \code{route_type}s (see
+\code{\link[=filter_by_route_type]{filter_by_route_type()}}). If given, only trips of routes of these types
+are changed; together with the other selection arguments, it restricts
+their selection. \code{route_type}s not listed in \code{routes} are ignored. If
+\code{NULL} (the default), trips of any type are changed.}
 }
 \value{
 A GTFS object with the time columns of its \code{stop_times} adjusted.
@@ -52,6 +84,23 @@ Spans whose arrival is earlier than the previous departure are left
 unchanged, with a warning. This usually happens when times after midnight
 are written as \code{"00:30:00"} instead of \code{"24:30:00"}. Only \code{stop_times} is
 modified.
+
+With \code{first_stop} and \code{last_stop}, only the spans between them are capped.
+\code{first_stop} is matched at its first visit in \code{stop_sequence} order, and
+\code{last_stop} at its next visit after that (which may be the same stop), as
+in \code{\link[=set_trip_speed]{set_trip_speed()}}. Times before \code{first_stop} don't change, and the times
+at and after \code{last_stop} are shifted by the extra time. The given stops must
+have a time, so that no span crosses them. If only \code{last_stop} is given,
+the trip's first stop doesn't need one, because spans start at stops with
+times. Trips that don't visit \code{first_stop} and then \code{last_stop}, or that
+have blank times there, are left unchanged, with a warning if they were
+given in \code{trip_id} or \code{route_id} (not if they were selected only by
+\code{route_type}). \code{from} and \code{to} are compared with the
+departure at the segment's first stop (or its arrival, if the departure is
+blank) as written in \code{stop_times}, so use times past \code{"24:00:00"} for
+departures after midnight. For trips listed in \code{frequencies}, these are
+template times, not actual departures. Trips without a time there are left
+unchanged.
 }
 
 \examples{
@@ -72,6 +121,17 @@ get_trip_speed(gtfs_capped, "CPTM L07-0", by = "segment")
 # the later stops are shifted, so the trip ends later
  get_start_and_end_times(gtfs, trip_id = "CPTM L07-0")
  get_start_and_end_times(gtfs_capped, trip_id = "CPTM L07-0")
+
+# cap the speed only between two stops. the spans before and after them
+# are not capped
+gtfs_capped <- set_max_speed(
+  gtfs,
+  max_speed = 30,
+  trip_id = "CPTM L07-0",
+  first_stop = "18921",
+  last_stop = "18974"
+)
+get_trip_speed(gtfs_capped, "CPTM L07-0", by = "segment")
 
 # cap the speed of all the trips of all routes of the GTFS feed
 gtfs_capped <- set_max_speed(gtfs, max_speed = 8)

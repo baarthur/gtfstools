@@ -4,14 +4,22 @@
 \alias{set_route_frequency}
 \title{Set route frequency}
 \usage{
-set_route_frequency(gtfs, route_id, headway, from, to)
+set_route_frequency(
+  gtfs,
+  route_id = NULL,
+  headway,
+  from,
+  to,
+  route_type = NULL
+)
 }
 \arguments{
 \item{gtfs}{A GTFS object, as created by \code{\link[=read_gtfs]{read_gtfs()}}.}
 
 \item{route_id}{A character vector including the \code{route_id}s to have their
 frequency set. \code{route_id}s not listed in \code{trips} are ignored, with a
-warning.}
+warning. If \code{NULL} (the default), \code{route_type} must be given, and the
+frequency of every route of these types is set.}
 
 \item{headway}{A number. The headway to be set, in minutes. It is rounded
 to whole seconds and applies to every \code{route_id} (call the function once
@@ -22,6 +30,12 @@ per route to set different headways).}
 
 \item{to}{A string. The ending point of the time of day, in the "HH:MM:SS"
 format. Must be later than \code{from}.}
+
+\item{route_type}{An integer vector of \code{route_type}s (see
+\code{\link[=filter_by_route_type]{filter_by_route_type()}}). If given, only routes of these types are
+changed; together with \code{route_id}, it restricts the given routes.
+\code{route_type}s not listed in \code{routes} are ignored. If \code{NULL} (the
+default), routes of any type are changed.}
 }
 \value{
 A GTFS object with updated \code{frequencies}, \code{trips} and \code{stop_times}
