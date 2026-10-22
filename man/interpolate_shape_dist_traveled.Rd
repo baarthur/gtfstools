@@ -15,9 +15,9 @@ A GTFS object whose \code{stop_times} and \code{shapes} have a
 other columns are kept. The given GTFS object is not modified.
 }
 \description{
-Fills the \code{shape_dist_traveled} columns of \code{stop_times} and \code{shapes} with
-the distance, in meters, from the start of each shape to each stop and to
-each shape point.
+Calculates the distance, in meters, from the start of each shape to each
+stop and to each shape point, and writes it to the \code{shape_dist_traveled}
+columns of \code{stop_times} and \code{shapes}, replacing any existing values.
 }
 \section{Details}{
 

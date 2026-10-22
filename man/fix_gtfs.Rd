@@ -21,7 +21,8 @@ The fixed GTFS object.
 \description{
 Cleans a GTFS feed in one call, by removing duplicated entries and unused
 ids, optionally capping the speed of trips, filling blank stop times and
-filling the distances travelled along shapes.
+recalculating the distances travelled along shapes (replacing any existing
+ones).
 }
 \section{Details}{
 
@@ -51,10 +52,10 @@ their trip's shape get \code{NA}.
 }
 
 The \code{trips} and \code{stop_times} tables are always required, and \code{stops} is
-required to cap speeds, to fill blank times and to fill the distances
-travelled along shapes. The warnings raised are
-those of the functions above, so some warnings (e.g. about a missing
-\code{shapes} table) may be raised twice.
+required to cap speeds, to fill blank times and to calculate the distances
+travelled along shapes. The warnings raised are those of the functions
+above, so some warnings (e.g. about trips not linked to a shape) may be
+raised more than once.
 }
 
 \examples{

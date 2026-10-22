@@ -147,6 +147,10 @@ test_that("fills shape_dist_traveled, only in feeds with shapes", {
   no_shapes <- copy_gtfs_without_file(hand_gtfs, "shapes")
   result <- suppressWarnings(tester(no_shapes))
   expect_false("shape_dist_traveled" %chin% names(result$stop_times))
+
+  no_shape_id <- copy_gtfs_without_field(hand_gtfs, "trips", "shape_id")
+  result <- suppressWarnings(tester(no_shape_id))
+  expect_false("shape_dist_traveled" %chin% names(result$stop_times))
 })
 
 test_that("doesn't make up times for trips that end before they start", {
@@ -168,9 +172,17 @@ test_that("doesn't make up times for trips that end before they start", {
   )
   expect_true("gtfstools_backwards_times" %in% warning_classes)
 
+  # shape_dist_traveled is added to every trip, so only the original columns
+  # are compared
+
+  original_cols <- names(poa_gtfs$stop_times)
   expect_identical(
-    result$stop_times[trip_id == trip],
+    result$stop_times[trip_id == trip, .SD, .SDcols = original_cols],
     poa_gtfs$stop_times[trip_id == trip]
+  )
+  expect_identical(
+    setdiff(names(result$stop_times), original_cols),
+    "shape_dist_traveled"
   )
 })
 
