@@ -311,14 +311,20 @@ empty_trip_length <- function(by) {
 #' @param trip_id The `trip_id`s whose stop_times should be selected, or `NULL`
 #'   to select every trip.
 #' @param with_departure Whether to also select the `departure_time`.
+#' @param with_row Whether to also return the `row` of each selected stop_time
+#'   in `gtfs$stop_times`.
 #'
 #' @return A new `data.table` with the `trip_id`, `stop_id` and
 #'   `stop_sequence` (and, if `with_departure` is `TRUE`, the
-#'   `departure_time`) of the selected stop_times, sorted by `trip_id` and
-#'   `stop_sequence`, plus the `stop_lat` and `stop_lon` of each stop.
+#'   `departure_time`, and if `with_row` is `TRUE`, the `row`) of the selected
+#'   stop_times, sorted by `trip_id` and `stop_sequence`, plus the `stop_lat`
+#'   and `stop_lon` of each stop.
 #'
 #' @keywords internal
-prepare_trip_stops <- function(gtfs, trip_id, with_departure = FALSE) {
+prepare_trip_stops <- function(gtfs,
+                               trip_id,
+                               with_departure = FALSE,
+                               with_row = FALSE) {
   stop_times_cols <- c("trip_id", "stop_id", "stop_sequence")
   if (with_departure) stop_times_cols <- c(stop_times_cols, "departure_time")
 
@@ -338,6 +344,7 @@ prepare_trip_stops <- function(gtfs, trip_id, with_departure = FALSE) {
   }
 
   st <- gtfs$stop_times[is_relevant, .SD, .SDcols = stop_times_cols]
+  if (with_row) data.table::set(st, j = "row", value = which(is_relevant))
 
   # the calculations below are vectorised over all rows, which requires the
   # rows of each trip to be contiguous, as sorting makes them

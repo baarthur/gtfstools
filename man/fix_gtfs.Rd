@@ -20,7 +20,8 @@ The fixed GTFS object.
 }
 \description{
 Cleans a GTFS feed in one call, by removing duplicated entries and unused
-ids, optionally capping the speed of trips, and filling blank stop times.
+ids, optionally capping the speed of trips, filling blank stop times and
+filling the distances travelled along shapes.
 }
 \section{Details}{
 
@@ -40,11 +41,18 @@ a warning;
 stops around them. Speeds are capped before interpolating, so the filled
 times follow the capped times. Interpolated times are rounded to the
 second. Stops whose times can't be interpolated are left blank, with a
-warning.
+warning;
+\item \code{\link[=interpolate_shape_dist_traveled]{interpolate_shape_dist_traveled()}}, only if the feed has a \code{shapes}
+table and \code{trips} has a \code{shape_id} column, replaces the
+\code{shape_dist_traveled} columns of \code{stop_times} and \code{shapes} with the
+distances, in meters, from the start of each shape. Existing values,
+whatever their unit, are replaced, and stops that can't be located along
+their trip's shape get \code{NA}.
 }
 
 The \code{trips} and \code{stop_times} tables are always required, and \code{stops} is
-required to cap speeds and to fill blank times. The warnings raised are
+required to cap speeds, to fill blank times and to fill the distances
+travelled along shapes. The warnings raised are
 those of the functions above, so some warnings (e.g. about a missing
 \code{shapes} table) may be raised twice.
 }
@@ -78,5 +86,5 @@ fixed_gtfs$stop_times |>
 }
 \seealso{
 \code{\link[=remove_duplicates]{remove_duplicates()}}, \code{\link[=remove_unused_ids]{remove_unused_ids()}}, \code{\link[=set_max_speed]{set_max_speed()}},
-\code{\link[=interpolate_stop_times]{interpolate_stop_times()}}
+\code{\link[=interpolate_stop_times]{interpolate_stop_times()}}, \code{\link[=interpolate_shape_dist_traveled]{interpolate_shape_dist_traveled()}}
 }

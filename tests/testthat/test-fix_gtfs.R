@@ -130,6 +130,25 @@ test_that("works without shapes, with a warning", {
   expect_false(anyNA(secs(result$stop_times$arrival_time)))
 })
 
+test_that("fills shape_dist_traveled, only in feeds with shapes", {
+  result <- tester()
+
+  # stops on the equator, 0.01 degrees apart, on the sphere used by {s2}
+
+  expect_equal(
+    result$stop_times$shape_dist_traveled,
+    (0:5) * 0.01 * 6371010 * pi / 180
+  )
+  expect_equal(
+    result$shapes$shape_dist_traveled,
+    c(0, 0.05) * 6371010 * pi / 180
+  )
+
+  no_shapes <- copy_gtfs_without_file(hand_gtfs, "shapes")
+  result <- suppressWarnings(tester(no_shapes))
+  expect_false("shape_dist_traveled" %chin% names(result$stop_times))
+})
+
 test_that("doesn't make up times for trips that end before they start", {
   # some trips of this feed have times after midnight written as "00:xx:xx",
   # so their times are not interpolated nor capped

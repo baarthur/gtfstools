@@ -26,6 +26,7 @@ reference:
   - title: "Spatial operations"
   - contents:
     - convert_sf_to_shapes
+    - crop_gtfs
     - filter_by_spatial_extent
     - get_trip_geometry
     - get_route_geometry
@@ -34,6 +35,7 @@ reference:
   - title: "Editing GTFS feeds"
   - contents:
     - interpolate_stop_times
+    - interpolate_shape_dist_traveled
     - merge_gtfs
     - remove_duplicates
     - remove_unused_ids
@@ -54,6 +56,7 @@ reference:
   - contents:
     - convert_stops_to_shapes
     - convert_time_to_seconds
+    - convert_seconds_to_time
   - title: "Interoperability between GTFS packages"
   - contents:
     - "as_dt_gtfs"

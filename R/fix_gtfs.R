@@ -1,7 +1,8 @@
 #' Fix common problems in GTFS feeds
 #'
 #' Cleans a GTFS feed in one call, by removing duplicated entries and unused
-#' ids, optionally capping the speed of trips, and filling blank stop times.
+#' ids, optionally capping the speed of trips, filling blank stop times and
+#' filling the distances travelled along shapes.
 #'
 #' @template gtfs
 #' @param max_speed A number. The maximum speed of trips, in the unit given by
@@ -28,15 +29,22 @@
 #'    stops around them. Speeds are capped before interpolating, so the filled
 #'    times follow the capped times. Interpolated times are rounded to the
 #'    second. Stops whose times can't be interpolated are left blank, with a
-#'    warning.
+#'    warning;
+#' 5. [interpolate_shape_dist_traveled()], only if the feed has a `shapes`
+#'    table and `trips` has a `shape_id` column, replaces the
+#'    `shape_dist_traveled` columns of `stop_times` and `shapes` with the
+#'    distances, in meters, from the start of each shape. Existing values,
+#'    whatever their unit, are replaced, and stops that can't be located along
+#'    their trip's shape get `NA`.
 #'
 #' The `trips` and `stop_times` tables are always required, and `stops` is
-#' required to cap speeds and to fill blank times. The warnings raised are
+#' required to cap speeds, to fill blank times and to fill the distances
+#' travelled along shapes. The warnings raised are
 #' those of the functions above, so some warnings (e.g. about a missing
 #' `shapes` table) may be raised twice.
 #'
 #' @seealso [remove_duplicates()], [remove_unused_ids()], [set_max_speed()],
-#'   [interpolate_stop_times()]
+#'   [interpolate_stop_times()], [interpolate_shape_dist_traveled()]
 #'
 #' @examplesIf requireNamespace("dplyr", quietly = TRUE)
 #' \dontshow{
@@ -96,6 +104,13 @@ fix_gtfs <- function(gtfs, max_speed = NULL, unit = "km/h") {
   # interpolate stop_times
 
   gtfs_fixed <- interpolate_stop_times(gtfs_fixed)
+
+  # interpolate shape_dist_traveled. feeds without shapes have nothing to be
+  # measured along, so the step is skipped
+
+  if (has_shapes(gtfs_fixed)) {
+    gtfs_fixed <- interpolate_shape_dist_traveled(gtfs_fixed)
+  }
 
   return(gtfs_fixed)
 }

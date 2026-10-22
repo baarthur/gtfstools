@@ -4,7 +4,7 @@
 \alias{prepare_trip_stops}
 \title{Select and prepare the stop_times of the relevant trips}
 \usage{
-prepare_trip_stops(gtfs, trip_id, with_departure = FALSE)
+prepare_trip_stops(gtfs, trip_id, with_departure = FALSE, with_row = FALSE)
 }
 \arguments{
 \item{gtfs}{A GTFS object.}
@@ -13,12 +13,16 @@ prepare_trip_stops(gtfs, trip_id, with_departure = FALSE)
 to select every trip.}
 
 \item{with_departure}{Whether to also select the \code{departure_time}.}
+
+\item{with_row}{Whether to also return the \code{row} of each selected stop_time
+in \code{gtfs$stop_times}.}
 }
 \value{
 A new \code{data.table} with the \code{trip_id}, \code{stop_id} and
 \code{stop_sequence} (and, if \code{with_departure} is \code{TRUE}, the
-\code{departure_time}) of the selected stop_times, sorted by \code{trip_id} and
-\code{stop_sequence}, plus the \code{stop_lat} and \code{stop_lon} of each stop.
+\code{departure_time}, and if \code{with_row} is \code{TRUE}, the \code{row}) of the selected
+stop_times, sorted by \code{trip_id} and \code{stop_sequence}, plus the \code{stop_lat}
+and \code{stop_lon} of each stop.
 }
 \description{
 Select and prepare the stop_times of the relevant trips
