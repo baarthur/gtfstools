@@ -104,14 +104,26 @@ get_calendar_overlap <- function(gtfs, resolution = "daily", plot = FALSE) {
     )
   }
 
-  # feeds given as paths are named after their files and read without their
-  # largest tables, which are not needed. 'skip' is used instead of 'files'
-  # because the latter errors when a listed file is missing
+  # feeds given as paths are named after their files and read with only the
+  # tables used below. 'files' errors when a listed file is missing, so it
+  # lists only the tables each zip has (a long 'skip' list is slower). a path
+  # that can't be listed lists none, and read_gtfs() raises its usual error
 
   if (is.character(gtfs)) {
     checkmate::assert_file_exists(gtfs)
     feed_names <- sub("\\.[^.]*$", "", basename(gtfs))
-    feeds <- lapply(gtfs, read_gtfs, skip = c("shapes", "stop_times"))
+    needed_files <- c("calendar", "calendar_dates", "trips", "frequencies")
+    feeds <- lapply(
+      gtfs,
+      function(path) {
+        entries <- tryCatch(
+          zip::zip_list(path)$filename,
+          error = function(cnd) character(0)
+        )
+        tables <- sub("\\.txt$", "", entries[endsWith(entries, ".txt")])
+        read_gtfs(path, files = tables[basename(tables) %chin% needed_files])
+      }
+    )
   } else {
     feed_names <- names(gtfs)
     if (is.null(feed_names)) {

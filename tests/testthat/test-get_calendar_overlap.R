@@ -236,6 +236,12 @@ test_that("raises error due to incorrect input types", {
   expect_error(tester(list(spo_gtfs, 1)))
   expect_error(tester(spo_gtfs))
   expect_error(tester(c(spo_path, tempfile(fileext = ".zip"))))
+
+  not_zip_path <- tempfile(fileext = ".zip")
+  on.exit(unlink(not_zip_path), add = TRUE)
+  writeLines("not a zip", not_zip_path)
+  expect_error(tester(not_zip_path), class = "path_must_be_zip")
+
   expect_error(tester(resolution = "weekly"))
   expect_error(tester(resolution = c("periods", "daily")))
   expect_error(tester(resolution = NA_character_))
@@ -267,6 +273,14 @@ test_that("returns the number of trips per day by default", {
   expect_identical(
     get_calendar_overlap(list(spo = spo_gtfs, poa = poa_gtfs)),
     daily_trips
+  )
+
+  # paths and lists give the same counts. ggl has frequencies and all the
+  # optional tables
+
+  expect_identical(
+    tester(ggl_path, resolution = "daily"),
+    tester(list(ggl_gtfs = ggl_gtfs), resolution = "daily")
   )
   expect_s3_class(daily_trips, "data.table")
   expect_named(daily_trips, c("feed", "date", "n_trips", "overlap"))
@@ -455,6 +469,18 @@ test_that("works when calendar or calendar_dates are missing", {
     overlap <- suppressMessages(
       tester(list(ggl = ggl_gtfs, empty = no_calendars))
     ),
+    class = "gtfstools_no_service_days"
+  )
+  expect_identical(nrow(overlap), 0L)
+
+  # a path to a feed with none of the service tables reads as a feed without
+  # service days
+
+  no_service_path <- tempfile(fileext = ".zip")
+  on.exit(unlink(no_service_path), add = TRUE)
+  write_gtfs(ggl_gtfs, no_service_path, files = "agency")
+  expect_warning(
+    overlap <- tester(no_service_path),
     class = "gtfstools_no_service_days"
   )
   expect_identical(nrow(overlap), 0L)
