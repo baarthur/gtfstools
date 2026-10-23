@@ -259,8 +259,9 @@ convert_stops_to_shapes <- function(gtfs, trip_id = NULL) {
 
 #' Get the usable shapes of a shapes table
 #'
-#' Returns the shapes with at least two distinct points with coordinates, the
-#' same rule used in `locate_stops_along_shapes()` (keep both in sync).
+#' Returns the shapes with at least two distinct points with coordinates. This
+#' is the single definition of a usable shape, used by both
+#' `convert_stops_to_shapes()` and `locate_stops_along_shapes()`.
 #'
 #' @param shapes A GTFS `shapes` table.
 #'
@@ -268,15 +269,17 @@ convert_stops_to_shapes <- function(gtfs, trip_id = NULL) {
 #'
 #' @keywords internal
 get_usable_shapes <- function(shapes) {
-  has_coords <- !is.na(shapes$shape_pt_lat) & !is.na(shapes$shape_pt_lon)
-  points <- shapes[
-    has_coords,
-    .SD,
-    .SDcols = c("shape_id", "shape_pt_lat", "shape_pt_lon")
-  ]
-  points <- unique(points)
+  # distinct points are flagged instead of selected into a new table, to avoid
+  # copying the shapes. a point with coordinates can only duplicate another
+  # point with coordinates, so points without them don't affect the flags
 
-  n_distinct_points <- table(points$shape_id)
+  has_coords <- !is.na(shapes$shape_pt_lat) & !is.na(shapes$shape_pt_lon)
+  is_distinct_point <- has_coords & !duplicated(
+    shapes,
+    by = c("shape_id", "shape_pt_lat", "shape_pt_lon")
+  )
+
+  n_distinct_points <- table(shapes$shape_id[is_distinct_point])
   usable_shapes <- names(n_distinct_points)[n_distinct_points >= 2]
 
   return(usable_shapes)

@@ -400,7 +400,7 @@ locate_stops_along_shapes <- function(gtfs,
   ]
 
   # usable shape points, split by shape. shapes with fewer than two distinct
-  # points can't be used
+  # points can't be used (see get_usable_shapes())
 
   shapes_cols <- c(
     "shape_id",
@@ -435,12 +435,7 @@ locate_stops_along_shapes <- function(gtfs,
   data.table::setorderv(shapes, c("shape_id", "shape_pt_sequence"))
 
   shape_rows <- split(seq_len(nrow(shapes)), shapes$shape_id)
-  is_distinct_point <- !duplicated(
-    shapes,
-    by = c("shape_id", "shape_pt_lat", "shape_pt_lon")
-  )
-  n_distinct_points <- table(shapes$shape_id[is_distinct_point])
-  usable_shapes <- names(n_distinct_points)[n_distinct_points >= 2]
+  usable_shapes <- get_usable_shapes(shapes)
   has_usable_shape <- trip_shape_id %chin% usable_shapes
 
   trips_without_shape <- st$trip_id[trip_start][!has_usable_shape & n_stops > 1]

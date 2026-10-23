@@ -13,7 +13,8 @@ get_usable_shapes(shapes)
 A character vector with the \code{shape_id}s of the usable shapes.
 }
 \description{
-Returns the shapes with at least two distinct points with coordinates, the
-same rule used in \code{locate_stops_along_shapes()} (keep both in sync).
+Returns the shapes with at least two distinct points with coordinates. This
+is the single definition of a usable shape, used by both
+\code{convert_stops_to_shapes()} and \code{locate_stops_along_shapes()}.
 }
 \keyword{internal}

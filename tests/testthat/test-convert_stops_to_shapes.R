@@ -149,6 +149,21 @@ test_that("by default, only trips without usable shapes get new shapes", {
   is_new <- grepl("^stops_shape_", new_gtfs$trips$shape_id)
   expect_setequal(new_gtfs$trips$trip_id[is_new], expected_trips)
 
+  # a shape with a single point with coordinates isn't usable, even if it has
+  # other points without them
+
+  gtfs <- read_gtfs(spo_path)
+  na_shape <- gtfs$trips$shape_id[1]
+  na_rows <- which(gtfs$shapes$shape_id == na_shape)[-1]
+  gtfs$shapes[na_rows, c("shape_pt_lat", "shape_pt_lon") := NA_real_]
+
+  new_gtfs <- tester(gtfs)
+  is_new <- grepl("^stops_shape_", new_gtfs$trips$shape_id)
+  expect_setequal(
+    new_gtfs$trips$trip_id[is_new],
+    gtfs$trips[shape_id == na_shape]$trip_id
+  )
+
   # trips without the shape_id column all get new shapes
 
   no_shape_id <- copy_gtfs_without_field(spo_gtfs, "trips", "shape_id")
