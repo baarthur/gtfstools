@@ -93,9 +93,9 @@ get_stop_distances <- function(gtfs, trip_id = NULL, route_id = NULL) {
     )
   }
 
-  # each pair takes about 64 bytes of memory at the peak (its indices, the
-  # coordinates of its two stops and its row in the result), so the user is
-  # warned before large selections that may exhaust the memory
+  # each pair takes at most about 64 bytes of memory at the peak (its indices
+  # and its row in the result), so the user is warned before large selections
+  # that may exhaust the memory
 
   if (n_pairs > max_stop_pairs_without_warning()) {
     memory_gb <- signif(n_pairs * 64 / 1e9, 2)
@@ -122,11 +122,11 @@ get_stop_distances <- function(gtfs, trip_id = NULL, route_id = NULL) {
   distances <- data.table::data.table(
     from_stop_id = stops$stop_id[from_idx],
     to_stop_id = stops$stop_id[to_idx],
-    distance = rcpp_distance_haversine(
-      stops$stop_lat[from_idx],
-      stops$stop_lon[from_idx],
-      stops$stop_lat[to_idx],
-      stops$stop_lon[to_idx]
+    distance = cpp_stop_distances(
+      stops$stop_lat,
+      stops$stop_lon,
+      from_idx,
+      to_idx
     )
   )
 

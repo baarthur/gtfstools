@@ -27,25 +27,21 @@ static int gtfs_threads() {
   return n_threads < 1 ? 1 : n_threads;
 }
 
-// great-circle distance, in meters, between each pair of points (from[i] and
-// to[i], in degrees), using the haversine formula. the sphere has the same
-// radius used by {s2}, {sf}'s default engine for geographic coordinates, so
-// the results match sf::st_distance() on lon/lat data
+// great-circle distance, in meters, between two points, using the haversine
+// formula. the sphere has the same radius used by {s2}, {sf}'s default engine
+// for geographic coordinates, so the results match sf::st_distance() on
+// lon/lat data. takes coordinates already in radians and the cosines of their
+// latitudes, so that callers can calculate these once per point
 
-static double distance_haversine(double lat_from, double lon_from,
-                                 double lat_to, double lon_to) {
+static inline double haversine_radians(double lat_from, double lon_from,
+                                       double cos_lat_from, double lat_to,
+                                       double lon_to, double cos_lat_to) {
   const double earth_radius = 6371010.0; // = s2::s2_earth_radius_meters()
-  const double to_radians = 3.14159265358979323846 / 180.0;
-
-  lat_from *= to_radians;
-  lon_from *= to_radians;
-  lat_to *= to_radians;
-  lon_to *= to_radians;
 
   const double sin_dlat = std::sin((lat_to - lat_from) / 2.0);
   const double sin_dlon = std::sin((lon_to - lon_from) / 2.0);
   double a = sin_dlat * sin_dlat +
-    std::cos(lat_from) * std::cos(lat_to) * sin_dlon * sin_dlon;
+    cos_lat_from * cos_lat_to * sin_dlon * sin_dlon;
 
   // rounding may push 'a' slightly outside [0, 1]
 
@@ -53,6 +49,23 @@ static double distance_haversine(double lat_from, double lon_from,
   if (a > 1.0) a = 1.0;
 
   return 2.0 * earth_radius * std::atan2(std::sqrt(a), std::sqrt(1.0 - a));
+}
+
+// the same, from coordinates in degrees
+
+static double distance_haversine(double lat_from, double lon_from,
+                                 double lat_to, double lon_to) {
+  const double to_radians = 3.14159265358979323846 / 180.0;
+
+  lat_from *= to_radians;
+  lon_from *= to_radians;
+  lat_to *= to_radians;
+  lon_to *= to_radians;
+
+  return haversine_radians(
+    lat_from, lon_from, std::cos(lat_from),
+    lat_to, lon_to, std::cos(lat_to)
+  );
 }
 
 //' rcpp_distance_haversine
@@ -93,6 +106,78 @@ doubles rcpp_distance_haversine(const doubles lat_from,
     } else {
       distance_p[i] = distance_haversine(
         lat_from_p[i], lon_from_p[i], lat_to_p[i], lon_to_p[i]
+      );
+    }
+  }
+
+  return distance;
+}
+
+//' cpp_stop_distances
+//'
+//' Great-circle distance between the pairs of points given by 'from' and 'to'
+//' (1-based indices into 'lat' and 'lon', in degrees), as calculated by
+//' rcpp_distance_haversine() on the coordinates of each pair. The radians and
+//' the cosine of the latitude of each point are calculated only once. Returns
+//' NA where any coordinate of the pair is NA.
+//'
+//' @noRd
+[[cpp11::register]]
+doubles cpp_stop_distances(const doubles lat,
+                           const doubles lon,
+                           const integers from,
+                           const integers to) {
+  const R_xlen_t n_points = lat.size();
+  const R_xlen_t n_pairs = from.size();
+  if (lon.size() != n_points) {
+    stop("Latitude and longitude vectors must have the same length.");
+  }
+  if (to.size() != n_pairs) {
+    stop("'from' and 'to' must have the same length.");
+  }
+
+  const double* lat_p = REAL(lat);
+  const double* lon_p = REAL(lon);
+  const int* from_p = INTEGER(from);
+  const int* to_p = INTEGER(to);
+
+  for (R_xlen_t k = 0; k < n_pairs; k++) {
+    if (from_p[k] == NA_INTEGER || from_p[k] < 1 || from_p[k] > n_points ||
+        to_p[k] == NA_INTEGER || to_p[k] < 1 || to_p[k] > n_points) {
+      stop("'from' and 'to' must be valid point indices.");
+    }
+  }
+
+  // the same operations as in distance_haversine(), but once per point
+
+  const double to_radians = 3.14159265358979323846 / 180.0;
+  std::vector<double> lat_rad(n_points);
+  std::vector<double> lon_rad(n_points);
+  std::vector<double> cos_lat(n_points);
+  for (R_xlen_t i = 0; i < n_points; i++) {
+    lat_rad[i] = lat_p[i] * to_radians;
+    lon_rad[i] = lon_p[i] * to_radians;
+    cos_lat[i] = std::cos(lat_rad[i]);
+  }
+
+  writable::doubles distance(n_pairs);
+  double* distance_p = REAL(distance);
+
+  const int n_threads = n_pairs > 10000 ? gtfs_threads() : 1;
+  (void) n_threads;
+
+#ifdef _OPENMP
+#pragma omp parallel for num_threads(n_threads) if(n_threads > 1)
+#endif
+  for (R_xlen_t k = 0; k < n_pairs; k++) {
+    const R_xlen_t i = from_p[k] - 1;
+    const R_xlen_t j = to_p[k] - 1;
+    if (ISNAN(lat_p[i]) || ISNAN(lon_p[i]) ||
+        ISNAN(lat_p[j]) || ISNAN(lon_p[j])) {
+      distance_p[k] = NA_REAL;
+    } else {
+      distance_p[k] = haversine_radians(
+        lat_rad[i], lon_rad[i], cos_lat[i], lat_rad[j], lon_rad[j], cos_lat[j]
       );
     }
   }

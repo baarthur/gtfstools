@@ -104,6 +104,7 @@
 ## Notes
 
 - `get_trip_length()`, `get_trip_geometry()` and the functions that use them (`get_trip_speed()`, `set_trip_speed()` and `interpolate_stop_times()`), as well as `get_shape_length()` and `get_stop_distances()`, now run their C++ code in parallel, using as many threads as `data.table::getDTthreads()` (change it with `data.table::setDTthreads()`). On a feed with 900,000 shape points and 2,200 trip patterns, with 6 threads, `get_trip_length()` and `get_trip_geometry()` are about 2 to 2.5 times faster, and `get_shape_length()` and `get_stop_distances()` about 2 times faster. Stops are also located along all shapes in a single call, which makes `get_trip_length()` about 15% faster even with a single thread. Results don't depend on the number of threads. On platforms whose compilers don't support OpenMP, the code runs on a single thread.
+- `get_stop_distances()` is about 1.5 times faster and allocates about 35% less memory than in earlier development versions (on a feed with 1.9 million pairs of stops), as the radians and the cosine of the latitude of each stop are calculated only once. Results are unchanged, up to floating-point rounding on some platforms.
 - gtfstools now requires `{units}` >= 1.0-1, which fixed an out-of-bounds read flagged by CRAN's sanitizer checks (#84).
 - `download_validator()` now automatically detects the latest validator version. PR contribution by @baarthur.
 - Invalid dates (e.g. `20240230`) are still converted to `NA` when reading or converting feeds, but now with a warning.

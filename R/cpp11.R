@@ -8,6 +8,10 @@ rcpp_distance_haversine <- function(lat_from, lon_from, lat_to, lon_to) {
   .Call(`_gtfstools_rcpp_distance_haversine`, lat_from, lon_from, lat_to, lon_to)
 }
 
+cpp_stop_distances <- function(lat, lon, from, to) {
+  .Call(`_gtfstools_cpp_stop_distances`, lat, lon, from, to)
+}
+
 cpp_locate_stops_on_shapes <- function(shape_lat, shape_lon, shape_size, pattern_shape, stop_lat, stop_lon, pattern_size) {
   .Call(`_gtfstools_cpp_locate_stops_on_shapes`, shape_lat, shape_lon, shape_size, pattern_shape, stop_lat, stop_lon, pattern_size)
 }

@@ -71,23 +71,86 @@ test_that("returns the distances between all pairs of stops", {
   # duplicated "a" uses its first entry, "d" has NA distances, and "z" (not
   # visited) and "ghost" (not in stops) are left out
 
-  expect_identical(
+  expect_equal(
     tester(),
     expected_distances(
       from = c("a", "a", "a", "b", "b", "c"),
       to = c("b", "c", "d", "c", "d", "d")
-    )
+    ),
+    tolerance = 1e-9
   )
 })
 
-test_that("considers only the stops of the given trips and routes", {
-  expect_identical(
-    tester(trip_id = "T1"),
-    expected_distances(from = c("a", "a", "b"), to = c("b", "c", "c"))
+test_that("matches the haversine distances of each pair's coordinates", {
+  # spo has more than 10,000 pairs, enough to use several threads (when
+  # compiled with OpenMP), and results must not depend on their number
+
+  stops <- unique(get_stops(spo_gtfs), by = "stop_id")
+  data.table::setorderv(stops, "stop_id")
+  n_stops <- nrow(stops)
+  from_idx <- rep.int(seq_len(n_stops), n_stops - seq_len(n_stops))
+  to_idx <- sequence(n_stops - seq_len(n_stops)) + from_idx
+  expect_gt(length(from_idx), 10000)
+
+  expected <- rcpp_distance_haversine(
+    stops$stop_lat[from_idx],
+    stops$stop_lon[from_idx],
+    stops$stop_lat[to_idx],
+    stops$stop_lon[to_idx]
   )
+
+  # the distances are usually identical, but compilers that fuse floating-point
+  # operations (e.g. with FMA instructions) may round them differently, since
+  # the radians of each stop are calculated beforehand
+
+  old_threads <- data.table::setDTthreads(1)
+  on.exit(data.table::setDTthreads(old_threads), add = TRUE)
+  one_thread <- tester(spo_gtfs)$distance
+  expect_equal(one_thread, expected, tolerance = 1e-9)
+
+  data.table::setDTthreads(2)
+  skip_if(data.table::getDTthreads() < 2, "Can't use more than one thread.")
+  expect_identical(tester(spo_gtfs)$distance, one_thread)
+})
+
+test_that("cpp_stop_distances() handles NA, NaN and Inf as the pair kernel", {
+  lat <- c(NA, NaN, Inf, 0, 10)
+  lon <- c(0, 0, 0, NA, 20)
+  from_idx <- rep(seq_along(lat), each = length(lat))
+  to_idx <- rep(seq_along(lat), times = length(lat))
+
+  result <- cpp_stop_distances(lat, lon, from_idx, to_idx)
+  expected <- rcpp_distance_haversine(
+    lat[from_idx],
+    lon[from_idx],
+    lat[to_idx],
+    lon[to_idx]
+  )
+  expect_equal(result, expected, tolerance = 1e-9)
+  expect_identical(is.nan(result), is.nan(expected))
+
   expect_identical(
+    cpp_stop_distances(numeric(0), numeric(0), integer(0), integer(0)),
+    numeric(0)
+  )
+  expect_length(cpp_stop_distances(lat, lon, 5L, 1L), 1)
+  expect_error(cpp_stop_distances(lat, lon, 0L, 1L))
+  expect_error(cpp_stop_distances(lat, lon, 1L, 6L))
+  expect_error(cpp_stop_distances(lat, lon, 1L, NA_integer_))
+  expect_error(cpp_stop_distances(lat, lon[-1], 1L, 1L))
+  expect_error(cpp_stop_distances(lat, lon, 1:2, 1L))
+})
+
+test_that("considers only the stops of the given trips and routes", {
+  expect_equal(
+    tester(trip_id = "T1"),
+    expected_distances(from = c("a", "a", "b"), to = c("b", "c", "c")),
+    tolerance = 1e-9
+  )
+  expect_equal(
     tester(route_id = "R2"),
-    expected_distances(from = "a", to = "d")
+    expected_distances(from = "a", to = "d"),
+    tolerance = 1e-9
   )
 
   expect_warning(
