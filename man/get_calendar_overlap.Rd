@@ -75,6 +75,8 @@ Feeds are named after their file names (without the extension) or after the
 list names. Unnamed feeds are named after their position (\code{"feed_1"},
 \code{"feed_2"}, etc.), and duplicated names are made unique. Plots of feeds
 spanning long periods can be zoomed in with \code{\link[ggplot2:coord_cartesian]{ggplot2::coord_cartesian()}}.
+The days on which all feeds have service are shaded in the plots only when
+two or more feeds are given.
 }
 
 \examples{

@@ -63,6 +63,8 @@
 #' list names. Unnamed feeds are named after their position (`"feed_1"`,
 #' `"feed_2"`, etc.), and duplicated names are made unique. Plots of feeds
 #' spanning long periods can be zoomed in with [ggplot2::coord_cartesian()].
+#' The days on which all feeds have service are shaded in the plots only when
+#' two or more feeds are given.
 #'
 #' @seealso [merge_gtfs()], [filter_by_service_id()]
 #'
@@ -177,7 +179,14 @@ get_calendar_overlap <- function(gtfs, resolution = "daily", plot = FALSE) {
     if (!plot) return(daily_trips[])
   }
 
-  # colours are okabe-ito orange (overlap) and blue (feeds)
+  # colours are okabe-ito orange (overlap) and blue (feeds). a single feed
+  # overlaps with itself, so its overlap isn't shaded (the shading layer is
+  # kept empty, so that the layers keep their positions)
+
+  shaded_days <- overlap
+  if (length(feeds) == 1L) {
+    shaded_days <- overlap[0L]
+  }
 
   if (resolution == "periods") {
     feed_periods <- data.table::rbindlist(
@@ -191,7 +200,7 @@ get_calendar_overlap <- function(gtfs, resolution = "daily", plot = FALSE) {
 
     overlap_plot <- ggplot2::ggplot() +
       ggplot2::geom_rect(
-        data = overlap,
+        data = shaded_days,
         ggplot2::aes(xmin = start_date, xmax = end_date + 1),
         ymin = -Inf,
         ymax = Inf,
@@ -227,7 +236,7 @@ get_calendar_overlap <- function(gtfs, resolution = "daily", plot = FALSE) {
 
     overlap_plot <- ggplot2::ggplot() +
       ggplot2::geom_rect(
-        data = overlap,
+        data = shaded_days,
         ggplot2::aes(xmin = start_date - 0.5, xmax = end_date + 0.5),
         ymin = -Inf,
         ymax = Inf,
@@ -258,10 +267,14 @@ get_calendar_overlap <- function(gtfs, resolution = "daily", plot = FALSE) {
 
   overlap_plot <- overlap_plot +
     ggplot2::scale_y_discrete(limits = rev(feed_names)) +
-    ggplot2::labs(
-      subtitle = "Shaded area in yellow: days on which all feeds have service"
-    ) +
     ggplot2::theme_minimal()
+
+  if (length(feeds) > 1L) {
+    overlap_plot <- overlap_plot +
+      ggplot2::labs(
+        subtitle = "Shaded area in yellow: days on which all feeds have service"
+      )
+  }
 
   return(overlap_plot)
 }
