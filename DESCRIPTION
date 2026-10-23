@@ -36,7 +36,7 @@ Imports:
     curl,
     data.table,
     gtfsio (>= 1.2.2),
-    httr2,
+    httr2 (>= 1.0.4),
     parallelly,
     processx,
     sf,

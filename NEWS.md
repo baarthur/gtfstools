@@ -18,6 +18,7 @@
 
 ## New features
 
+- The `path` argument of `download_validator()` now defaults to `tempdir()`, so the validator is downloaded to a temporary directory unless another one is given.
 - New function `crop_gtfs()`, which crops a feed to a spatial extent: it keeps the stops inside it (and their parent stations) and the parts of the trips that serve them, and, by default, trims the trips' shapes to their first and last remaining stops. Unlike `filter_by_spatial_extent()`, which keeps entire trips, trips that leave the spatial extent are cut. Blank times at the new ends of cropped trips are interpolated, and the `frequencies` of trips whose first stop is dropped are shifted accordingly (#44). Thanks to @luukvdmeer for the proposal and discussion.
 - New function `get_summary()`, which summarises a feed (its files, agencies, service calendar, totals and the distributions of trip speeds, trip lengths and route headways), optionally restricted to some dates, routes, modes, agencies and a time of day. It returns a list of `data.table`s and writes an HTML report with tables and figures (requires `{ggplot2}`, `{knitr}`, `{rmarkdown}` and Pandoc). With `by_route_type = TRUE`, the totals, speeds, lengths and headways are also broken down by transport mode (#127).
 - New function `get_route_speed()`, which returns the minimum, mean, median, maximum and standard deviation of the speeds of the trips of each route, as calculated by `get_trip_speed()`.
@@ -60,6 +61,8 @@
 
 ## Bug fixes
 
+- `download_validator()` and `list_validator_versions()` now fail gracefully on network problems, as CRAN requires: they retry transient failures and, if GitHub still can't be reached, inform that with a message (class `gtfstools_validator_download_failure`) and invisibly return `NULL`, instead of raising an error. Previously, `download_validator()` reported any network problem as a misleading "invalid URL" error. A version that doesn't exist still raises an error, now with its own class (`gtfstools_invalid_validator_version`).
+- `download_validator()` now downloads the validator only once, instead of twice. When an explicit `version` was already downloaded to `path`, it no longer goes online at all. With `quiet = FALSE`, it now shows a progress bar.
 - `get_trip_duration()` no longer adds temporary columns to the `stop_times` table of the given GTFS object, which could be left behind if an error happened during the calculation.
 - The `filter_by_*()` functions no longer drop:
   - rows whose blank keys mean "applies to all": zone `fare_rules` without `route_id`, `transfers` without `from_stop_id`/`to_stop_id` and `attributions` without `agency_id`;

@@ -4,10 +4,16 @@
 \alias{download_validator}
 \title{Download MobilityData's GTFS validator}
 \usage{
-download_validator(path, version = "latest", force = FALSE, quiet = TRUE)
+download_validator(
+  path = tempdir(),
+  version = "latest",
+  force = FALSE,
+  quiet = TRUE
+)
 }
 \arguments{
-\item{path}{A string. The directory where the validator should be saved to.}
+\item{path}{A string. The directory where the validator should be saved to.
+By default, the function downloads the validator to a temp directory.}
 
 \item{version}{A string. The version of the validator that should be
 downloaded. Defaults to \code{"latest"}, but accepts version numbers as strings
@@ -23,12 +29,15 @@ Defaults to \code{TRUE}.}
 }
 \value{
 Invisibly returns the normalized path to the downloaded validator.
+If the validator can't be downloaded due to network problems (e.g. no
+internet connection or GitHub being unavailable), it informs that with a
+message and invisibly returns \code{NULL}.
 }
 \description{
 Downloads MobilityData's command line tool to validate GTFS feeds.
 }
 \examples{
-\dontshow{if (identical(tolower(Sys.getenv("NOT_CRAN")), "true")) withAutoprint(\{ # examplesIf}
+\dontshow{if (identical(tolower(Sys.getenv("NOT_CRAN")), "true") && curl::has_internet()) withAutoprint(\{ # examplesIf}
 path <- tempdir()
 
 download_validator(path)

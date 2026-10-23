@@ -8,6 +8,8 @@ list_validator_versions()
 }
 \value{
 A data.table with each CLI version, published date, and download URL.
+If the versions can't be listed due to network problems, it informs that
+with a message and invisibly returns \code{NULL}.
 }
 \description{
 Lists available versions of MobilityData's command line tool to validate GTFS feeds.

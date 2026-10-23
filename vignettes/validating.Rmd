@@ -3,15 +3,17 @@ title: "Validating GTFS feeds"
 output: rmarkdown::html_vignette
 vignette: >
   %\VignetteIndexEntry{Validating GTFS feeds}
-  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEngine{knitr::rmarkdown_notangle}
   %\VignetteEncoding{UTF-8}
 ---
 
 ```{r, include = FALSE}
+not_cran <- identical(tolower(Sys.getenv("NOT_CRAN")), "true")
+
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
-  eval = identical(tolower(Sys.getenv("NOT_CRAN")), "true"),
+  eval = not_cran,
   out.width = "100%"
 )
 
@@ -48,10 +50,41 @@ should be saved with the same filename convention used by the function (i.e.
 validation function can correctly parse the command-line tool version, which
 controls some of its behavior.
 
-```{r}
+```{r, eval = FALSE}
 library(gtfstools)
 
 latest_validator <- download_validator(tempdir())
+```
+
+```{r, include = FALSE}
+# the download needs internet access and the validator needs java. if either
+# is unavailable, skip the remaining chunks instead of failing the build
+
+library(gtfstools)
+
+latest_validator <- tryCatch(
+  download_validator(tempdir()),
+  error = function(cnd) NULL
+)
+java_works <- identical(
+  suppressWarnings(
+    system2("java", "-version", stdout = FALSE, stderr = FALSE)
+  ),
+  0L
+)
+can_validate <- !is.null(latest_validator) && java_works
+
+knitr::opts_chunk$set(eval = can_validate)
+```
+
+```{r, echo = FALSE, results = "asis", eval = not_cran && !can_validate}
+cat(
+  "> **Note:** the validator could not be downloaded or Java could not be",
+  "run when this vignette was built, so the code below was not evaluated.\n"
+)
+```
+
+```{r}
 latest_validator
 ```
 
@@ -89,14 +122,14 @@ As we can see, the validation generates a few output files:
 `validation_stderr.txt` may slightly vary depending on the version of the
 validator.
 
-```{r, echo = FALSE}
+```{r, echo = FALSE, eval = not_cran}
 knitr::include_graphics("../man/figures/html_validation_report.png")
 ```
 
 Had we run the validator using the same GTFS data in different formats (an URL
 or a GTFS object, for example) the results would be exactly the same:
 
-```{r}
+```{r, error = TRUE}
 gtfs_url <- "https://github.com/ipea/gtfstools/raw/main/inst/extdata/spo_gtfs.zip"
 gtfs <- read_gtfs(data_path)
 
