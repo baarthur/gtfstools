@@ -1,3 +1,15 @@
+## R CMD check results
+
+── R CMD check results ───────────────────────────────────────── gtfstools 2.0.0 ────
+Duration: 9m 23.3s
+
+0 errors ✔ | 0 warnings ✔ | 0 notes ✔
+
+## Notes
+
+- Change in package maintainer from Daniel to Rafael
+- the URL <https://www.sptrans.com.br/desenvolvedores/> works fine on the browser.
+
 ## Test environments
 
 - Local Windows 11 installation (R 4.4.2)
@@ -13,31 +25,12 @@
   - windows (devel)
   - rchk (devel)
 
-## R CMD check results
-
-0 errors | 0 warnings | 1 note
-  
-  Found the following (possibly) invalid URLs:
-    URL: https://www.sptrans.com.br/desenvolvedores/
-      From: inst/doc/gtfstools.html
-      Status: 403
-      Message: Forbidden
 
 ## Reverse dependencies
 
-We checked 5 reverse dependencies (gtfs2emis, gtfs2gps, GTFShift, GTFSwizard
-and r5r), comparing R CMD check results across CRAN and dev versions of this
+We checked 5 reverse dependencies (gtfs2emis, gtfs2gps, GTFShift, GTFSwizard and r5r), comparing R CMD check results across CRAN and dev versions of this
 package.
 
  * We saw 0 new problems
  * We failed to check 0 packages
 
-This is a resubmission.
-
-The package was flagged for having examples and vignettes with CPU time
-considerably higher than elapsed time. This was caused by the heavy reliance on
-{data.table}, which uses multiple threads by default. We have restricted the
-number of threads to 1 in the examples and set the env var OMP_THREAD_LIMIT to 2
-in vignettes and tests. We have also skipped some tests that were flagging
-runtime errors when post-processing tests. We're still receiving the note
-regarding the possibly invalid URL above, but we have no issues accessing it.

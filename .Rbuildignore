@@ -24,3 +24,4 @@
 ^quality_reports$
 ^Rplots\.pdf$
 ^revdep$
+^tests/tests_rafa$
