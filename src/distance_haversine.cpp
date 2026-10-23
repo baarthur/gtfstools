@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <climits>
 #include <cmath>
+#include <cstdint>
 #include <limits>
 #include <utility>
 #include <vector>
@@ -994,4 +995,194 @@ list cpp_shape_cut_segments(const doubles lat,
     "first_inner"_nm = first_inner,
     "last_inner"_nm = last_inner
   });
+}
+
+// the clusters next to a cluster, sorted by cluster, with the number of pairs
+// of points between them. the number fits in an int, since it can't exceed
+// the number of pairs given
+
+typedef std::pair<int, int> cluster_link;
+
+static inline std::vector<cluster_link>::iterator find_link(
+    std::vector<cluster_link>& links, const int cluster) {
+  return std::lower_bound(
+    links.begin(),
+    links.end(),
+    cluster,
+    [](const cluster_link& link, int c) { return link.first < c; }
+  );
+}
+
+//' cpp_merge_stop_clusters
+//'
+//' Greedy clustering of 'n' points such that every pair of points of a cluster
+//' is close enough. 'from' and 'to' (1-based, each pair listed only once) are
+//' the pairs of points that are close enough, sorted from the closest to the
+//' farthest. Pairs are processed in this order, and the clusters of a pair's
+//' points are merged only if every point of one cluster is paired with every
+//' point of the other. Returns the 1-based cluster of each point, numbered in
+//' the order of each cluster's first point. That each pair is listed only
+//' once is not checked.
+//'
+//' Each cluster keeps the number of pairs between it and each neighbouring
+//' cluster, in a vector sorted by cluster, so the merge condition is checked
+//' with a binary search. On a merge, the links of the cluster with fewer
+//' neighbours are merged into the other's, and its neighbours' links are
+//' renamed.
+//'
+//' @noRd
+[[cpp11::register]]
+integers cpp_merge_stop_clusters(const int n,
+                                 const integers from,
+                                 const integers to) {
+  const R_xlen_t n_pairs = from.size();
+  if (to.size() != n_pairs) {
+    stop("'from' and 'to' must have the same length.");
+  }
+  if (n < 0) {
+    stop("'n' must not be negative.");
+  }
+  if (n_pairs > INT_MAX) {
+    stop("Too many pairs.");
+  }
+
+  const int* from_p = INTEGER(from);
+  const int* to_p = INTEGER(to);
+
+  for (R_xlen_t k = 0; k < n_pairs; k++) {
+    if (from_p[k] == NA_INTEGER || to_p[k] == NA_INTEGER ||
+        from_p[k] < 1 || from_p[k] > n || to_p[k] < 1 || to_p[k] > n ||
+        from_p[k] == to_p[k]) {
+      stop("'from' and 'to' must be distinct indices between 1 and 'n'.");
+    }
+  }
+
+  std::vector<int> root(n);
+  for (int i = 0; i < n; i++) root[i] = i;
+  std::vector<std::int64_t> size(n, 1);
+
+  std::vector<int> n_links(n, 0);
+  for (R_xlen_t k = 0; k < n_pairs; k++) {
+    n_links[from_p[k] - 1]++;
+    n_links[to_p[k] - 1]++;
+  }
+
+  std::vector<std::vector<cluster_link>> links(n);
+  for (int i = 0; i < n; i++) links[i].reserve(n_links[i]);
+  for (R_xlen_t k = 0; k < n_pairs; k++) {
+    links[from_p[k] - 1].push_back(cluster_link(to_p[k] - 1, 1));
+    links[to_p[k] - 1].push_back(cluster_link(from_p[k] - 1, 1));
+  }
+  for (int i = 0; i < n; i++) std::sort(links[i].begin(), links[i].end());
+
+  // union-find root lookup, with path halving
+
+  auto find_root = [&root](int i) {
+    while (root[i] != i) {
+      root[i] = root[root[i]];
+      i = root[i];
+    }
+    return i;
+  };
+
+  std::vector<cluster_link> merged;
+
+  for (R_xlen_t k = 0; k < n_pairs; k++) {
+    if (k % 65536 == 0) check_user_interrupt();
+
+    int root_a = find_root(from_p[k] - 1);
+    int root_b = find_root(to_p[k] - 1);
+    if (root_a == root_b) continue;
+
+    // the clusters are merged only if all pairs between them are close enough.
+    // the pair being processed guarantees a link between them
+
+    const std::int64_t n_pairs_between =
+      find_link(links[root_a], root_b)->second;
+    if (n_pairs_between != size[root_a] * size[root_b]) continue;
+
+    if (links[root_a].size() < links[root_b].size()) std::swap(root_a, root_b);
+
+    // the neighbours of b now link to a: b's link is added to an existing link
+    // to a, or renamed to a and moved to keep the links sorted. links to
+    // clusters that were merged into others are left in place, since only
+    // roots are ever looked up, and are dropped when their cluster merges.
+    // erasing them would shift the whole vector on every merge
+
+    for (const cluster_link& link_b : links[root_b]) {
+      const int neighbour = link_b.first;
+      if (neighbour == root_a || root[neighbour] != neighbour) continue;
+
+      std::vector<cluster_link>& neighbour_links = links[neighbour];
+      auto to_b = find_link(neighbour_links, root_b);
+      auto to_a = find_link(neighbour_links, root_a);
+
+      if (to_a != neighbour_links.end() && to_a->first == root_a) {
+        to_a->second += to_b->second;
+      } else {
+        to_b->first = root_a;
+        if (to_a > to_b) {
+          std::rotate(to_b, to_b + 1, to_a);
+        } else {
+          std::rotate(to_a, to_b, to_b + 1);
+        }
+      }
+    }
+
+    // a's and b's links are merged, without the links between them and the
+    // links to merged clusters
+
+    merged.clear();
+    merged.reserve(links[root_a].size() + links[root_b].size());
+    auto link_a = links[root_a].begin();
+    auto end_a = links[root_a].end();
+    auto link_b = links[root_b].begin();
+    auto end_b = links[root_b].end();
+
+    while (link_a != end_a || link_b != end_b) {
+      const bool a_first = link_b == end_b ||
+        (link_a != end_a && link_a->first < link_b->first);
+
+      if (a_first) {
+        const int neighbour = link_a->first;
+        if (neighbour != root_b && root[neighbour] == neighbour) {
+          merged.push_back(*link_a);
+        }
+        ++link_a;
+      } else if (link_a == end_a || link_b->first < link_a->first) {
+        const int neighbour = link_b->first;
+        if (neighbour != root_a && root[neighbour] == neighbour) {
+          merged.push_back(*link_b);
+        }
+        ++link_b;
+      } else {
+        const int neighbour = link_a->first;
+        if (root[neighbour] == neighbour) {
+          merged.push_back(
+            cluster_link(neighbour, link_a->second + link_b->second)
+          );
+        }
+        ++link_a;
+        ++link_b;
+      }
+    }
+
+    links[root_a].swap(merged);
+    std::vector<cluster_link>().swap(links[root_b]);
+
+    root[root_b] = root_a;
+    size[root_a] += size[root_b];
+  }
+
+  writable::integers cluster(n);
+  std::vector<int> label(n, 0);
+  int n_clusters = 0;
+
+  for (int i = 0; i < n; i++) {
+    const int r = find_root(i);
+    if (label[r] == 0) label[r] = ++n_clusters;
+    cluster[i] = label[r];
+  }
+
+  return cluster;
 }

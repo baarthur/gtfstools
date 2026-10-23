@@ -40,6 +40,13 @@ extern "C" SEXP _gtfstools_cpp_shape_cut_segments(SEXP lat, SEXP lon, SEXP shape
     return cpp11::as_sexp(cpp_shape_cut_segments(cpp11::as_cpp<cpp11::decay_t<const doubles>>(lat), cpp11::as_cpp<cpp11::decay_t<const doubles>>(lon), cpp11::as_cpp<cpp11::decay_t<const integers>>(shape_size), cpp11::as_cpp<cpp11::decay_t<const integers>>(cut_shape), cpp11::as_cpp<cpp11::decay_t<const doubles>>(from), cpp11::as_cpp<cpp11::decay_t<const doubles>>(to)));
   END_CPP11
 }
+// distance_haversine.cpp
+integers cpp_merge_stop_clusters(const int n, const integers from, const integers to);
+extern "C" SEXP _gtfstools_cpp_merge_stop_clusters(SEXP n, SEXP from, SEXP to) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(cpp_merge_stop_clusters(cpp11::as_cpp<cpp11::decay_t<const int>>(n), cpp11::as_cpp<cpp11::decay_t<const integers>>(from), cpp11::as_cpp<cpp11::decay_t<const integers>>(to)));
+  END_CPP11
+}
 // seconds_to_string.cpp
 strings cpp_seconds_to_string(const integers seconds_from_midnight);
 extern "C" SEXP _gtfstools_cpp_seconds_to_string(SEXP seconds_from_midnight) {
@@ -58,6 +65,7 @@ extern "C" SEXP _gtfstools_cpp_sequence_pattern_id(SEXP group_size, SEXP columns
 extern "C" {
 static const R_CallMethodDef CallEntries[] = {
     {"_gtfstools_cpp_locate_stops_on_shapes", (DL_FUNC) &_gtfstools_cpp_locate_stops_on_shapes, 8},
+    {"_gtfstools_cpp_merge_stop_clusters",    (DL_FUNC) &_gtfstools_cpp_merge_stop_clusters,    3},
     {"_gtfstools_cpp_seconds_to_string",      (DL_FUNC) &_gtfstools_cpp_seconds_to_string,      1},
     {"_gtfstools_cpp_sequence_pattern_id",    (DL_FUNC) &_gtfstools_cpp_sequence_pattern_id,    2},
     {"_gtfstools_cpp_shape_cut_segments",     (DL_FUNC) &_gtfstools_cpp_shape_cut_segments,     6},

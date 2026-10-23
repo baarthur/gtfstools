@@ -37,6 +37,7 @@ reference:
     - interpolate_stop_times
     - interpolate_shape_dist_traveled
     - merge_gtfs
+    - combine_nearby_stops
     - remove_duplicates
     - remove_unused_ids
     - fix_gtfs

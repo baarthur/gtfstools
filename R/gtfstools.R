@@ -176,6 +176,18 @@ utils::globalVariables(
     "lower_day",
     "median_day",
     "upper_day",
-    "i.mode"
+    "i.mode",
+    "node_key",
+    "node_lat",
+    "node_lon",
+    "node_name",
+    "cluster",
+    "stop_name",
+    "stop_lat",
+    "stop_lon",
+    "location_type",
+    "distance",
+    "from",
+    "to"
   )
 )

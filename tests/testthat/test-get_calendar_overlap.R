@@ -652,6 +652,15 @@ test_that("returns a plot of the trips per day", {
   # the first and last service days
 
   daily_plot <- tester(list(poa_gtfs), resolution = "daily", plot = TRUE)
+
+  # a single feed overlaps with itself, so nothing is shaded or explained
+
+  expect_identical(nrow(ggplot2::layer_data(daily_plot, 1)), 0L)
+  expect_null(daily_plot$labels$subtitle)
+  periods_plot <- tester(list(poa_gtfs), plot = TRUE)
+  expect_identical(nrow(ggplot2::layer_data(periods_plot, 1)), 0L)
+  expect_null(periods_plot$labels$subtitle)
+
   box <- ggplot2::layer_data(daily_plot, 2)
   service_days <- get_service_days(poa_gtfs)
   trip_days <- rep(service_days$date, service_days$n_trips)
