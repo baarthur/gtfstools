@@ -488,7 +488,8 @@ locate_stops_along_shapes <- function(gtfs,
       match(located_shape_id, used_shapes),
       lat[to_locate],
       lon[to_locate],
-      n_valid[is_located]
+      n_valid[is_located],
+      prune = TRUE
     )
   }
 

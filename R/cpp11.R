@@ -12,8 +12,8 @@ cpp_stop_distances <- function(lat, lon, from, to) {
   .Call(`_gtfstools_cpp_stop_distances`, lat, lon, from, to)
 }
 
-cpp_locate_stops_on_shapes <- function(shape_lat, shape_lon, shape_size, pattern_shape, stop_lat, stop_lon, pattern_size) {
-  .Call(`_gtfstools_cpp_locate_stops_on_shapes`, shape_lat, shape_lon, shape_size, pattern_shape, stop_lat, stop_lon, pattern_size)
+cpp_locate_stops_on_shapes <- function(shape_lat, shape_lon, shape_size, pattern_shape, stop_lat, stop_lon, pattern_size, prune) {
+  .Call(`_gtfstools_cpp_locate_stops_on_shapes`, shape_lat, shape_lon, shape_size, pattern_shape, stop_lat, stop_lon, pattern_size, prune)
 }
 
 cpp_shape_cut_segments <- function(lat, lon, shape_size, cut_shape, from, to) {

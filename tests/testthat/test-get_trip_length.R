@@ -484,6 +484,143 @@ test_that("results don't depend on the number of threads", {
   expect_identical(two_threads, one_thread)
 })
 
+test_that("pruned and full stop location give identical results", {
+  # cases built to make pruning hard: loops traversed several times,
+  # out-and-back shapes, stops at exactly the same distance from two parts of
+  # a shape (ties), stops out of order, a stop far from the shape, repeated
+  # points and the antimeridian. the shapes are long enough (hundreds of
+  # segments) for the pruned dynamic program to be used, which 'dp_runs'
+  # confirms
+
+  wiggle <- function(n, k) 2e-5 * sin(seq_len(n) * k)
+
+  angle <- function(laps, n) seq(0, 2 * pi * laps, length.out = n)
+  circle <- function(laps) {
+    a <- angle(laps, 300 * laps)
+    list(lon = 0.01 * cos(a), lat = 0.01 * sin(a))
+  }
+
+  line_lon <- seq(0, 0.05, length.out = 400)
+  line_lat <- 0.002 * sin(line_lon * 200)
+  along_line <- function(at) {
+    list(lon = at, lat = 0.002 * sin(at * 200))
+  }
+
+  # east along lat 0, north, then west along lat 0.002: a stop at lat 0.001 is
+  # equally far from both passes
+  zigzag <- list(
+    lon = c(seq(0, 0.03, by = 1e-4), seq(0.03, 0, by = -1e-4)),
+    lat = c(rep(0, 301), rep(0.002, 301))
+  )
+
+  cases <- list()
+  for (laps in 1:3) {
+    a <- angle(laps, 12 * laps)[-1]
+    cases[[paste("loop", laps)]] <- list(
+      shape = circle(laps),
+      stops = list(
+        lon = 0.01 * cos(a) + wiggle(length(a), 3),
+        lat = 0.01 * sin(a) + wiggle(length(a), 5)
+      )
+    )
+  }
+
+  out_and_back_lon <- c(line_lon, rev(line_lon)[-1])
+  out_and_back_lat <- c(line_lat, rev(line_lat)[-1])
+  at <- c(seq(0.002, 0.048, length.out = 8), seq(0.047, 0.003, length.out = 8))
+  cases[["out and back"]] <- list(
+    shape = list(lon = out_and_back_lon, lat = out_and_back_lat),
+    stops = along_line(at)
+  )
+
+  cases[["ties"]] <- list(
+    shape = zigzag,
+    stops = list(
+      lon = c(0.005, 0.01, 0.02, 0.025, 0.015, 0.005),
+      lat = c(0, 0.001, 0.001, 0.001, 0.001, 0.001)
+    )
+  )
+
+  # stops slightly out of order (33 meters) and a stop 330 meters away from
+  # the shape, along a longer shape
+
+  long_lon <- seq(0, 0.2, length.out = 1200)
+  long_lat <- 0.002 * sin(long_lon * 200)
+  at_long <- seq(0.005, 0.195, length.out = 20)
+  at_long[c(7, 15)] <- at_long[c(6, 14)] - 3e-4
+  cases[["out of order"]] <- list(
+    shape = list(lon = long_lon, lat = long_lat),
+    stops = along_line(at_long)
+  )
+
+  far <- along_line(seq(0.005, 0.195, length.out = 20))
+  far$lat[8] <- far$lat[8] + 0.003
+  cases[["far stop"]] <- list(
+    shape = list(lon = long_lon, lat = long_lat),
+    stops = far
+  )
+
+  at <- seq(0.002, 0.048, length.out = 15)
+  repeated <- rep(
+    seq_along(line_lon),
+    times = 1 + (seq_along(line_lon) %% 7 == 0)
+  )
+  cases[["repeated points"]] <- list(
+    shape = list(lon = line_lon[repeated], lat = line_lat[repeated]),
+    stops = along_line(at)
+  )
+
+  wrap <- function(lon) (lon + 179.975 + 180) %% 360 - 180
+  cases[["antimeridian"]] <- list(
+    shape = list(lon = wrap(line_lon), lat = line_lat),
+    stops = list(lon = wrap(at), lat = along_line(at)$lat)
+  )
+
+  locate <- function(case, prune) {
+    cpp_locate_stops_on_shapes(
+      case$shape$lat,
+      case$shape$lon,
+      length(case$shape$lat),
+      1L,
+      case$stops$lat,
+      case$stops$lon,
+      length(case$stops$lat),
+      prune
+    )
+  }
+
+  runs <- integer(0)
+  for (case in cases) {
+    pruned <- locate(case, TRUE)
+    runs <- c(runs, attr(pruned, "dp_runs"))
+    attr(pruned, "dp_runs") <- NULL
+    expect_identical(pruned, locate(case, FALSE))
+  }
+  expect_true(all(runs > 0))
+  expect_true(any(runs >= 2))
+
+  # cases where the full dynamic program is used: a two-point shape (pruning
+  # wouldn't pay), a single stop on it and a stop with an invalid latitude,
+  # for which the bounds used by pruning don't hold
+
+  short <- list(
+    shape = list(lon = c(0, 0.01), lat = c(0, 0)),
+    stops = list(lon = c(0.002, 0.008), lat = c(0, 0))
+  )
+  single <- list(shape = short$shape, stops = list(lon = 0.004, lat = 0))
+  invalid_lat <- cases[["out of order"]]
+  invalid_lat$stops$lat[3] <- 95
+
+  for (case in list(short, single, invalid_lat)) {
+    pruned <- locate(case, TRUE)
+    expect_identical(attr(pruned, "dp_runs"), 0L)
+    attr(pruned, "dp_runs") <- NULL
+    expect_identical(pruned, locate(case, FALSE))
+  }
+
+  expect_null(attr(locate(short, FALSE), "dp_runs"))
+})
+
 test_that("raises an informative error with a blank shape_id in shapes", {
   blank_gtfs <- read_gtfs(spo_path)
   blank_gtfs$trips[trip_id == "CPTM L07-0", shape_id := ""]

@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <climits>
 #include <cmath>
+#include <limits>
 #include <utility>
 #include <vector>
 
@@ -196,16 +197,18 @@ static double unwrap_longitude(double lon, double reference) {
 
 // locates the stops of one pattern along its shape (see
 // cpp_locate_stops_on_shapes() below). doesn't use the R API, so it can run in
-// parallel. may throw std::bad_alloc
+// parallel. may throw std::bad_alloc. returns the number of runs of the
+// pruned dynamic program that were needed, or 0 if the full one was used
 
-static void locate_stops_on_shape(const double* shape_lat,
-                                  const double* shape_lon,
-                                  const R_xlen_t n_points,
-                                  const double* stop_lat,
-                                  const double* stop_lon,
-                                  const R_xlen_t n_stops,
-                                  double* position) {
-  if (n_stops == 0) return;
+static int locate_stops_on_shape(const double* shape_lat,
+                                 const double* shape_lon,
+                                 const R_xlen_t n_points,
+                                 const double* stop_lat,
+                                 const double* stop_lon,
+                                 const R_xlen_t n_stops,
+                                 double* position,
+                                 const bool prune) {
+  if (n_stops == 0) return 0;
 
   const R_xlen_t n_segments = n_points - 1;
   const double earth_radius = 6371010.0;
@@ -220,14 +223,27 @@ static void locate_stops_on_shape(const double* shape_lat,
     lon[k] = unwrap_longitude(shape_lon[k], shape_lon[0]);
   }
 
+  // the radians and the cosine of the latitude of each point are calculated
+  // only once, with the same operations as in distance_haversine()
+
+  std::vector<double> lat_rad(n_points);
+  std::vector<double> lon_rad(n_points);
+  std::vector<double> cos_lat(n_points);
+  for (R_xlen_t k = 0; k < n_points; k++) {
+    lat_rad[k] = shape_lat[k] * to_radians;
+    lon_rad[k] = shape_lon[k] * to_radians;
+    cos_lat[k] = std::cos(lat_rad[k]);
+  }
+
   std::vector<double> seg_length(n_segments);
   std::vector<double> cum_dist(n_segments);
   std::vector<double> x_scale(n_segments);
   double total = 0.0;
 
   for (R_xlen_t j = 0; j < n_segments; j++) {
-    seg_length[j] = distance_haversine(
-      shape_lat[j], shape_lon[j], shape_lat[j + 1], shape_lon[j + 1]
+    seg_length[j] = haversine_radians(
+      lat_rad[j], lon_rad[j], cos_lat[j],
+      lat_rad[j + 1], lon_rad[j + 1], cos_lat[j + 1]
     );
     cum_dist[j] = total;
     total += seg_length[j];
@@ -283,72 +299,364 @@ static void locate_stops_on_shape(const double* shape_lat,
   // directions of an out-and-back shape)
 
   const double tie_tolerance = 1e-6;
-  std::vector<double> prev(n_segments);
-  std::vector<double> cur(n_segments);
-  std::vector<double> prev_t(n_segments);
-  std::vector<double> cur_t(n_segments);
-  std::vector<int> back((size_t) n_stops * (size_t) n_segments);
+  std::vector<R_xlen_t> segment(n_stops);
   double t;
 
-  for (R_xlen_t j = 0; j < n_segments; j++) {
-    prev[j] = project(0, j, t);
-    prev_t[j] = t;
-  }
+  // pruned dynamic programming. the full dynamic program below evaluates every
+  // stop on every segment, but each stop is usually close to only a few of
+  // them. let cf(i, j) be the squared distance between stop i and segment j,
+  // d_i its minimum over the segments and D the sum of the d_i. each step of
+  // the dynamic program adds a cost of at least d_i (the stay cost is never
+  // smaller than cf), so the cost of a cell plus the d_k of the stops after it
+  // is a lower bound of every cell derived from it, and the cost of a cell of
+  // stop i is at least D - d_i + cf(i, j) when the d_k of the remaining stops
+  // are added. the dynamic program is run only on the cells with
+  // cf(i, j) <= d_i + band + margin, the others being treated as infinite. if
+  // the resulting cost C satisfies C - D <= band, the result is the same as
+  // that of the full dynamic program: by induction over the stops, every cell
+  // whose bound is below D + band (minus the drift allowed by the tie rules)
+  // has the same cost, position and back pointer in both, because the cells
+  // left out are separated from them by more than 'tie_tolerance' and so
+  // never win a comparison, nor change which of the remaining cells does. the
+  // chosen cell of the last stop is one of these cells, and so are all the
+  // cells it is traced back to. 'margin' covers the tie rules (up to about
+  // 2 * tie_tolerance per stop) and rounding errors. otherwise the band is
+  // widened and the dynamic program is run again. it gives up, and the full
+  // dynamic program is used, when the band would keep more than a quarter of
+  // the cells (so this never uses more memory than the full one), after 8
+  // runs, or with coordinates for which the bounds below don't hold
+  //
+  // the bound of cf(i, j) is calculated for chunks of 'chunk_size'
+  // consecutive segments, from the bounding box of their points and the
+  // smallest east-west scale of their segments (cos() decreases with the
+  // absolute latitude only up to 90 degrees)
 
-  for (R_xlen_t i = 1; i < n_stops; i++) {
-    // minimum cost (and its segment) among the segments before segment j
-    double earlier_min = 0.0;
-    int earlier_arg = -1;
-
-    for (R_xlen_t j = 0; j < n_segments; j++) {
-      double t_free;
-      const double cost_free = project(i, j, t_free);
-
-      // staying on the same segment as the previous stop: the stop can't be
-      // placed before it
-      double t_stay = t_free;
-      double cost_stay = cost_free;
-      if (t_free < prev_t[j]) {
-        t_stay = prev_t[j];
-        cost_stay = squared_distance(i, j, t_stay, false);
+  auto locate_pruned = [&]() -> int {
+    for (R_xlen_t k = 0; k < n_points; k++) {
+      if (!std::isfinite(lon[k]) || !(std::fabs(shape_lat[k]) <= 90.0)) {
+        return 0;
       }
-
-      double total = prev[j] + cost_stay;
-      double total_t = t_stay;
-      int best_arg = (int) j;
-
-      if (earlier_arg >= 0 &&
-          earlier_min + cost_free <= total + tie_tolerance) {
-        total = earlier_min + cost_free;
-        total_t = t_free;
-        best_arg = earlier_arg;
-      }
-
-      cur[j] = total;
-      cur_t[j] = total_t;
-      back[(size_t) i * (size_t) n_segments + (size_t) j] = best_arg;
-
-      if (earlier_arg < 0 || prev[j] < earlier_min - tie_tolerance) {
-        earlier_min = prev[j];
-        earlier_arg = (int) j;
+    }
+    for (R_xlen_t i = 0; i < n_stops; i++) {
+      if (!std::isfinite(stop_x[i]) || !(std::fabs(stop_lat[i]) <= 90.0)) {
+        return 0;
       }
     }
 
-    std::swap(prev, cur);
-    std::swap(prev_t, cur_t);
-  }
+    const double inf = std::numeric_limits<double>::infinity();
+    const R_xlen_t chunk_size = 8;
+    const R_xlen_t n_chunks = (n_segments + chunk_size - 1) / chunk_size;
+    auto chunk_end = [&](R_xlen_t c) {
+      return std::min(c * chunk_size + chunk_size, n_segments);
+    };
 
-  R_xlen_t best_segment = 0;
-  for (R_xlen_t j = 1; j < n_segments; j++) {
-    if (prev[j] < prev[best_segment] - tie_tolerance) best_segment = j;
-  }
+    // bounding box and smallest east-west scale of each chunk
 
-  // traceback, from the last stop to the first one
+    std::vector<double> box_lon_min(n_chunks);
+    std::vector<double> box_lon_max(n_chunks);
+    std::vector<double> box_lat_min(n_chunks);
+    std::vector<double> box_lat_max(n_chunks);
+    std::vector<double> box_x_scale(n_chunks);
 
-  std::vector<R_xlen_t> segment(n_stops);
-  segment[n_stops - 1] = best_segment;
-  for (R_xlen_t i = n_stops - 1; i > 0; i--) {
-    segment[i - 1] = back[(size_t) i * (size_t) n_segments + (size_t) segment[i]];
+    for (R_xlen_t c = 0; c < n_chunks; c++) {
+      const R_xlen_t first = c * chunk_size;
+      box_lon_min[c] = box_lon_max[c] = lon[first];
+      box_lat_min[c] = box_lat_max[c] = shape_lat[first];
+      box_x_scale[c] = x_scale[first];
+      for (R_xlen_t j = first; j < chunk_end(c); j++) {
+        box_lon_min[c] = std::min(box_lon_min[c], lon[j + 1]);
+        box_lon_max[c] = std::max(box_lon_max[c], lon[j + 1]);
+        box_lat_min[c] = std::min(box_lat_min[c], shape_lat[j + 1]);
+        box_lat_max[c] = std::max(box_lat_max[c], shape_lat[j + 1]);
+        box_x_scale[c] = std::min(box_x_scale[c], x_scale[j]);
+      }
+    }
+
+    // lower bound of the squared distance between each stop and the segments
+    // of each chunk
+
+    std::vector<double> bound((size_t) n_stops * (size_t) n_chunks);
+
+    for (R_xlen_t i = 0; i < n_stops; i++) {
+      for (R_xlen_t c = 0; c < n_chunks; c++) {
+        const double dlon = std::max(
+          0.0,
+          std::max(box_lon_min[c] - stop_x[i], stop_x[i] - box_lon_max[c])
+        );
+        const double dlat = std::max(
+          0.0,
+          std::max(box_lat_min[c] - stop_lat[i], stop_lat[i] - box_lat_max[c])
+        );
+        const double dx = dlon * box_x_scale[c];
+        const double dy = dlat * meters_per_degree;
+        bound[(size_t) i * (size_t) n_chunks + (size_t) c] = dx * dx + dy * dy;
+      }
+    }
+
+    // d_i: the chunk with the smallest bound is searched first, then only the
+    // chunks whose bound doesn't exceed the minimum found so far. if that
+    // already means evaluating more than 'max_cells' cells (e.g. stops near
+    // the centre of a loop), pruning wouldn't pay
+
+    const double max_cells = 0.25 * (double) n_stops * (double) n_segments;
+    std::vector<double> nearest(n_stops);
+    double nearest_sum = 0.0;
+    double n_searched = 0.0;
+
+    for (R_xlen_t i = 0; i < n_stops; i++) {
+      const double* stop_bound = &bound[(size_t) i * (size_t) n_chunks];
+      double best = inf;
+      auto search = [&](R_xlen_t c) {
+        for (R_xlen_t j = c * chunk_size; j < chunk_end(c); j++) {
+          double t_free;
+          best = std::min(best, project(i, j, t_free));
+        }
+        n_searched += chunk_end(c) - c * chunk_size;
+      };
+
+      R_xlen_t closest = 0;
+      for (R_xlen_t c = 1; c < n_chunks; c++) {
+        if (stop_bound[c] < stop_bound[closest]) closest = c;
+      }
+      search(closest);
+      for (R_xlen_t c = 0; c < n_chunks; c++) {
+        if (c != closest && stop_bound[c] <= best) search(c);
+      }
+
+      nearest[i] = best;
+      nearest_sum += best;
+      if (n_searched > max_cells) return 0;
+    }
+
+    // the cells of each stop are stored contiguously, in the order of their
+    // segments: 'cell_segment' holds their segments and 'cell_back' the
+    // segments of the cells of the previous stop they follow. the costs and
+    // positions are only kept for the previous and the current stops
+
+    std::vector<size_t> row_start(n_stops + 1);
+    std::vector<int> cell_segment;
+    std::vector<int> cell_back;
+    std::vector<double> prev_cost;
+    std::vector<double> prev_t;
+    std::vector<double> cur_cost;
+    std::vector<double> cur_t;
+    double band = 1.0;
+
+    for (int run = 1; run <= 8; run++) {
+      const double margin = 1.0 + 1e-9 * (nearest_sum + band) +
+        4.0 * (double) n_stops * tie_tolerance;
+
+      // the cells are counted before any allocation
+
+      size_t n_cells = 0;
+      size_t max_row = 0;
+      for (R_xlen_t i = 0; i < n_stops; i++) {
+        row_start[i] = n_cells;
+        const double limit = nearest[i] + band + margin;
+        const double* stop_bound = &bound[(size_t) i * (size_t) n_chunks];
+        for (R_xlen_t c = 0; c < n_chunks; c++) {
+          if (stop_bound[c] <= limit) n_cells += chunk_end(c) - c * chunk_size;
+        }
+        max_row = std::max(max_row, n_cells - row_start[i]);
+      }
+      row_start[n_stops] = n_cells;
+
+      if ((double) n_cells > max_cells) return 0;
+
+      cell_segment.resize(n_cells);
+      cell_back.assign(n_cells, -1);
+      for (R_xlen_t i = 0; i < n_stops; i++) {
+        size_t k = row_start[i];
+        const double limit = nearest[i] + band + margin;
+        const double* stop_bound = &bound[(size_t) i * (size_t) n_chunks];
+        for (R_xlen_t c = 0; c < n_chunks; c++) {
+          if (stop_bound[c] > limit) continue;
+          for (R_xlen_t j = c * chunk_size; j < chunk_end(c); j++) {
+            cell_segment[k++] = (int) j;
+          }
+        }
+      }
+
+      prev_cost.resize(max_row);
+      prev_t.resize(max_row);
+      cur_cost.resize(max_row);
+      cur_t.resize(max_row);
+
+      for (size_t k = row_start[0]; k < row_start[1]; k++) {
+        prev_cost[k] = project(0, cell_segment[k], prev_t[k]);
+      }
+
+      // the same recurrence as in the full dynamic program below, where the
+      // segments of the previous stop without a cell are infinite: they can't
+      // be stayed on, and they never become 'earlier_arg' once a finite cell
+      // has been seen
+
+      for (R_xlen_t i = 1; i < n_stops; i++) {
+        const size_t prev_first = row_start[i - 1];
+        const size_t prev_end = row_start[i];
+        size_t p = prev_first;
+        double earlier_min = 0.0;
+        int earlier_arg = -1;
+
+        for (size_t k = row_start[i]; k < row_start[i + 1]; k++) {
+          const int j = cell_segment[k];
+
+          while (p < prev_end && cell_segment[p] < j) {
+            const double cost = prev_cost[p - prev_first];
+            if (earlier_arg < 0 || cost < earlier_min - tie_tolerance) {
+              earlier_min = cost;
+              earlier_arg = cell_segment[p];
+            }
+            p++;
+          }
+
+          double t_free;
+          const double cost_free = project(i, j, t_free);
+
+          double total = inf;
+          double total_t = t_free;
+          int best_arg = -1;
+
+          if (p < prev_end && cell_segment[p] == j) {
+            const double stay_from = prev_t[p - prev_first];
+            double t_stay = t_free;
+            double cost_stay = cost_free;
+            if (t_free < stay_from) {
+              t_stay = stay_from;
+              cost_stay = squared_distance(i, j, t_stay, false);
+            }
+            total = prev_cost[p - prev_first] + cost_stay;
+            total_t = t_stay;
+            best_arg = j;
+          }
+
+          if (earlier_arg >= 0 &&
+              earlier_min + cost_free <= total + tie_tolerance) {
+            total = earlier_min + cost_free;
+            total_t = t_free;
+            best_arg = earlier_arg;
+          }
+
+          cur_cost[k - row_start[i]] = total;
+          cur_t[k - row_start[i]] = total_t;
+          cell_back[k] = best_arg;
+        }
+
+        std::swap(prev_cost, cur_cost);
+        std::swap(prev_t, cur_t);
+      }
+
+      const size_t last_first = row_start[n_stops - 1];
+      const size_t last_end = row_start[n_stops];
+      size_t best = last_first;
+      double cost = inf;
+      if (last_end > last_first) {
+        for (size_t k = last_first + 1; k < last_end; k++) {
+          if (prev_cost[k - last_first] <
+              prev_cost[best - last_first] - tie_tolerance) {
+            best = k;
+          }
+        }
+        cost = prev_cost[best - last_first];
+      }
+
+      if (cost < inf && cost - nearest_sum <= band) {
+        segment[n_stops - 1] = cell_segment[best];
+        size_t k = best;
+        for (R_xlen_t i = n_stops - 1; i > 0; i--) {
+          const int s = cell_back[k];
+          segment[i - 1] = s;
+          k = std::lower_bound(
+            cell_segment.begin() + row_start[i - 1],
+            cell_segment.begin() + row_start[i],
+            s
+          ) - cell_segment.begin();
+        }
+        return run;
+      }
+
+      // without any path through the cells (e.g. stops in the opposite order
+      // of the shape), the band is widened faster
+
+      band = cost < inf ? std::max(cost - nearest_sum, 16.0 * band)
+                        : 256.0 * band;
+    }
+
+    return 0;
+  };
+
+  const int dp_runs = prune ? locate_pruned() : 0;
+
+  // the full dynamic program, when pruning is off or gave up
+
+  if (dp_runs == 0) {
+    std::vector<double> prev(n_segments);
+    std::vector<double> cur(n_segments);
+    std::vector<double> prev_t(n_segments);
+    std::vector<double> cur_t(n_segments);
+    std::vector<int> back((size_t) n_stops * (size_t) n_segments);
+
+    for (R_xlen_t j = 0; j < n_segments; j++) {
+      prev[j] = project(0, j, t);
+      prev_t[j] = t;
+    }
+
+    for (R_xlen_t i = 1; i < n_stops; i++) {
+      // minimum cost (and its segment) among the segments before segment j
+      double earlier_min = 0.0;
+      int earlier_arg = -1;
+
+      for (R_xlen_t j = 0; j < n_segments; j++) {
+        double t_free;
+        const double cost_free = project(i, j, t_free);
+
+        // staying on the same segment as the previous stop: the stop can't be
+        // placed before it
+        double t_stay = t_free;
+        double cost_stay = cost_free;
+        if (t_free < prev_t[j]) {
+          t_stay = prev_t[j];
+          cost_stay = squared_distance(i, j, t_stay, false);
+        }
+
+        double total = prev[j] + cost_stay;
+        double total_t = t_stay;
+        int best_arg = (int) j;
+
+        if (earlier_arg >= 0 &&
+            earlier_min + cost_free <= total + tie_tolerance) {
+          total = earlier_min + cost_free;
+          total_t = t_free;
+          best_arg = earlier_arg;
+        }
+
+        cur[j] = total;
+        cur_t[j] = total_t;
+        back[(size_t) i * (size_t) n_segments + (size_t) j] = best_arg;
+
+        if (earlier_arg < 0 || prev[j] < earlier_min - tie_tolerance) {
+          earlier_min = prev[j];
+          earlier_arg = (int) j;
+        }
+      }
+
+      std::swap(prev, cur);
+      std::swap(prev_t, cur_t);
+    }
+
+    R_xlen_t best_segment = 0;
+    for (R_xlen_t j = 1; j < n_segments; j++) {
+      if (prev[j] < prev[best_segment] - tie_tolerance) best_segment = j;
+    }
+
+    // traceback, from the last stop to the first one
+
+    segment[n_stops - 1] = best_segment;
+    for (R_xlen_t i = n_stops - 1; i > 0; i--) {
+      segment[i - 1] = back[
+        (size_t) i * (size_t) n_segments + (size_t) segment[i]
+      ];
+    }
   }
 
   // positions along the shape. a stop projected onto the same segment as the
@@ -366,6 +674,7 @@ static void locate_stops_on_shape(const double* shape_lat,
     previous_pos = pos;
   }
 
+  return dp_runs;
 }
 
 //' cpp_locate_stops_on_shapes
@@ -386,6 +695,18 @@ static void locate_stops_on_shape(const double* shape_lat,
 //' equirectangular frame of each shape segment, while the lengths along the
 //' shape are great-circle distances calculated with the haversine formula.
 //'
+//' With 'prune', the dynamic program is first run only on the segments near
+//' each stop, which is checked to give the same results as running it on all
+//' segments (see locate_stops_on_shape() above), and the result gets a
+//' "dp_runs" attribute with, for each pattern, the number of runs of the
+//' pruned dynamic program needed, or 0 where the full one was used. The
+//' results are identical to those without 'prune' when both use the same
+//' floating-point operations, which the tests check, on constructed cases,
+//' on each platform they run on. Compilers that fuse multiplications and
+//' additions differently in the two dynamic programs (e.g. GCC with
+//' -ffp-contract=fast on aarch64) could break ties differently, but this
+//' hasn't been seen.
+//'
 //' The shapes' points are in 'shape_lat' and 'shape_lon', contiguous and in the
 //' order of 'shape_size'. The stops of each pattern are in 'stop_lat' and
 //' 'stop_lon', contiguous and in the order of 'pattern_size', and the shape of
@@ -403,7 +724,8 @@ doubles cpp_locate_stops_on_shapes(const doubles shape_lat,
                                    const integers pattern_shape,
                                    const doubles stop_lat,
                                    const doubles stop_lon,
-                                   const integers pattern_size) {
+                                   const integers pattern_size,
+                                   const bool prune) {
   const R_xlen_t n_points = shape_lat.size();
   const R_xlen_t n_shapes = shape_size.size();
   const R_xlen_t n_stops = stop_lat.size();
@@ -473,6 +795,7 @@ doubles cpp_locate_stops_on_shapes(const doubles shape_lat,
 
   writable::doubles position(n_stops);
   double* position_p = REAL(position);
+  std::vector<int> dp_runs(n_patterns);
 
   // patterns are processed in blocks, so that the user can interrupt the
   // calculation between them. within a block, patterns are spread among the
@@ -494,14 +817,15 @@ doubles cpp_locate_stops_on_shapes(const doubles shape_lat,
       try {
         const R_xlen_t shape = pattern_shape_p[p] - 1;
         const R_xlen_t offset = shape_start[shape];
-        locate_stops_on_shape(
+        dp_runs[p] = locate_stops_on_shape(
           shape_lat_p + offset,
           shape_lon_p + offset,
           shape_size_p[shape],
           stop_lat_p + stop_start[p],
           stop_lon_p + stop_start[p],
           pattern_size_p[p],
-          position_p + stop_start[p]
+          position_p + stop_start[p],
+          prune
         );
       } catch (...) {
         // exceptions can't leave a parallel region (e.g. std::bad_alloc)
@@ -513,6 +837,12 @@ doubles cpp_locate_stops_on_shapes(const doubles shape_lat,
     }
 
     if (failed) stop("Failed to locate the stops along the shapes.");
+  }
+
+  if (prune) {
+    writable::integers runs(n_patterns);
+    std::copy(dp_runs.begin(), dp_runs.end(), INTEGER(runs));
+    position.attr("dp_runs") = runs;
   }
 
   return position;
