@@ -18,8 +18,7 @@ of nodes is surely within \code{max_dist}, all nodes are in cluster 1 and the
 pairs are not calculated.
 }
 \description{
-Finds the pairs of nodes within \code{max_dist} of each other with a grid of
-cells at least \code{max_dist} wide, so that only nodes in neighbouring cells
-are compared, and merges them with \code{cpp_merge_stop_clusters()}.
+Finds the pairs of nodes within \code{max_dist} of each other with
+\code{find_stop_pairs_within()} and merges them with \code{cpp_merge_stop_clusters()}.
 }
 \keyword{internal}

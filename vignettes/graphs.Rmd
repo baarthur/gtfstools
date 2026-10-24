@@ -1,0 +1,202 @@
+---
+title: "Building transit network graphs"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Building transit network graphs}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+# the queries in this vignette use {dplyr}, and the graphs use {igraph},
+# {tidygraph}, {sfnetworks} and {ggraph}, which gtfstools only suggests
+has_dplyr <- requireNamespace("dplyr", quietly = TRUE)
+has_igraph <- has_dplyr && requireNamespace("igraph", quietly = TRUE)
+has_viz <- has_dplyr &&
+  requireNamespace("tidygraph", quietly = TRUE) &&
+  requireNamespace("sfnetworks", quietly = TRUE) &&
+  requireNamespace("ggraph", quietly = TRUE) &&
+  requireNamespace("ggplot2", quietly = TRUE)
+
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  eval = has_dplyr
+)
+
+Sys.setenv(OMP_THREAD_LIMIT = 2)
+data.table::setDTthreads(2)
+
+library(gtfstools)
+```
+
+Many transport analyses, such as transit assignment models and the
+centrality of stops, are carried out on a graph of the transit network rather
+than on its timetable. `build_graph()` builds such a graph from the trips of a
+GTFS feed that depart within a time of day. The graph has two types of nodes:
+
+- **stop** nodes, one for each stop visited by these trips;
+- **service** nodes, one for each route and direction at each of its stops.
+
+And four types of links:
+
+- **in-vehicle** links between the service nodes of consecutive stops, with
+  the mean travel time between them;
+- **boarding** links from each stop to the service nodes from which trips
+  depart, with the number of departures and the mean waiting time (half the
+  headway);
+- **alighting** links from each service node back to its stop;
+- walking **transfer** links between nearby stops.
+
+The graph can be returned as the tables of the General Modeling Network
+Specification (GMNS), or as an `{igraph}` or `{tidygraph}` graph. This vignette
+shows how to build it and how to analyse and plot it with these packages and
+with `{sfnetworks}` and `{ggraph}`. Please see the documentation of
+`build_graph()` for the details of how nodes and links are built.
+
+# Preparing the feed
+
+We will use the sample feed of Porto Alegre, included in the package, and build
+the network of the morning peak, from 8am to 10am. `build_graph()` pools the
+trips of every service in the feed, so first we keep only the services that
+run on Wednesdays with `filter_by_weekday()`:
+
+```{r}
+path <- system.file("extdata/poa_gtfs.zip", package = "gtfstools")
+gtfs <- read_gtfs(path)
+
+gtfs <- filter_by_weekday(gtfs, "wednesday")
+```
+
+This feed lists only the times of the first and the last stop of each trip,
+and the links between stops without times would have no travel time, so they
+couldn't be used to calculate travel times through the network. So we fill the
+missing times with `interpolate_stop_times()`. Its warning refers to a few late
+night trips whose times go back to "00:00:00" after midnight, which depart
+outside the time of day used below:
+
+```{r}
+gtfs <- interpolate_stop_times(gtfs)
+```
+
+# Building the network
+
+By default, `build_graph()` returns the GMNS `node`, `link` and `config`
+tables:
+
+```{r}
+graph <- build_graph(gtfs, from = "08:00:00", to = "10:00:00")
+
+head(graph$node)
+
+head(graph$link)
+
+graph$link |>
+  dplyr::count(link_type)
+```
+
+The tables can be written to the CSV files of a GMNS network with
+`data.table::fwrite()`, as shown in the examples of `build_graph()`, and then
+read by other modelling software.
+
+# Calculating the centrality of stops with igraph
+
+With `format = "igraph"`, the network is returned as an `{igraph}` graph, whose
+links have the travel time as an attribute. We use it to calculate the shortest
+travel times between every pair of stops, which include the waiting time at
+the stops where vehicles are boarded:
+
+```{r, eval = has_igraph}
+g <- build_graph(gtfs, from = "08:00:00", to = "10:00:00", format = "igraph")
+
+stop_nodes <- igraph::V(g)[igraph::V(g)$node_type == "stop"]
+
+travel_times <- igraph::distances(
+  g,
+  v = stop_nodes,
+  to = stop_nodes,
+  mode = "out",
+  weights = igraph::E(g)$travel_time
+)
+diag(travel_times) <- NA
+```
+
+From these travel times, we calculate the harmonic closeness of each stop: the
+mean of the inverse of the travel times between it and the other stops, in
+which the stops that can't be reached count as 0. We don't use the centrality
+functions of `{igraph}`, such as `closeness()`, because they would also take
+the service nodes as destinations, and because they require positive weights,
+while alighting links have a travel time of 0. This sample feed has a single
+direction of each route, so the closeness *from* a stop depends on how far it
+is from the end of its routes, and the closeness *to* it on how far it is from
+their start. Hence we average the closeness from and to each stop:
+
+```{r, eval = has_igraph}
+closeness <- data.frame(
+  stop_id = stop_nodes$stop_id,
+  stop_name = stop_nodes$stop_name,
+  closeness_from = rowMeans(1 / travel_times, na.rm = TRUE),
+  closeness_to = colMeans(1 / travel_times, na.rm = TRUE)
+) |>
+  dplyr::mutate(closeness = (closeness_from + closeness_to) / 2)
+
+closeness |>
+  dplyr::slice_max(closeness, n = 10)
+```
+
+# Plotting the network with tidygraph, sfnetworks and ggraph
+
+With `format = "tidygraph"`, the network is returned as a `{tidygraph}` graph,
+whose nodes have the coordinates of their stops. These coordinates can be used
+to plot the network with `{ggraph}`:
+
+```{r, eval = has_viz, message = FALSE, warning = FALSE}
+library(ggplot2)
+library(ggraph)
+```
+
+```{r, eval = has_viz, fig.width = 7, fig.height = 5, dpi = 96}
+a <- build_graph(gtfs, from = "08:00:00", to = "10:00:00", format = "tidygraph")
+a
+
+ggraph(a, layout = "manual", x = x_coord, y = y_coord) +
+  geom_edge_link() +
+  geom_node_point()
+```
+
+This plot treats longitudes and latitudes as plain coordinates. To work with
+the network as spatial data, we convert it into an `{sfnetworks}` network, in
+which nodes are points and links are lines. Since boarding and alighting links
+connect nodes at the same place, we keep only the in-vehicle and transfer
+links, and place the in-vehicle links last, so that they are drawn on top:
+
+```{r, eval = has_viz}
+net <- a |>
+  tidygraph::activate("edges") |>
+  dplyr::filter(link_type %in% c("in_vehicle", "transfer")) |>
+  dplyr::arrange(dplyr::desc(link_type)) |>
+  sfnetworks::as_sfnetwork(
+    coords = c("x_coord", "y_coord"),
+    crs = 4326,
+    remove = FALSE,
+    edges_as_lines = TRUE,
+    message = FALSE
+  )
+net
+```
+
+`net` can be used with the functions of `{sfnetworks}` and `{sf}`, for
+example to filter the network by a spatial extent or to join it with other
+spatial data. It can also be mapped with the `"sf"` layout of `{ggraph}`:
+
+```{r, eval = has_viz, fig.width = 7, fig.height = 5, dpi = 96}
+ggraph(net, layout = "sf") +
+  geom_edge_sf(aes(colour = link_type)) +
+  geom_node_sf(size = 0.5) +
+  scale_edge_colour_manual(
+    name = "Link type",
+    values = c(in_vehicle = "#0072B2", transfer = "#D55E00"),
+    labels = c(in_vehicle = "In-vehicle", transfer = "Walking transfer")
+  ) +
+  theme_void()
+```

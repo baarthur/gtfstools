@@ -423,9 +423,8 @@ get_stop_node_keys <- function(stop_id, parent_station, ignored_parents) {
 
 #' Cluster stop nodes by distance
 #'
-#' Finds the pairs of nodes within `max_dist` of each other with a grid of
-#' cells at least `max_dist` wide, so that only nodes in neighbouring cells
-#' are compared, and merges them with `cpp_merge_stop_clusters()`.
+#' Finds the pairs of nodes within `max_dist` of each other with
+#' `find_stop_pairs_within()` and merges them with `cpp_merge_stop_clusters()`.
 #'
 #' @param lat,lon Numeric vectors with the coordinates of each node, in
 #'   degrees.
@@ -466,6 +465,88 @@ cluster_stop_nodes <- function(lat, lon, max_dist) {
     if (max_possible_dist * (1 + 1e-9) <= max_dist) {
       return(rep(1L, n_nodes))
     }
+  }
+
+  # the errors are raised from this function's frame, so that they mention it
+  # rather than the closure that checks the number of pairs
+
+  env <- environment()
+
+  check_n_pairs <- function(n_pairs) {
+    if (n_pairs > .Machine$integer.max) {
+      cli::cli_abort(
+        c(
+          "Too many pairs of stops to compare.",
+          "x" = "{format(n_pairs, big.mark = ',', scientific = FALSE)} pairs
+                 would have to be compared.",
+          "i" = "Please use a smaller {.arg max_dist}."
+        ),
+        class = "gtfstools_too_many_stops",
+        call = env
+      )
+    }
+
+    if (n_pairs > max_stop_pairs_without_warning()) {
+      memory_gb <- signif(n_pairs * 64 / 1e9, 2)
+
+      cli::cli_warn(
+        c(
+          "Merging stops with a {.arg max_dist} of {max_dist} m may use a lot
+           of memory.",
+          "i" = "{format(n_pairs, big.mark = ',', scientific = FALSE)} pairs of
+                 stops need at least about {memory_gb} GB.",
+          "i" = "Consider using a smaller {.arg max_dist}."
+        ),
+        class = "gtfstools_many_stops_warning"
+      )
+    }
+
+    return(invisible(NULL))
+  }
+
+  pairs <- find_stop_pairs_within(lat, lon, max_dist, check_n_pairs)
+  data.table::setorderv(pairs, c("distance", "from", "to"))
+
+  cluster <- cpp_merge_stop_clusters(n_nodes, pairs$from, pairs$to)
+
+  return(cluster)
+}
+
+
+
+#' Find the pairs of stops within a distance of each other
+#'
+#' Finds the pairs of points within `max_dist` of each other with a grid of
+#' cells at least `max_dist` wide, so that only points in neighbouring cells
+#' are compared.
+#'
+#' @param lat,lon Numeric vectors with the coordinates of each point, in
+#'   degrees. Points without coordinates are ignored.
+#' @param max_dist A number, in meters.
+#' @param check_n_pairs A function called with the number of pairs of points
+#'   in neighbouring cells before they are listed, to check that they can be
+#'   compared.
+#'
+#' @return A `data.table` with the indices of the two points of each pair
+#'   (`from` smaller than `to`) and the `distance` between them, in meters.
+#'
+#' @keywords internal
+find_stop_pairs_within <- function(lat, lon, max_dist, check_n_pairs) {
+  earth_radius <- 6371010
+  to_radians <- pi / 180
+
+  has_coords <- !is.na(lat) & !is.na(lon)
+  node <- which(has_coords)
+  lat_rad <- lat[node] * to_radians
+  lon_rad <- lon[node] * to_radians
+
+  if (length(node) < 2) {
+    empty_pairs <- data.table::data.table(
+      from = integer(0),
+      to = integer(0),
+      distance = numeric(0)
+    )
+    return(empty_pairs)
   }
 
   # with these cell sizes, two points within dist are in the same or in
@@ -509,32 +590,7 @@ cluster_stop_nodes <- function(lat, lon, max_dist) {
     }
   }
 
-  if (n_pairs > .Machine$integer.max) {
-    cli::cli_abort(
-      c(
-        "Too many pairs of stops to compare.",
-        "x" = "{format(n_pairs, big.mark = ',', scientific = FALSE)} pairs
-               would have to be compared.",
-        "i" = "Please use a smaller {.arg max_dist}."
-      ),
-      class = "gtfstools_too_many_stops"
-    )
-  }
-
-  if (n_pairs > max_stop_pairs_without_warning()) {
-    memory_gb <- signif(n_pairs * 64 / 1e9, 2)
-
-    cli::cli_warn(
-      c(
-        "Merging stops with a {.arg max_dist} of {max_dist} m may use a lot
-         of memory.",
-        "i" = "{format(n_pairs, big.mark = ',', scientific = FALSE)} pairs of
-               stops need at least about {memory_gb} GB.",
-        "i" = "Consider using a smaller {.arg max_dist}."
-      ),
-      class = "gtfstools_many_stops_warning"
-    )
-  }
+  check_n_pairs(n_pairs)
 
   pairs <- lapply(
     seq_along(row_offsets),
@@ -562,9 +618,6 @@ cluster_stop_nodes <- function(lat, lon, max_dist) {
 
   pairs[, distance := cpp_stop_distances(lat, lon, from, to)]
   pairs <- pairs[distance <= max_dist]
-  data.table::setorderv(pairs, c("distance", "from", "to"))
 
-  cluster <- cpp_merge_stop_clusters(n_nodes, pairs$from, pairs$to)
-
-  return(cluster)
+  return(pairs)
 }

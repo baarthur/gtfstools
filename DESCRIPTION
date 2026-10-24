@@ -39,6 +39,7 @@ Imports:
     httr2 (>= 1.0.4),
     parallelly,
     processx,
+    rlang,
     sf,
     sfheaders,
     stats,
@@ -49,10 +50,14 @@ Suggests:
     covr,
     dplyr,
     ggplot2,
+    ggraph,
+    igraph,
     jsonlite,
     knitr,
     rmarkdown,
-    testthat (>= 3.0.0)
+    sfnetworks,
+    testthat (>= 3.0.0),
+    tidygraph
 VignetteBuilder: 
     knitr
 Config/testthat/edition: 3

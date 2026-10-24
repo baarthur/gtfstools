@@ -58,6 +58,9 @@ reference:
     - convert_stops_to_shapes
     - convert_time_to_seconds
     - convert_seconds_to_time
+  - title: "Network analysis"
+  - contents:
+    - "build_graph"
   - title: "Interoperability between GTFS packages"
   - contents:
     - "as_dt_gtfs"

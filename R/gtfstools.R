@@ -188,6 +188,17 @@ utils::globalVariables(
     "location_type",
     "distance",
     "from",
-    "to"
+    "to",
+    "inferred_direction",
+    "node_id",
+    "parent_node_id",
+    "service_node",
+    "from_node_id",
+    "to_node_id",
+    "travel_time",
+    "free_speed",
+    "direction",
+    "timed_weight",
+    "weighted_duration"
   )
 )

@@ -61,6 +61,16 @@
     },
     {
       "@type": "Person",
+      "givenName": "Gonçalo",
+      "familyName": "F. Matos"
+    },
+    {
+      "@type": "Person",
+      "givenName": "Yigit",
+      "familyName": "Han Eroglu"
+    },
+    {
+      "@type": "Person",
       "givenName": "Arthur",
       "familyName": "Bazolli",
       "email": "baz.arthur@gmail.com"
@@ -108,6 +118,18 @@
     },
     {
       "@type": "SoftwareApplication",
+      "identifier": "dplyr",
+      "name": "dplyr",
+      "provider": {
+        "@id": "https://cran.r-project.org",
+        "@type": "Organization",
+        "name": "Comprehensive R Archive Network (CRAN)",
+        "url": "https://cran.r-project.org"
+      },
+      "sameAs": "https://CRAN.R-project.org/package=dplyr"
+    },
+    {
+      "@type": "SoftwareApplication",
       "identifier": "ggplot2",
       "name": "ggplot2",
       "provider": {
@@ -117,6 +139,30 @@
         "url": "https://cran.r-project.org"
       },
       "sameAs": "https://CRAN.R-project.org/package=ggplot2"
+    },
+    {
+      "@type": "SoftwareApplication",
+      "identifier": "ggraph",
+      "name": "ggraph",
+      "provider": {
+        "@id": "https://cran.r-project.org",
+        "@type": "Organization",
+        "name": "Comprehensive R Archive Network (CRAN)",
+        "url": "https://cran.r-project.org"
+      },
+      "sameAs": "https://CRAN.R-project.org/package=ggraph"
+    },
+    {
+      "@type": "SoftwareApplication",
+      "identifier": "igraph",
+      "name": "igraph",
+      "provider": {
+        "@id": "https://cran.r-project.org",
+        "@type": "Organization",
+        "name": "Comprehensive R Archive Network (CRAN)",
+        "url": "https://cran.r-project.org"
+      },
+      "sameAs": "https://CRAN.R-project.org/package=igraph"
     },
     {
       "@type": "SoftwareApplication",
@@ -156,6 +202,18 @@
     },
     {
       "@type": "SoftwareApplication",
+      "identifier": "sfnetworks",
+      "name": "sfnetworks",
+      "provider": {
+        "@id": "https://cran.r-project.org",
+        "@type": "Organization",
+        "name": "Comprehensive R Archive Network (CRAN)",
+        "url": "https://cran.r-project.org"
+      },
+      "sameAs": "https://CRAN.R-project.org/package=sfnetworks"
+    },
+    {
+      "@type": "SoftwareApplication",
       "identifier": "testthat",
       "name": "testthat",
       "version": ">= 3.0.0",
@@ -166,6 +224,18 @@
         "url": "https://cran.r-project.org"
       },
       "sameAs": "https://CRAN.R-project.org/package=testthat"
+    },
+    {
+      "@type": "SoftwareApplication",
+      "identifier": "tidygraph",
+      "name": "tidygraph",
+      "provider": {
+        "@id": "https://cran.r-project.org",
+        "@type": "Organization",
+        "name": "Comprehensive R Archive Network (CRAN)",
+        "url": "https://cran.r-project.org"
+      },
+      "sameAs": "https://CRAN.R-project.org/package=tidygraph"
     }
   ],
   "softwareRequirements": {
@@ -173,7 +243,7 @@
       "@type": "SoftwareApplication",
       "identifier": "R",
       "name": "R",
-      "version": ">= 2.10"
+      "version": ">= 4.1.0"
     },
     "2": {
       "@type": "SoftwareApplication",
@@ -227,7 +297,7 @@
       "@type": "SoftwareApplication",
       "identifier": "gtfsio",
       "name": "gtfsio",
-      "version": ">= 1.0.0",
+      "version": ">= 1.2.2",
       "provider": {
         "@id": "https://cran.r-project.org",
         "@type": "Organization",
@@ -240,6 +310,7 @@
       "@type": "SoftwareApplication",
       "identifier": "httr2",
       "name": "httr2",
+      "version": ">= 1.0.4",
       "provider": {
         "@id": "https://cran.r-project.org",
         "@type": "Organization",
@@ -274,6 +345,18 @@
     },
     "10": {
       "@type": "SoftwareApplication",
+      "identifier": "rlang",
+      "name": "rlang",
+      "provider": {
+        "@id": "https://cran.r-project.org",
+        "@type": "Organization",
+        "name": "Comprehensive R Archive Network (CRAN)",
+        "url": "https://cran.r-project.org"
+      },
+      "sameAs": "https://CRAN.R-project.org/package=rlang"
+    },
+    "11": {
+      "@type": "SoftwareApplication",
       "identifier": "sf",
       "name": "sf",
       "provider": {
@@ -284,7 +367,7 @@
       },
       "sameAs": "https://CRAN.R-project.org/package=sf"
     },
-    "11": {
+    "12": {
       "@type": "SoftwareApplication",
       "identifier": "sfheaders",
       "name": "sfheaders",
@@ -296,12 +379,12 @@
       },
       "sameAs": "https://CRAN.R-project.org/package=sfheaders"
     },
-    "12": {
+    "13": {
       "@type": "SoftwareApplication",
       "identifier": "stats",
       "name": "stats"
     },
-    "13": {
+    "14": {
       "@type": "SoftwareApplication",
       "identifier": "units",
       "name": "units",
@@ -314,12 +397,12 @@
       },
       "sameAs": "https://CRAN.R-project.org/package=units"
     },
-    "14": {
+    "15": {
       "@type": "SoftwareApplication",
       "identifier": "utils",
       "name": "utils"
     },
-    "15": {
+    "16": {
       "@type": "SoftwareApplication",
       "identifier": "zip",
       "name": "zip",
@@ -333,7 +416,7 @@
     },
     "SystemRequirements": null
   },
-  "fileSize": "5853.713KB",
+  "fileSize": "10544.517KB",
   "releaseNotes": "https://github.com/ipea/gtfstools/blob/main/NEWS.md",
   "readme": "https://github.com/ipea/gtfstools/blob/main/README.md",
   "contIntegration": ["https://github.com/ipea/gtfstools/actions?query=workflow%3Acheck", "https://app.codecov.io/gh/ipeaGIT/gtfstools?branch=main"],
