@@ -221,6 +221,33 @@ test_that("sets a minimum dwell time at intermediate stops", {
   expect_identical(fixed_again, result)
 })
 
+test_that("keeps the first stop with times when earlier stops stay blank", {
+  # the trip's first and last stops have no times to be interpolated from, so
+  # they stay blank. the first and last stops with times (X and Z) keep their
+  # dwell times
+
+  feed <- dwell_feed()
+  feed$stop_times <- data.table::data.table(
+    trip_id = "A",
+    arrival_time = c("", "08:00:00", "08:05:00", "08:10:00", ""),
+    departure_time = c("", "08:00:00", "08:05:00", "08:10:00", ""),
+    stop_id = c("s0", "X", "Y", "Z", "s9"),
+    stop_sequence = 1:5
+  )
+  result <- suppressWarnings(
+    tester(feed, max_speed = NULL, min_dwell_time = 30)
+  )
+
+  expect_identical(
+    result$stop_times$arrival_time,
+    c("", "08:00:00", "08:05:00", "08:10:30", "")
+  )
+  expect_identical(
+    result$stop_times$departure_time,
+    c("", "08:00:00", "08:05:30", "08:10:30", "")
+  )
+})
+
 test_that("sets the minimum dwell time at stops with interpolated times", {
   without_min <- tester()
   result <- tester(min_dwell_time = 10)
