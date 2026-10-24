@@ -3,7 +3,9 @@
 #' Downloads MobilityData's command line tool to validate GTFS feeds.
 #'
 #' @param path A string. The directory where the validator should be saved to.
-#'   By default, the function downloads the validator to a temp directory.
+#'   By default, the function downloads the validator to a temporary
+#'   directory, which is removed when the R session ends. Use a persistent
+#'   directory to reuse the validator across sessions.
 #' @param version A string. The version of the validator that should be
 #'   downloaded. Defaults to `"latest"`, but accepts version numbers as strings
 #'   (i.e. to download version v6.0.0 please enter `"6.0.0"`). Please check

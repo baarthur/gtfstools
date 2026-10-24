@@ -13,7 +13,9 @@ download_validator(
 }
 \arguments{
 \item{path}{A string. The directory where the validator should be saved to.
-By default, the function downloads the validator to a temp directory.}
+By default, the function downloads the validator to a temporary
+directory, which is removed when the R session ends. Use a persistent
+directory to reuse the validator across sessions.}
 
 \item{version}{A string. The version of the validator that should be
 downloaded. Defaults to \code{"latest"}, but accepts version numbers as strings
