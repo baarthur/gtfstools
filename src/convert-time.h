@@ -11,5 +11,4 @@
 using namespace cpp11;
 
 // ----------  Vector conversion of GTFS times:  ----------
-int convert_time_to_seconds(std::string hms);
 integers cpp_time_to_seconds(const strings times);

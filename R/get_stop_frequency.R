@@ -100,18 +100,9 @@ get_stop_frequency <- function(gtfs,
   checkmate::assert_string(from, pattern = "^\\d{2}:[0-5]\\d:[0-5]\\d$")
   checkmate::assert_string(to, pattern = "^\\d{2}:[0-5]\\d:[0-5]\\d$")
 
-  from_secs <- string_to_seconds(from)
-  to_secs <- string_to_seconds(to)
-
-  if (from_secs >= to_secs) {
-    cli::cli_abort(
-      paste0(
-        "{.arg from} ({.val {from}}) must be earlier than {.arg to} ",
-        "({.val {to}})."
-      ),
-      class = "gtfstools_invalid_time_of_day"
-    )
-  }
+  window <- time_of_day_window(from, to)
+  from_secs <- window[1]
+  to_secs <- window[2]
 
   # check if required fields and files exist ('frequencies' is checked by
   # get_trip_departures()). the departures are counted by stop and service,

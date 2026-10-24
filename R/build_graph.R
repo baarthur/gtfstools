@@ -204,18 +204,9 @@ build_graph <- function(gtfs,
     )
   }
 
-  from_secs <- string_to_seconds(from)
-  to_secs <- string_to_seconds(to)
-
-  if (from_secs >= to_secs) {
-    cli::cli_abort(
-      paste0(
-        "{.arg from} ({.val {from}}) must be earlier than {.arg to} ",
-        "({.val {to}})."
-      ),
-      class = "gtfstools_invalid_time_of_day"
-    )
-  }
+  window <- time_of_day_window(from, to)
+  from_secs <- window[1]
+  to_secs <- window[2]
 
   # igraph and tidygraph are suggested packages. in interactive sessions, the
   # user is asked whether to install the missing one

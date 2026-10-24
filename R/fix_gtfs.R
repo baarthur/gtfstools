@@ -8,8 +8,12 @@
 #' @template gtfs
 #' @param max_speed A number. The maximum speed of trips, in the unit given by
 #'   `unit`. If `NULL` (the default), speeds are not capped.
-#' @param unit A string representing the unit in which `max_speed` is given.
+#' @param speed_unit A string representing the unit in which `max_speed` is given.
 #'   One of `"km/h"` (the default), `"m/s"` or `"mph"` (miles per hour).
+#' @param min_dwell_time A number. The minimum time vehicles remains stopped at
+#'   stops/stations with its doors open to serve passengers.
+#' @param dwell_time_unit A string representing the unit in which `min_dwell_time`
+#'   is given. Defaults to `"s"` seconds.
 #'
 #' @return The fixed GTFS object.
 #'
@@ -73,7 +77,13 @@
 #' \dontshow{data.table::setDTthreads(old_dt_threads)}
 #'
 #' @export
-fix_gtfs <- function(gtfs, max_speed = NULL, unit = "km/h") {
+fix_gtfs <- function(
+  gtfs,
+  max_speed = NULL,
+  speed_unit = "km/h",
+  min_dwell_time = NULL,
+  dwell_time_unit = "s"
+) {
   gtfs <- assert_and_assign_gtfs_object(gtfs)
   checkmate::assert_number(
     max_speed,
@@ -100,6 +110,24 @@ fix_gtfs <- function(gtfs, max_speed = NULL, unit = "km/h") {
 
   if (!is.null(max_speed)) {
     gtfs_fixed <- set_max_speed(gtfs_fixed, max_speed = max_speed, unit = unit)
+  }
+
+  # set min dwell_time
+  if (!is.null(min_dwell_time)) {
+    # find which trips and stops are below min_dwell_time
+    all_dwell_times <- get_dwell_time(gtfs_fixed)
+    dwell_times_below_min <- all_dwell_times[
+      dwell_time < min_dwell_time,
+      .(trip_id, stop_id)
+    ]
+
+    gtfs_fixed <- set_dwell_time(
+      gtfs,
+      trip_id = dwell_times_below_min$trip_id,
+      stop_id = dwell_times_below_min$stop_id,
+      dwell_time = min_dwell_time,
+      unit = dwell_time_unit
+    )
   }
 
   # interpolate stop_times

@@ -85,18 +85,9 @@ get_route_frequency <- function(gtfs, route_id = NULL, from, to) {
   checkmate::assert_string(from, pattern = "^\\d{2}:[0-5]\\d:[0-5]\\d$")
   checkmate::assert_string(to, pattern = "^\\d{2}:[0-5]\\d:[0-5]\\d$")
 
-  from_secs <- string_to_seconds(from)
-  to_secs <- string_to_seconds(to)
-
-  if (from_secs >= to_secs) {
-    cli::cli_abort(
-      paste0(
-        "{.arg from} ({.val {from}}) must be earlier than {.arg to} ",
-        "({.val {to}})."
-      ),
-      class = "gtfstools_invalid_time_of_day"
-    )
-  }
+  window <- time_of_day_window(from, to)
+  from_secs <- window[1]
+  to_secs <- window[2]
 
   # check if required fields and files exist ('stop_times' and 'frequencies'
   # are checked by get_trip_departures())
@@ -239,4 +230,37 @@ get_trip_departures <- function(gtfs, trip_id) {
   departures <- rbind(frequency_departures, scheduled_departures)
 
   return(departures)
+}
+
+
+
+#' Convert a time of day to seconds and check its order
+#'
+#' Converts the `from` and `to` strings of a time of day to seconds after
+#' midnight, raising an error attributed to the calling function if `from` is
+#' not earlier than `to`. Unlike `dwell_time_window()`, both ends are required
+#' and they can't be equal. The callers validate the format of the strings
+#' themselves, so that those errors keep naming the user-facing function.
+#'
+#' @param from,to Strings in the "HH:MM:SS" format.
+#'
+#' @return An integer vector with `from` and `to` in seconds after midnight.
+#'
+#' @keywords internal
+time_of_day_window <- function(from, to) {
+  from_secs <- string_to_seconds(from)
+  to_secs <- string_to_seconds(to)
+
+  if (from_secs >= to_secs) {
+    cli::cli_abort(
+      paste0(
+        "{.arg from} ({.val {from}}) must be earlier than {.arg to} ",
+        "({.val {to}})."
+      ),
+      class = "gtfstools_invalid_time_of_day",
+      call = parent.frame()
+    )
+  }
+
+  return(c(from_secs, to_secs))
 }

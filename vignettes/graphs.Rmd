@@ -27,16 +27,19 @@ knitr::opts_chunk$set(
 Sys.setenv(OMP_THREAD_LIMIT = 2)
 data.table::setDTthreads(2)
 
-library(gtfstools)
 ```
 
-Many transport analyses, such as transit assignment models and the
-centrality of stops, are carried out on a graph of the transit network rather
-than on its timetable. `build_graph()` builds such a graph from the trips of a
-GTFS feed that depart within a time of day. The graph has two types of nodes:
+Many transport analyses, such as network centrality and transit assignment 
+models, are carried out on a graph of the transit network rather than on 
+its timetable. `build_graph()` builds such a graph from the trips of a
+GTFS feed that depart within a period of day. The graph has two types of 
+nodes:
 
-- **stop** nodes, one for each stop visited by these trips;
-- **service** nodes, one for each route and direction at each of its stops.
+- **stop** nodes, one per stop, the physical place where a passenger stands;
+- **service** nodes, one for each route and direction at each stop it serves. 
+
+obs. this way, a stop served by routes 1 and 2, both in one direction, gets 
+*one stop node* and *two service nodes*, all at the same coordinates.
 
 And four types of links:
 
@@ -48,50 +51,59 @@ And four types of links:
 - **alighting** links from each service node back to its stop;
 - walking **transfer** links between nearby stops.
 
-The graph can be returned as the tables of the General Modeling Network
+The graph can be returned as tables following the General Modeling Network
 Specification (GMNS), or as an `{igraph}` or `{tidygraph}` graph. This vignette
-shows how to build it and how to analyse and plot it with these packages and
-with `{sfnetworks}` and `{ggraph}`. Please see the documentation of
-`build_graph()` for the details of how nodes and links are built.
+shows how to build a transit network graph from GTFS feeds and how to analyse and plot the network with these packages like `{sfnetworks}` and `{ggraph}`. Please see the documentation of `build_graph()` for the details of how nodes and links are built.
 
 # Preparing the feed
 
 We will use the sample feed of Porto Alegre, included in the package, and build
-the network of the morning peak, from 8am to 10am. `build_graph()` pools the
-trips of every service in the feed, so first we keep only the services that
-run on Wednesdays with `filter_by_weekday()`:
+the network of the morning peak, from 7am to 10am. `build_graph()` pools the
+trips of every service in the feed. In this example, we will remove services running on weekends with `filter_by_weekday()`:
 
 ```{r}
+library(gtfstools)
+library(dplyr)
+
 path <- system.file("extdata/poa_gtfs.zip", package = "gtfstools")
 gtfs <- read_gtfs(path)
 
-gtfs <- filter_by_weekday(gtfs, "wednesday")
+gtfs <- filter_by_weekday(
+  gtfs,
+  weekday = c("saturday", "sunday"), 
+  keep = FALSE
+  )
 ```
 
-This feed lists only the times of the first and the last stop of each trip,
-and the links between stops without times would have no travel time, so they
-couldn't be used to calculate travel times through the network. So we fill the
-missing times with `interpolate_stop_times()`. Its warning refers to a few late
-night trips whose times go back to "00:00:00" after midnight, which depart
-outside the time of day used below:
+Oftentimes, a GTFS feed comes with a few inconsistencies, such as duplicated 
+trips, unused stops, etc. This particular feed lists only the times of the 
+first and the last stop of each trip, and the links between stops without times would have no travel time, so they couldn't be used to calculate travel times through the network. Here we will use the `fix_gtfs()` function to fix several 
+of these inconsistencies. Its warning refers to a few late night trips whose 
+times go back to "00:00:00" after midnight, which depart outside the time of 
+day used below:
 
-```{r}
-gtfs <- interpolate_stop_times(gtfs)
+```{r, warning = FALSE, message = FALSE}
+gtfs <- fix_gtfs(gtfs, max_speed = 25)
 ```
 
-# Building the network
+# Building a GMNS network
 
 By default, `build_graph()` returns the GMNS `node`, `link` and `config`
 tables:
 
 ```{r}
-graph <- build_graph(gtfs, from = "08:00:00", to = "10:00:00")
+g_gmns <- build_graph(
+  gtfs, 
+  from = "07:00:00", 
+  to = "10:00:00", 
+  format = "gmns"
+  )
 
-head(graph$node)
+head(g_gmns$node)
 
-head(graph$link)
+head(g_gmns$link)
 
-graph$link |>
+g_gmns$link |>
   dplyr::count(link_type)
 ```
 
@@ -99,7 +111,8 @@ The tables can be written to the CSV files of a GMNS network with
 `data.table::fwrite()`, as shown in the examples of `build_graph()`, and then
 read by other modelling software.
 
-# Calculating the centrality of stops with igraph
+
+# Building and igraph and Calculating the centrality of stops
 
 With `format = "igraph"`, the network is returned as an `{igraph}` graph, whose
 links have the travel time as an attribute. We use it to calculate the shortest
@@ -107,25 +120,36 @@ travel times between every pair of stops, which include the waiting time at
 the stops where vehicles are boarded:
 
 ```{r, eval = has_igraph}
-g <- build_graph(gtfs, from = "08:00:00", to = "10:00:00", format = "igraph")
+library(igraph)
 
-stop_nodes <- igraph::V(g)[igraph::V(g)$node_type == "stop"]
+g_igraph <- build_graph(
+  gtfs, 
+  from = "07:00:00", 
+  to = "10:00:00", 
+  format = "igraph"
+  )
 
+# get stop nodes
+# stop_nodes <- igraph::V(g_igraph)[igraph::V(g_igraph)$node_type == "stop"]
+stop_nodes <- igraph::V(g_igraph)[node_type == "stop"]
+
+# get travel times between stops
 travel_times <- igraph::distances(
-  g,
+  g_igraph,
   v = stop_nodes,
   to = stop_nodes,
   mode = "out",
-  weights = igraph::E(g)$travel_time
+  weights = igraph::E(g_igraph)$travel_time
 )
+
+# travel time from one stop to itself is NA
+# an `Inf` value means {igraph} found no path for a given origin-destination pair.
 diag(travel_times) <- NA
 ```
 
-From these travel times, we calculate the harmonic closeness of each stop: the
-mean of the inverse of the travel times between it and the other stops, in
-which the stops that can't be reached count as 0. We don't use the centrality
-functions of `{igraph}`, such as `closeness()`, because they would also take
-the service nodes as destinations, and because they require positive weights,
+From these travel times, we calculate the closeness centrality of each stop, 
+which tell us how close a node is to all other nodes in the network. To do 
+this, we calculate harmonic mean of the inverse of the travel times between each stop and the other stops. Stops that can't be reached count as 0. We don't use the centrality functions of `{igraph}`, such as `closeness()`, because they would also take the service nodes as destinations, and because they require positive weights,
 while alighting links have a travel time of 0. This sample feed has a single
 direction of each route, so the closeness *from* a stop depends on how far it
 is from the end of its routes, and the closeness *to* it on how far it is from
@@ -153,6 +177,9 @@ to plot the network with `{ggraph}`:
 ```{r, eval = has_viz, message = FALSE, warning = FALSE}
 library(ggplot2)
 library(ggraph)
+library(tidygraph)
+library(sfnetworks)
+
 ```
 
 ```{r, eval = has_viz, fig.width = 7, fig.height = 5, dpi = 96}
@@ -182,6 +209,7 @@ net <- a |>
     edges_as_lines = TRUE,
     message = FALSE
   )
+  
 net
 ```
 

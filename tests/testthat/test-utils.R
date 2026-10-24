@@ -20,6 +20,13 @@ test_that("calculates seconds adequately", {
   expect_identical(string_to_seconds("00:00:00"), 0L)
   expect_identical(string_to_seconds("25:00:00"), 90000L)
   expect_identical(string_to_seconds("01:01:01"), 3661L)
+  expect_identical(
+    string_to_seconds(
+      c(" 07:05:09 ", "\t07:05:09\r\n", "7:05:09", "000000001:00:00",
+        "596523:14:07")
+    ),
+    c(25509L, 25509L, 25509L, 3600L, .Machine$integer.max)
+  )
 })
 
 test_that("handles repeated values and counts malformed strings per row", {
@@ -30,6 +37,29 @@ test_that("handles repeated values and counts malformed strings per row", {
     class = "gtfstools_malformed_time"
   )
   expect_identical(result, c(NA, 28800L, NA, NA, NA, 28800L, NA, NA))
+
+  malformed <- c(
+    "596523:14:08", "1234567890:00:00", "08:60:00", "08:00:60", "08:0:00",
+    "08:00", "08:00:00:00", ":00:00", "08 :00:00", "08:00:00 x", "08:00:00\f"
+  )
+  expect_warning(
+    result <- string_to_seconds(malformed),
+    regexp = "^11 malformed time strings",
+    class = "gtfstools_malformed_time"
+  )
+  expect_identical(result, rep(NA_integer_, 11))
+
+  # non-ASCII strings marked as "bytes" can't be translated to UTF-8, but are
+  # just malformed times
+
+  bytes_string <- rawToChar(c(charToRaw("08:00:00"), as.raw(0xff)))
+  Encoding(bytes_string) <- "bytes"
+  expect_warning(
+    result <- string_to_seconds(c("08:00:00", bytes_string)),
+    regexp = "^1 malformed time string",
+    class = "gtfstools_malformed_time"
+  )
+  expect_identical(result, c(28800L, NA))
 
   expect_identical(string_to_seconds(character(0)), integer(0))
 })
