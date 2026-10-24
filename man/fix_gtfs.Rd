@@ -4,25 +4,40 @@
 \alias{fix_gtfs}
 \title{Fix common problems in GTFS feeds}
 \usage{
-fix_gtfs(gtfs, max_speed = NULL, unit = "km/h")
+fix_gtfs(
+  gtfs,
+  max_speed = NULL,
+  speed_unit = "km/h",
+  min_dwell_time = NULL,
+  dwell_time_unit = "s"
+)
 }
 \arguments{
 \item{gtfs}{A GTFS object, as created by \code{\link[=read_gtfs]{read_gtfs()}}.}
 
 \item{max_speed}{A number. The maximum speed of trips, in the unit given by
-\code{unit}. If \code{NULL} (the default), speeds are not capped.}
+\code{speed_unit}. If \code{NULL} (the default), speeds are not capped.}
 
-\item{unit}{A string representing the unit in which \code{max_speed} is given.
-One of \code{"km/h"} (the default), \code{"m/s"} or \code{"mph"} (miles per hour).}
+\item{speed_unit}{A string representing the unit in which \code{max_speed} is
+given. One of \code{"km/h"} (the default), \code{"m/s"} or \code{"mph"} (miles per hour).}
+
+\item{min_dwell_time}{A non-negative number. The minimum time vehicles
+remain stopped at each intermediate stop of their trips, with their doors
+open to serve passengers, in the unit given by \code{dwell_time_unit}. If
+\code{NULL} (the default), dwell times are not changed.}
+
+\item{dwell_time_unit}{A string representing the time unit in which
+\code{min_dwell_time} is given. One of \code{"s"} (seconds, the default), \code{"min"}
+(minutes), \code{"h"} (hours) or \code{"d"} (days).}
 }
 \value{
 The fixed GTFS object.
 }
 \description{
 Cleans a GTFS feed in one call, by removing duplicated entries and unused
-ids, optionally capping the speed of trips, filling blank stop times and
-recalculating the distances travelled along shapes (replacing any existing
-ones).
+ids, optionally capping the speed of trips, filling blank stop times,
+optionally setting a minimum dwell time at stops and recalculating the
+distances travelled along shapes (replacing any existing ones).
 }
 \section{Details}{
 
@@ -43,6 +58,16 @@ stops around them. Speeds are capped before interpolating, so the filled
 times follow the capped times. Interpolated times are rounded to the
 second. Stops whose times can't be interpolated are left blank, with a
 warning;
+\item \code{\link[=set_dwell_time]{set_dwell_time()}}, only if \code{min_dwell_time} is given, delays the
+departure from each intermediate stop whose dwell time is shorter than
+\code{min_dwell_time}, so that vehicles stay there for at least that long.
+The minimum is rounded to the second. The later times of each changed
+trip are shifted accordingly, so the trip ends later (for trips listed
+in \code{frequencies}, every departure gets longer). This is done after
+filling blank times, so the filled stops also get the minimum. The
+first and last stops with times of each trip are left unchanged, so
+trips keep their start times, as are stops whose departure is earlier
+than their arrival (e.g. times after midnight written as \code{"00:30:00"});
 \item \code{\link[=interpolate_shape_dist_traveled]{interpolate_shape_dist_traveled()}}, only if the feed has a \code{shapes}
 table and \code{trips} has a \code{shape_id} column, replaces the
 \code{shape_dist_traveled} columns of \code{stop_times} and \code{shapes} with the
@@ -69,9 +94,10 @@ data_path <- system.file("extdata/spo_gtfs.zip", package = "gtfstools")
 
 gtfs <- read_gtfs(data_path)
 
-fixed_gtfs <- fix_gtfs(gtfs, max_speed = 40)
+fixed_gtfs <- fix_gtfs(gtfs, max_speed = 40, min_dwell_time = 30)
 
-# duplicated agencies were removed, and the trip is now slower
+# duplicated agencies were removed, and the trip is now slower and stays at
+# least 30 seconds at each intermediate stop
 gtfs$agency
 fixed_gtfs$agency
 
@@ -87,5 +113,6 @@ fixed_gtfs$stop_times |>
 }
 \seealso{
 \code{\link[=remove_duplicates]{remove_duplicates()}}, \code{\link[=remove_unused_ids]{remove_unused_ids()}}, \code{\link[=set_max_speed]{set_max_speed()}},
-\code{\link[=interpolate_stop_times]{interpolate_stop_times()}}, \code{\link[=interpolate_shape_dist_traveled]{interpolate_shape_dist_traveled()}}
+\code{\link[=interpolate_stop_times]{interpolate_stop_times()}}, \code{\link[=set_dwell_time]{set_dwell_time()}},
+\code{\link[=interpolate_shape_dist_traveled]{interpolate_shape_dist_traveled()}}
 }

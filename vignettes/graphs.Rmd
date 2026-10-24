@@ -78,13 +78,14 @@ gtfs <- filter_by_weekday(
 Oftentimes, a GTFS feed comes with a few inconsistencies, such as duplicated 
 trips, unused stops, etc. This particular feed lists only the times of the 
 first and the last stop of each trip, and the links between stops without times would have no travel time, so they couldn't be used to calculate travel times through the network. Here we will use the `fix_gtfs()` function to fix several 
-of these inconsistencies. Its warning refers to a few late night trips whose 
-times go back to "00:00:00" after midnight, which depart outside the time of 
-day used below:
+of these inconsistencies. We also want to ensure that no trips exceed 25 km/h and that all trips have a minimum dwell time of 30 seconds to allow passengers to board and alight.
 
 ```{r, warning = FALSE, message = FALSE}
-gtfs <- fix_gtfs(gtfs, max_speed = 25)
+gtfs <- fix_gtfs(gtfs)
 ```
+
+obs. in this case, `fix_gtfs()` throws a warning that refers to a few late night trips whose times go back to "00:00:00" after midnight, which depart outside the time of day used below:
+
 
 # Building a GMNS network
 
@@ -209,7 +210,7 @@ net <- a |>
     edges_as_lines = TRUE,
     message = FALSE
   )
-  
+
 net
 ```
 

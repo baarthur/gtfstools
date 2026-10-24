@@ -36,8 +36,55 @@ hand_feed <- function() {
 
 hand_gtfs <- hand_feed()
 
-tester <- function(gtfs = hand_gtfs, max_speed = 30, unit = "km/h") {
-  fix_gtfs(gtfs, max_speed, unit)
+# creates a feed with three trips whose intermediate stops have dwell times
+# below and above 30 seconds. trip A has a stop whose departure is written as
+# "00:01:00", after midnight, and trip C visits stop Y twice
+
+dwell_feed <- function() {
+  feed <- list(
+    routes = data.table::data.table(route_id = "r1"),
+    trips = data.table::data.table(
+      trip_id = c("A", "B", "C"),
+      route_id = "r1"
+    ),
+    stops = data.table::data.table(
+      stop_id = c("s0", "X", "Y", "Z", "s9"),
+      stop_lat = 0,
+      stop_lon = c(0, 0.01, 0.02, 0.03, 0.04)
+    ),
+    stop_times = data.table::data.table(
+      trip_id = rep(c("A", "B", "C"), c(5, 3, 4)),
+      arrival_time = c(
+        "08:00:00", "08:05:00", "08:10:00", "23:59:00", "24:10:00",
+        "09:00:00", "09:05:00", "09:10:00",
+        "10:00:00", "10:05:00", "10:10:00", "10:20:00"
+      ),
+      departure_time = c(
+        "08:00:00", "08:05:00", "08:12:00", "00:01:00", "24:10:00",
+        "09:00:00", "09:05:00", "09:10:00",
+        "10:00:00", "10:05:00", "10:12:00", "10:20:00"
+      ),
+      stop_id = c(
+        "s0", "X", "Y", "Z", "s9",
+        "s0", "Y", "s9",
+        "s0", "Y", "Y", "s9"
+      ),
+      stop_sequence = c(1:5, 1:3, 1:4)
+    )
+  )
+
+  return(gtfsio::new_gtfs(feed, "dt_gtfs"))
+}
+
+dwell_gtfs <- dwell_feed()
+
+spo_path <- system.file("extdata/spo_gtfs.zip", package = "gtfstools")
+
+tester <- function(gtfs = hand_gtfs,
+                   max_speed = 30,
+                   speed_unit = "km/h",
+                   ...) {
+  fix_gtfs(gtfs, max_speed, speed_unit, ...)
 }
 
 secs <- function(x) string_to_seconds(x)
@@ -48,7 +95,12 @@ test_that("raises error due to incorrect input types", {
   expect_error(tester(unclass(hand_gtfs)))
   expect_error(tester(max_speed = -1))
   expect_error(tester(max_speed = NA_real_))
-  expect_error(tester(unit = "kms/h"))
+  expect_error(tester(speed_unit = "kms/h"), regexp = "speed_unit")
+  expect_error(tester(min_dwell_time = -1), regexp = "min_dwell_time")
+  expect_error(
+    tester(min_dwell_time = 30, dwell_time_unit = "sec"),
+    regexp = "dwell_time_unit"
+  )
 })
 
 test_that("raises errors if gtfs doesn't have required tables", {
@@ -74,6 +126,18 @@ test_that("results in a dt_gtfs object and doesn't change given gtfs", {
   result <- tester(gtfs)
   expect_s3_class(result, "dt_gtfs")
   expect_equal(original_gtfs, gtfs, ignore_attr = TRUE)
+
+  # spo has neither duplicated stop times nor blank times, so its dwell times
+  # are set in the table returned by remove_duplicates(), not in a copy made
+  # by a later step
+
+  original_spo <- read_gtfs(spo_path)
+  spo <- read_gtfs(spo_path)
+  result <- tester(spo, max_speed = NULL, min_dwell_time = 30)
+  expect_false(
+    identical(result$stop_times$departure_time, spo$stop_times$departure_time)
+  )
+  expect_equal(original_spo, spo, ignore_attr = TRUE)
 })
 
 test_that("removes duplicated entries and unused ids", {
@@ -122,6 +186,58 @@ test_that("doesn't cap speeds if max_speed is NULL", {
   expect_false(anyNA(secs(times$arrival_time)))
 })
 
+test_that("sets a minimum dwell time at intermediate stops", {
+  result <- tester(dwell_gtfs, max_speed = NULL, min_dwell_time = 30)
+  times <- result$stop_times
+
+  # dwell times below 30 seconds are raised and the later times shifted.
+  # longer and negative dwell times are kept, and so are the first and last
+  # stops of each trip
+
+  expect_identical(
+    times$arrival_time,
+    c(
+      "08:00:00", "08:05:00", "08:10:30", "23:59:30", "24:10:30",
+      "09:00:00", "09:05:00", "09:10:30",
+      "10:00:00", "10:05:00", "10:10:30", "10:20:30"
+    )
+  )
+  expect_identical(
+    times$departure_time,
+    c(
+      "08:00:00", "08:05:30", "08:12:30", "00:01:30", "24:10:30",
+      "09:00:00", "09:05:30", "09:10:30",
+      "10:00:00", "10:05:30", "10:12:30", "10:20:30"
+    )
+  )
+  expect_identical(times$stop_id, dwell_gtfs$stop_times$stop_id)
+
+  # nothing is below the minimum anymore, so fixing the result again changes
+  # nothing
+
+  expect_no_warning(
+    fixed_again <- tester(result, max_speed = NULL, min_dwell_time = 30)
+  )
+  expect_identical(fixed_again, result)
+})
+
+test_that("sets the minimum dwell time at stops with interpolated times", {
+  without_min <- tester()
+  result <- tester(min_dwell_time = 10)
+
+  expect_identical(nrow(result$stop_times), 6L)
+  expect_identical(result$stop_times$stop_id, paste0("s", 1:6))
+  expect_identical(
+    get_dwell_time(result)$dwell_time,
+    c(0, 10, 10, 10, 10, 0)
+  )
+  expect_identical(result$stop_times$departure_time[1], "08:00:00")
+  expect_identical(
+    secs(result$stop_times$arrival_time[6]),
+    secs(without_min$stop_times$arrival_time[6]) + 40L
+  )
+})
+
 test_that("works without shapes, with a warning", {
   no_shapes <- copy_gtfs_without_file(hand_gtfs, "shapes")
   warnings <- capture_warnings(result <- tester(no_shapes))
@@ -155,7 +271,8 @@ test_that("fills shape_dist_traveled, only in feeds with shapes", {
 
 test_that("doesn't make up times for trips that end before they start", {
   # some trips of this feed have times after midnight written as "00:xx:xx",
-  # so their times are not interpolated nor capped
+  # so their times are not interpolated nor capped. only their first and last
+  # stops have times, so no minimum dwell time is set either
 
   poa_gtfs <- read_gtfs(
     system.file("extdata/poa_gtfs.zip", package = "gtfstools")
@@ -164,7 +281,7 @@ test_that("doesn't make up times for trips that end before they start", {
 
   warning_classes <- character(0)
   result <- withCallingHandlers(
-    tester(poa_gtfs, max_speed = 30),
+    tester(poa_gtfs, max_speed = 30, min_dwell_time = 30),
     warning = function(w) {
       warning_classes <<- c(warning_classes, class(w))
       invokeRestart("muffleWarning")
@@ -186,9 +303,14 @@ test_that("doesn't make up times for trips that end before they start", {
   )
 })
 
-test_that("unit argument works correctly", {
+test_that("unit arguments work correctly", {
   expect_identical(
     tester(max_speed = 36),
-    tester(max_speed = 10, unit = "m/s")
+    tester(max_speed = 10, speed_unit = "m/s")
   )
+  expect_identical(
+    tester(min_dwell_time = 1, dwell_time_unit = "min"),
+    tester(min_dwell_time = 60)
+  )
+  expect_identical(tester(min_dwell_time = 0), tester())
 })

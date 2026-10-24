@@ -39,7 +39,7 @@ GTFS feeds describe the transit services of a city or region as they are. Quite 
 - `merge_gtfs()`: combines several feeds into a single one;
 - `remove_duplicates()`: removes duplicated entries from the feed's tables;
 - `remove_unused_ids()`: removes the ids that the feed doesn't use, with their entries in every table;
-- `fix_gtfs()`: cleans a feed in one call, removing duplicated entries and unused ids, optionally capping the speed of trips, filling blank stop times and recalculating the distances travelled along shapes (replacing any existing ones).
+- `fix_gtfs()`: cleans a feed in one call, removing duplicated entries and unused ids, optionally capping the speed of trips, filling blank stop times, optionally setting a minimum dwell time at stops and recalculating the distances travelled along shapes (replacing any existing ones).
 
 This vignette will introduce you to the first four functions and will cover their usage in detail. By default, they return an edited copy of the feed and leave the given GTFS object unchanged.
 

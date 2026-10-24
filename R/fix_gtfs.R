@@ -1,19 +1,22 @@
 #' Fix common problems in GTFS feeds
 #'
 #' Cleans a GTFS feed in one call, by removing duplicated entries and unused
-#' ids, optionally capping the speed of trips, filling blank stop times and
-#' recalculating the distances travelled along shapes (replacing any existing
-#' ones).
+#' ids, optionally capping the speed of trips, filling blank stop times,
+#' optionally setting a minimum dwell time at stops and recalculating the
+#' distances travelled along shapes (replacing any existing ones).
 #'
 #' @template gtfs
 #' @param max_speed A number. The maximum speed of trips, in the unit given by
-#'   `unit`. If `NULL` (the default), speeds are not capped.
-#' @param speed_unit A string representing the unit in which `max_speed` is given.
-#'   One of `"km/h"` (the default), `"m/s"` or `"mph"` (miles per hour).
-#' @param min_dwell_time A number. The minimum time vehicles remains stopped at
-#'   stops/stations with its doors open to serve passengers.
-#' @param dwell_time_unit A string representing the unit in which `min_dwell_time`
-#'   is given. Defaults to `"s"` seconds.
+#'   `speed_unit`. If `NULL` (the default), speeds are not capped.
+#' @param speed_unit A string representing the unit in which `max_speed` is
+#'   given. One of `"km/h"` (the default), `"m/s"` or `"mph"` (miles per hour).
+#' @param min_dwell_time A non-negative number. The minimum time vehicles
+#'   remain stopped at each intermediate stop of their trips, with their doors
+#'   open to serve passengers, in the unit given by `dwell_time_unit`. If
+#'   `NULL` (the default), dwell times are not changed.
+#' @param dwell_time_unit A string representing the time unit in which
+#'   `min_dwell_time` is given. One of `"s"` (seconds, the default), `"min"`
+#'   (minutes), `"h"` (hours) or `"d"` (days).
 #'
 #' @return The fixed GTFS object.
 #'
@@ -35,7 +38,17 @@
 #'    times follow the capped times. Interpolated times are rounded to the
 #'    second. Stops whose times can't be interpolated are left blank, with a
 #'    warning;
-#' 5. [interpolate_shape_dist_traveled()], only if the feed has a `shapes`
+#' 5. [set_dwell_time()], only if `min_dwell_time` is given, delays the
+#'    departure from each intermediate stop whose dwell time is shorter than
+#'    `min_dwell_time`, so that vehicles stay there for at least that long.
+#'    The minimum is rounded to the second. The later times of each changed
+#'    trip are shifted accordingly, so the trip ends later (for trips listed
+#'    in `frequencies`, every departure gets longer). This is done after
+#'    filling blank times, so the filled stops also get the minimum. The
+#'    first and last stops with times of each trip are left unchanged, so
+#'    trips keep their start times, as are stops whose departure is earlier
+#'    than their arrival (e.g. times after midnight written as `"00:30:00"`);
+#' 6. [interpolate_shape_dist_traveled()], only if the feed has a `shapes`
 #'    table and `trips` has a `shape_id` column, replaces the
 #'    `shape_dist_traveled` columns of `stop_times` and `shapes` with the
 #'    distances, in meters, from the start of each shape. Existing values,
@@ -49,7 +62,8 @@
 #' raised more than once.
 #'
 #' @seealso [remove_duplicates()], [remove_unused_ids()], [set_max_speed()],
-#'   [interpolate_stop_times()], [interpolate_shape_dist_traveled()]
+#'   [interpolate_stop_times()], [set_dwell_time()],
+#'   [interpolate_shape_dist_traveled()]
 #'
 #' @examplesIf requireNamespace("dplyr", quietly = TRUE)
 #' \dontshow{
@@ -61,9 +75,10 @@
 #'
 #' gtfs <- read_gtfs(data_path)
 #'
-#' fixed_gtfs <- fix_gtfs(gtfs, max_speed = 40)
+#' fixed_gtfs <- fix_gtfs(gtfs, max_speed = 40, min_dwell_time = 30)
 #'
-#' # duplicated agencies were removed, and the trip is now slower
+#' # duplicated agencies were removed, and the trip is now slower and stays at
+#' # least 30 seconds at each intermediate stop
 #' gtfs$agency
 #' fixed_gtfs$agency
 #'
@@ -92,9 +107,23 @@ fix_gtfs <- function(
     null.ok = TRUE
   )
   checkmate::assert(
-    checkmate::check_string(unit),
-    checkmate::check_names(unit, subset.of = c("km/h", "m/s", "mph")),
+    checkmate::check_string(speed_unit),
+    checkmate::check_names(speed_unit, subset.of = c("km/h", "m/s", "mph")),
     combine = "and"
+  )
+  checkmate::assert(
+    checkmate::check_string(dwell_time_unit),
+    checkmate::check_names(
+      dwell_time_unit,
+      subset.of = names(dwell_unit_factors)
+    ),
+    combine = "and"
+  )
+  checkmate::assert_number(
+    min_dwell_time,
+    lower = 0,
+    upper = max_time_secs / dwell_unit_factors[[dwell_time_unit]],
+    null.ok = TRUE
   )
 
   # remove duplicates first, so the other steps don't see repeated rows
@@ -109,30 +138,57 @@ fix_gtfs <- function(
   # times follow the capped times
 
   if (!is.null(max_speed)) {
-    gtfs_fixed <- set_max_speed(gtfs_fixed, max_speed = max_speed, unit = unit)
-  }
-
-  # set min dwell_time
-  if (!is.null(min_dwell_time)) {
-    # find which trips and stops are below min_dwell_time
-    all_dwell_times <- get_dwell_time(gtfs_fixed)
-    dwell_times_below_min <- all_dwell_times[
-      dwell_time < min_dwell_time,
-      .(trip_id, stop_id)
-    ]
-
-    gtfs_fixed <- set_dwell_time(
-      gtfs,
-      trip_id = dwell_times_below_min$trip_id,
-      stop_id = dwell_times_below_min$stop_id,
-      dwell_time = min_dwell_time,
-      unit = dwell_time_unit
+    gtfs_fixed <- set_max_speed(
+      gtfs_fixed,
+      max_speed = max_speed,
+      unit = speed_unit
     )
   }
 
   # interpolate stop_times
 
   gtfs_fixed <- interpolate_stop_times(gtfs_fixed)
+
+  # set a minimum dwell time at intermediate stops. this is done after
+  # interpolating, so the filled stops also get it. set_dwell_time() sets
+  # every given trip at every given stop, so each row temporarily gets a
+  # unique stop_id to select visits one by one. 'stop_times' is not the
+  # caller's table: the earlier steps return new tables
+
+  min_secs <- 0
+  if (!is.null(min_dwell_time)) {
+    min_secs <- round(min_dwell_time * dwell_unit_factors[[dwell_time_unit]])
+  }
+
+  if (min_secs > 0) {
+    original_stop_id <- gtfs_fixed$stop_times$stop_id
+    gtfs_fixed$stop_times[, stop_id := as.character(.I)]
+
+    # the first and last visits with times are left unchanged, so trips keep
+    # their start times. negative dwell times (e.g. times after midnight
+    # written as "00:30:00") are left unchanged too
+
+    dwell <- get_dwell_time(gtfs_fixed)
+    dwell <- dwell[
+      !is.na(dwell_time) & !is.na(trip_id) & !is.na(stop_sequence)
+    ]
+    is_middle <- duplicated(dwell$trip_id) &
+      duplicated(dwell$trip_id, fromLast = TRUE)
+    to_raise <- dwell$stop_id[
+      is_middle & dwell$dwell_time >= 0 & dwell$dwell_time < min_secs
+    ]
+
+    if (length(to_raise) > 0) {
+      set_dwell_time(
+        gtfs_fixed,
+        stop_id = to_raise,
+        dwell_time = min_secs,
+        by_reference = TRUE
+      )
+    }
+
+    gtfs_fixed$stop_times[, stop_id := original_stop_id]
+  }
 
   # interpolate shape_dist_traveled. feeds without shapes have nothing to be
   # measured along, so the step is skipped
