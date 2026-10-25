@@ -15,23 +15,24 @@
 #'   the whole period covered by the feed is described.
 #' @param route_id A character vector. If given, only these routes are
 #'   described. If `NULL` (the default), all routes are described.
-#' @param mode An integer vector of `route_type`s (see
-#'   [filter_by_route_type()]) or a character vector of mode names (`"tram"`,
-#'   `"subway"`, `"rail"`, `"bus"`, `"ferry"`, `"cable_tram"`, `"aerial_lift"`,
-#'   `"funicular"`, `"trolleybus"` and `"monorail"`, which correspond to the
-#'   basic `route_type`s). If given, only routes of these modes are described.
-#'   If `NULL` (the default), all modes are described.
-#' @param agency A character vector of `agency_id`s. If given, only the
+#' @param route_type An integer vector of `route_type`s (see
+#'   [filter_by_route_type()]) or, unlike in other functions, a character
+#'   vector of mode names (`"tram"`, `"subway"`, `"rail"`, `"bus"`, `"ferry"`,
+#'   `"cable_tram"`, `"aerial_lift"`, `"funicular"`, `"trolleybus"` and
+#'   `"monorail"`, which correspond to the basic `route_type`s). If given, only
+#'   routes of these modes are described. If `NULL` (the default), all modes
+#'   are described.
+#' @param agency_id A character vector of `agency_id`s. If given, only the
 #'   services of these agencies are described. If `NULL` (the default), all
 #'   agencies are described.
 #' @param from,to Strings in the `"HH:MM:SS"` format. If given (both must be),
 #'   only the trips that run within this time of day are described. If `NULL`
 #'   (the default), the whole day is described.
-#' @param output_dir A string. The directory in which the report is saved
+#' @param output_path A string. The directory in which the report is saved
 #'   (created if needed). If `NULL` (the default), a `gtfstools` directory
 #'   inside [tempdir()] is used. Existing reports in this directory are
 #'   overwritten.
-#' @param open_browser A logical. Whether to open the HTML report in the
+#' @param html_preview A logical. Whether to open the HTML report in the
 #'   browser, in interactive sessions (defaults to `TRUE`).
 #' @param by_route_type A logical. Whether to break down the totals, speeds,
 #'   distances and frequencies by transport mode (`route_type`), in addition
@@ -82,7 +83,7 @@
 #'   travelled).
 #'
 #'   The report is saved as `gtfs_summary.md` and `gtfs_summary.html`
-#'   (together with its figures) in `output_dir`.
+#'   (together with its figures) in `output_path`.
 #'
 #' @section Details:
 #' The report requires the `{ggplot2}`, `{knitr}` and `{rmarkdown}` packages,
@@ -108,14 +109,14 @@
 #' are the given `date`s or, if `date` is `NULL`, every day on which the
 #' selected services run, and `vkt_daily_mean` is the mean over those on which
 #' at least one counted departure runs. With `from` and `to`, only the
-#' departures at or after `from` and before `to` are counted, as listed in the
-#' feed before it is filtered by time of day, so selected trips that depart
-#' before `from` add nothing to the VKT. If no selected trip departs on the
-#' counted days (within the time of day), `vkt_total` and `vkt_daily_mean` are
-#' `NA`. An error is raised if the `frequencies` table has invalid entries for
-#' selected trips that run on the counted days. With `unit = "mph"`, the VKT
-#' are instead the vehicle-miles travelled (VMT), as in [get_vmt()], reported
-#' in the rows `vmt_total` and `vmt_daily_mean`.
+#' departures at or after `from` and at or before `to` are counted, as listed
+#' in the feed before it is filtered by time of day, so selected trips that
+#' depart before `from` add nothing to the VKT. If no selected trip departs on
+#' the counted days (within the time of day), `vkt_total` and `vkt_daily_mean`
+#' are `NA`. An error is raised if the `frequencies` table has invalid entries
+#' for selected trips that run on the counted days. With `unit = "mph"`, the
+#' VKT are instead the vehicle-miles travelled (VMT), as in [get_vmt()],
+#' reported in the rows `vmt_total` and `vmt_daily_mean`.
 #'
 #' The `services` summary and the calendar chart in the report describe the
 #' whole calendar of the selected services: when `date` is given, the
@@ -128,12 +129,13 @@
 #' by `direction_id`, if the field is present in the `trips` table), on a
 #' single day: the day with the most trips among the given `date`s, or in the
 #' whole feed if `date` is `NULL` (the earliest one, in case of ties). They
-#' are measured within the given time of day or, if `from` and `to` are
-#' `NULL`, from the first to the last departure of that day, rounded out to
-#' whole hours. Trips that start on the previous day and run after midnight
-#' are not counted, and times are in the local time of each agency.
+#' are measured within the given time of day (not including `to`, as in
+#' [get_route_frequency()], unlike the other indicators) or, if `from` and
+#' `to` are `NULL`, from the first to the last departure of that day, rounded
+#' out to whole hours. Trips that start on the previous day and run after
+#' midnight are not counted, and times are in the local time of each agency.
 #'
-#' With `by_route_type = TRUE`, modes are named as in the `mode` argument,
+#' With `by_route_type = TRUE`, modes are named as in the `route_type` argument,
 #' extended `route_type`s by their code, and trips whose `route_type` is
 #' unknown are grouped as `"unknown"`. Modes are ordered by `route_type`, with
 #' `"unknown"` last. Each mode is described as if it were selected alone
@@ -161,26 +163,26 @@
 #'
 #'   feed_summary <- get_summary(
 #'     data_path,
-#'     output_dir = tempdir(),
-#'     open_browser = FALSE
+#'     output_path = tempdir(),
+#'     html_preview = FALSE
 #'   )
 #'   feed_summary$totals
 #'
 #'   \donttest{
 #'   feed_summary <- get_summary(
 #'     data_path,
-#'     mode = "bus",
+#'     route_type = "bus",
 #'     from = "07:00:00",
 #'     to = "09:00:00",
-#'     output_dir = tempdir(),
-#'     open_browser = FALSE
+#'     output_path = tempdir(),
+#'     html_preview = FALSE
 #'   )
 #'   feed_summary$frequency
 #'
 #'   feed_summary <- get_summary(
 #'     data_path,
-#'     output_dir = tempdir(),
-#'     open_browser = FALSE,
+#'     output_path = tempdir(),
+#'     html_preview = FALSE,
 #'     by_route_type = TRUE
 #'   )
 #'   feed_summary$totals
@@ -192,12 +194,12 @@ get_summary <- function(
   gtfs,
   date = NULL,
   route_id = NULL,
-  mode = NULL,
-  agency = NULL,
+  route_type = NULL,
+  agency_id = NULL,
   from = NULL,
   to = NULL,
-  output_dir = NULL,
-  open_browser = TRUE,
+  output_path = NULL,
+  html_preview = TRUE,
   by_route_type = FALSE,
   unit = "km/h"
 ) {
@@ -226,14 +228,14 @@ get_summary <- function(
   }
   checkmate::assert_character(route_id, any.missing = FALSE, null.ok = TRUE)
   checkmate::assert(
-    checkmate::check_null(mode),
-    checkmate::check_integerish(mode, any.missing = FALSE, min.len = 1),
-    checkmate::check_character(mode, any.missing = FALSE, min.len = 1),
-    .var.name = "mode"
+    checkmate::check_null(route_type),
+    checkmate::check_integerish(route_type, any.missing = FALSE, min.len = 1),
+    checkmate::check_character(route_type, any.missing = FALSE, min.len = 1),
+    .var.name = "route_type"
   )
-  checkmate::assert_character(agency, any.missing = FALSE, null.ok = TRUE)
-  checkmate::assert_string(output_dir, null.ok = TRUE)
-  checkmate::assert_flag(open_browser)
+  checkmate::assert_character(agency_id, any.missing = FALSE, null.ok = TRUE)
+  checkmate::assert_string(output_path, null.ok = TRUE)
+  checkmate::assert_flag(html_preview)
   checkmate::assert_flag(by_route_type)
   checkmate::assert(
     checkmate::check_string(unit),
@@ -270,15 +272,15 @@ get_summary <- function(
     trolleybus = 11L,
     monorail = 12L
   )
-  if (is.character(mode)) {
-    checkmate::assert_names(mode, subset.of = names(mode_route_types))
-    route_type <- unname(mode_route_types[mode])
+  if (is.character(route_type)) {
+    checkmate::assert_names(route_type, subset.of = names(mode_route_types))
+    route_type_codes <- unname(mode_route_types[route_type])
   } else {
-    route_type <- mode
+    route_type_codes <- route_type
   }
 
-  if (is.null(output_dir)) {
-    output_dir <- file.path(tempdir(), "gtfstools")
+  if (is.null(output_path)) {
+    output_path <- file.path(tempdir(), "gtfstools")
   }
 
   progress_bar <- cli::cli_progress_bar(
@@ -311,12 +313,12 @@ get_summary <- function(
   # filter_by_agency_id() doesn't filter the routes of feeds whose 'routes'
   # table has no agency_id field, so unknown agencies are caught beforehand
 
-  if (!is.null(agency)) {
-    invalid_agency <- agency[!agency %chin% gtfs$agency$agency_id]
+  if (!is.null(agency_id)) {
+    invalid_agency <- agency_id[!agency_id %chin% gtfs$agency$agency_id]
 
     if (length(invalid_agency) > 0) {
       cli::cli_abort(
-        "{.arg agency} contains agency_id{?s} not listed in {.file agency}:
+        "{.arg agency_id} contains agency_id{?s} not listed in {.file agency}:
          {.val {invalid_agency}}.",
         class = "gtfstools_invalid_agency_id_error"
       )
@@ -326,18 +328,18 @@ get_summary <- function(
   cli::cli_progress_update(id = progress_bar, status = "Applying filters")
 
   feed <- gtfs
-  if (!is.null(agency)) {
+  if (!is.null(agency_id)) {
     # feeds whose routes' agency_id is missing or blank have a single agency
     # (the up-front check ensures it's the given one), so they're not filtered
 
     route_agencies <- feed$routes$agency_id
     route_agencies <- route_agencies[!is.na(route_agencies)]
     if (any(route_agencies != "")) {
-      feed <- filter_by_agency_id(feed, agency)
+      feed <- filter_by_agency_id(feed, agency_id)
     }
   }
-  if (!is.null(route_type)) {
-    feed <- filter_by_route_type(feed, route_type)
+  if (!is.null(route_type_codes)) {
+    feed <- filter_by_route_type(feed, route_type_codes)
   }
   if (!is.null(route_id)) {
     feed <- filter_by_route_id(feed, route_id)
@@ -357,8 +359,8 @@ get_summary <- function(
 
   if (NROW(feed$trips) == 0) {
     cli::cli_abort(
-      "No trips match the given {.arg date}, {.arg route_id}, {.arg mode},
-       {.arg agency}, {.arg from} and {.arg to}.",
+      "No trips match the given {.arg date}, {.arg route_id},
+       {.arg route_type}, {.arg agency_id}, {.arg from} and {.arg to}.",
       class = "gtfstools_empty_selection_error"
     )
   }
@@ -734,8 +736,8 @@ get_summary <- function(
   selection <- list(
     date = if (is.null(date)) NULL else format(date),
     route_id = route_id,
-    mode = mode,
-    agency = agency,
+    route_type = route_type,
+    agency_id = agency_id,
     time_of_day = if (is.null(from)) NULL else paste(from, "-", to)
   )
   values <- list(
@@ -745,11 +747,11 @@ get_summary <- function(
     calendar = calendar_plot,
     modes = plot_modes
   )
-  report_path <- write_summary_report(result, values, selection, output_dir)
+  report_path <- write_summary_report(result, values, selection, output_path)
 
   cli::cli_progress_done(id = progress_bar)
 
-  if (open_browser && interactive()) {
+  if (html_preview && interactive()) {
     utils::browseURL(report_path)
     return(invisible(result))
   }

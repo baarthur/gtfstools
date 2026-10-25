@@ -117,7 +117,7 @@ get_route_speed(gtfs, route_id = c("CPTM L07", "2002-10"))
 `get_summary()` runs a set of diagnostics on a feed, such as the number of routes, trips and stops, and the distributions of trip speeds, lengths and route headways. It returns them as a list of `data.table`s and writes an HTML report with tables and figures, which is opened in the browser by default in interactive sessions:
 
 ```{r, eval = requireNamespace("ggplot2", quietly = TRUE) && requireNamespace("knitr", quietly = TRUE) && requireNamespace("rmarkdown", quietly = TRUE) && rmarkdown::pandoc_available()}
-feed_summary <- get_summary(spo_path, open_browser = FALSE)
+feed_summary <- get_summary(spo_path, html_preview = FALSE)
 
 feed_summary$totals
 ```

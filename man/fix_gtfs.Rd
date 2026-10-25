@@ -68,8 +68,9 @@ in \code{frequencies}, every departure gets longer). This is done after
 filling blank times, so the filled stops also get the minimum. Only the
 stops between the first and the last stop with times of each trip get
 the minimum, so trips keep their start times. Stops with negative dwell
-times (departures earlier than arrivals, e.g. times after midnight
-written as \code{"00:30:00"}) don't get it either;
+times (departures earlier than arrivals) also get it, see
+\code{\link[=set_min_dwell_time]{set_min_dwell_time()}} for times after midnight written as
+\code{"00:30:00"};
 \item \code{\link[=interpolate_shape_dist_traveled]{interpolate_shape_dist_traveled()}}, only if the feed has a \code{shapes}
 table and \code{trips} has a \code{shape_id} column, replaces the
 \code{shape_dist_traveled} columns of \code{stop_times} and \code{shapes} with the

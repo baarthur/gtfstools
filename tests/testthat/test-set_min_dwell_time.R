@@ -2,8 +2,8 @@ spo_path <- system.file("extdata/spo_gtfs.zip", package = "gtfstools")
 spo_gtfs <- read_gtfs(spo_path)
 
 # creates a feed with three trips whose intermediate stops have dwell times
-# below and above 30 seconds. trip A has a stop whose departure is written as
-# "00:01:00", after midnight, and trip C visits stop Y twice
+# below and above 30 seconds. trip A runs past midnight, with its later times
+# written as "00:01:00" and "00:10:00", and trip C visits stop Y twice
 
 dwell_feed <- function() {
   feed <- list(
@@ -20,12 +20,12 @@ dwell_feed <- function() {
     stop_times = data.table::data.table(
       trip_id = rep(c("A", "B", "C"), c(5, 3, 4)),
       arrival_time = c(
-        "08:00:00", "08:05:00", "08:10:00", "23:59:00", "24:10:00",
+        "08:00:00", "08:05:00", "08:10:00", "23:59:00", "00:10:00",
         "09:00:00", "09:05:00", "09:10:00",
         "10:00:00", "10:05:00", "10:10:00", "10:20:00"
       ),
       departure_time = c(
-        "08:00:00", "08:05:00", "08:12:00", "00:01:00", "24:10:00",
+        "08:00:00", "08:05:00", "08:12:00", "00:01:00", "00:10:00",
         "09:00:00", "09:05:00", "09:10:00",
         "10:00:00", "10:05:00", "10:12:00", "10:20:00"
       ),
@@ -91,13 +91,14 @@ test_that("raises only shorter dwell times at intermediate stops", {
   times <- result$stop_times
 
   # dwell times below 30 seconds are raised and the later times shifted.
-  # longer and negative dwell times are kept, and so are the first and last
-  # stops of each trip
+  # longer dwell times are kept, and so are the first and last stops of each
+  # trip. Z's negative dwell time is raised too, so its departure and the
+  # later times are shifted by about a day and written past 24:00:00
 
   expect_identical(
     times$arrival_time,
     c(
-      "08:00:00", "08:05:00", "08:10:30", "23:59:30", "24:10:30",
+      "08:00:00", "08:05:00", "08:10:30", "23:59:30", "24:09:00",
       "09:00:00", "09:05:00", "09:10:30",
       "10:00:00", "10:05:00", "10:10:30", "10:20:30"
     )
@@ -105,7 +106,7 @@ test_that("raises only shorter dwell times at intermediate stops", {
   expect_identical(
     times$departure_time,
     c(
-      "08:00:00", "08:05:30", "08:12:30", "00:01:30", "24:10:30",
+      "08:00:00", "08:05:30", "08:12:30", "24:00:00", "24:09:00",
       "09:00:00", "09:05:30", "09:10:30",
       "10:00:00", "10:05:30", "10:12:30", "10:20:30"
     )
@@ -115,6 +116,15 @@ test_that("raises only shorter dwell times at intermediate stops", {
 
   expect_silent(set_again <- tester(result))
   expect_equal(set_again, result)
+
+  # a minimum of 0 raises only Z's negative dwell time
+
+  zero_min <- tester(min_dwell_time = 0)$stop_times
+  expect_identical(zero_min$departure_time[4:5], c("23:59:00", "24:08:00"))
+  expect_identical(
+    zero_min$departure_time[-(4:5)],
+    dwell_gtfs$stop_times$departure_time[-(4:5)]
+  )
 })
 
 test_that("never shortens dwell times, whatever the trips and stops given", {
@@ -198,6 +208,26 @@ test_that("from, to, route_type and unit work as in set_dwell_time()", {
   expect_equal(
     tester(min_dwell_time = 0.5, unit = "min"),
     tester(min_dwell_time = 30)
+  )
+  expect_equal(tester(min_dwell_time = 29.6), tester())
+
+  # trip A's first stop arrives before 08:05 but is still its first stop, so
+  # X is raised as without a time of day
+
+  expect_equal(tester(from = "08:05:00"), tester())
+})
+
+test_that("rows with a NA stop_sequence are never raised", {
+  feed <- dwell_feed()
+  feed$stop_times[1, stop_sequence := NA_integer_]
+  result <- tester(feed, trip_id = "A")
+
+  # X is A's first stop with a stop_sequence, so it keeps its departure, and
+  # so does Y, which stays 120 seconds
+
+  expect_identical(
+    result$stop_times$departure_time[1:3],
+    c("08:00:00", "08:05:00", "08:12:00")
   )
 })
 

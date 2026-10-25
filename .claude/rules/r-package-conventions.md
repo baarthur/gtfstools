@@ -79,6 +79,20 @@ filter_by_something <- function(gtfs, something, keep = TRUE) {
     can't be matched: warn and keep the table intact, e.g. `"'trips' table
     missing 'shape_id' column, therefore kept intact during the filtering
     process."` New code emits that warning with `cli::cli_warn()` (A4).
+- **Argument names and order** (exported functions):
+  - Arguments that filter by id end in `_id`. `first_stop` and `last_stop`
+    mark segment ends and are not filters.
+  - Shared names: `route_type`, `unit` (`<x>_unit` when a function has
+    several), `quiet`, `by_reference`, and `output_path`/`html_preview` in
+    functions that write HTML reports.
+  - Position: in `set_*()`, `unit` comes right after the value it qualifies.
+    `date` comes before `from`/`to`.
+  - Time windows include `to` (`[from, to]`), except in
+    `get_route_frequency()`, `get_stop_frequency()`, `set_route_frequency()`
+    and `build_graph()`, which use `[from, to)`, because a headway is the
+    window length divided by the departures, and `end_time` in
+    `frequencies.txt` is exclusive. `get_summary()` inherits this for its
+    headways, which come from `get_route_frequency()`.
 
 ## A3. data.table discipline
 

@@ -37,25 +37,25 @@
 #' get_vmt(
 #'   gtfs,
 #'   route_id = c("CPTM L07", "2002-10"),
+#'   date = "2019-03-04",
 #'   from = "07:00:00",
-#'   to = "09:00:00",
-#'   date = "2019-03-04"
+#'   to = "09:00:00"
 #' )
 #'
 #' @export
 get_vmt <- function(
   gtfs,
   route_id = NULL,
+  date = NULL,
   from = NULL,
-  to = NULL,
-  date = NULL
+  to = NULL
 ) {
   vkt <- get_vkt(
     gtfs = gtfs,
     route_id = route_id,
+    date = date,
     from = from,
-    to = to,
-    date = date
+    to = to
   )
 
   # convert kilometres to international miles

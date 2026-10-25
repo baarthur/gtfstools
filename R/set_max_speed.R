@@ -8,6 +8,8 @@
 #' @template gtfs
 #' @param max_speed A number. The maximum speed allowed, in the unit given by
 #'   `unit`.
+#' @param unit A string representing the unit in which the speed is given. One
+#'   of `"km/h"` (the default), `"m/s"` or `"mph"` (miles per hour).
 #' @param route_id A character vector including the `route_id`s whose trips
 #'   have their speeds capped. If `route_id`, `trip_id` and `route_type` are
 #'   all `NULL` (the default), the speeds of every trip in the GTFS are capped.
@@ -15,8 +17,6 @@
 #' @param trip_id A character vector including the `trip_id`s to have their
 #'   speeds capped. When given together with `route_id`, the trips of both are
 #'   capped.
-#' @param unit A string representing the unit in which the speed is given. One
-#'   of `"km/h"` (the default), `"m/s"` or `"mph"` (miles per hour).
 #' @param first_stop A string. The `stop_id` where the segment whose speeds
 #'   are capped starts. If `NULL` (the default), the segment starts at each
 #'   trip's first stop.
@@ -107,9 +107,9 @@
 set_max_speed <- function(
   gtfs,
   max_speed,
+  unit = "km/h",
   route_id = NULL,
   trip_id = NULL,
-  unit = "km/h",
   first_stop = NULL,
   last_stop = NULL,
   from = NULL,

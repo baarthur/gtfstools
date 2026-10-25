@@ -317,13 +317,13 @@ change_dwell_times <- function(
       )
     }
 
-    # a minimum skips the first and last visits with both times and negative
-    # dwell times. it comes after the blank warning, which needs the
-    # selection before it's narrowed
+    # a minimum skips the first and last visits with both times, and raises
+    # negative dwell times like any other shorter one. it comes after the
+    # blank warning, which needs the selection before it's narrowed
 
     if (raise_only) {
       timed <- st[
-        !is.na(arr) & !is.na(dep),
+        !is.na(arr) & !is.na(dep) & !is.na(trip_id) & !is.na(stop_sequence),
         c("row", "trip_id", "stop_sequence")
       ]
       data.table::setorderv(timed, c("trip_id", "stop_sequence"))
@@ -332,7 +332,6 @@ change_dwell_times <- function(
       st[,
         selected := selected &
           row %in% timed$row[is_middle] &
-          dep >= arr &
           dep - arr < dwell_secs
       ]
     }

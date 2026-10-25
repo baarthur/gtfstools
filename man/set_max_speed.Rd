@@ -7,9 +7,9 @@
 set_max_speed(
   gtfs,
   max_speed,
+  unit = "km/h",
   route_id = NULL,
   trip_id = NULL,
-  unit = "km/h",
   first_stop = NULL,
   last_stop = NULL,
   from = NULL,
@@ -23,6 +23,9 @@ set_max_speed(
 \item{max_speed}{A number. The maximum speed allowed, in the unit given by
 \code{unit}.}
 
+\item{unit}{A string representing the unit in which the speed is given. One
+of \code{"km/h"} (the default), \code{"m/s"} or \code{"mph"} (miles per hour).}
+
 \item{route_id}{A character vector including the \code{route_id}s whose trips
 have their speeds capped. If \code{route_id}, \code{trip_id} and \code{route_type} are
 all \code{NULL} (the default), the speeds of every trip in the GTFS are capped.
@@ -31,9 +34,6 @@ all \code{NULL} (the default), the speeds of every trip in the GTFS are capped.
 \item{trip_id}{A character vector including the \code{trip_id}s to have their
 speeds capped. When given together with \code{route_id}, the trips of both are
 capped.}
-
-\item{unit}{A string representing the unit in which the speed is given. One
-of \code{"km/h"} (the default), \code{"m/s"} or \code{"mph"} (miles per hour).}
 
 \item{first_stop}{A string. The \code{stop_id} where the segment whose speeds
 are capped starts. If \code{NULL} (the default), the segment starts at each

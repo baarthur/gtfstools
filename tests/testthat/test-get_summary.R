@@ -12,24 +12,24 @@ gtfs <- read_gtfs(spo_path)
 tester <- function(gtfs = get("gtfs", envir = parent.frame()),
                    date = NULL,
                    route_id = NULL,
-                   mode = NULL,
-                   agency = NULL,
+                   route_type = NULL,
+                   agency_id = NULL,
                    from = NULL,
                    to = NULL,
-                   output_dir = tempfile("get_summary"),
-                   open_browser = FALSE,
+                   output_path = tempfile("get_summary"),
+                   html_preview = FALSE,
                    by_route_type = FALSE,
                    unit = "km/h") {
   get_summary(
     gtfs,
     date = date,
     route_id = route_id,
-    mode = mode,
-    agency = agency,
+    route_type = route_type,
+    agency_id = agency_id,
     from = from,
     to = to,
-    output_dir = output_dir,
-    open_browser = open_browser,
+    output_path = output_path,
+    html_preview = html_preview,
     by_route_type = by_route_type,
     unit = unit
   )
@@ -46,12 +46,12 @@ test_that("raises error due to incorrect input types", {
   expect_error(tester(tempfile(fileext = ".zip")))
   expect_error(tester(date = "2019-13-01"), class = "gtfstools_bad_date_error")
   expect_error(tester(route_id = 1))
-  expect_error(tester(mode = "spaceship"))
-  expect_error(tester(mode = NA))
-  expect_error(tester(agency = 1))
+  expect_error(tester(route_type = "spaceship"))
+  expect_error(tester(route_type = NA))
+  expect_error(tester(agency_id = 1))
   expect_error(tester(from = "07:00"))
-  expect_error(tester(output_dir = 1))
-  expect_error(tester(open_browser = NA))
+  expect_error(tester(output_path = 1))
+  expect_error(tester(html_preview = NA))
   expect_error(tester(by_route_type = NA))
   expect_error(tester(by_route_type = "yes"))
   expect_error(tester(unit = "m/s"))
@@ -66,7 +66,7 @@ test_that("raises error due to incorrect input types", {
     class = "gtfstools_invalid_time_of_day"
   )
   expect_error(
-    tester(agency = "not_an_agency"),
+    tester(agency_id = "not_an_agency"),
     class = "gtfstools_invalid_agency_id_error"
   )
 })
@@ -78,7 +78,7 @@ test_that("raises error if the report dependencies are missing", {
 
 test_that("raises error if no trips are selected", {
   expect_error(
-    tester(mode = "funicular"),
+    tester(route_type = "funicular"),
     class = "gtfstools_empty_selection_error"
   )
 })
@@ -96,8 +96,8 @@ test_that("raises error if running trips have invalid frequencies", {
 })
 
 test_that("returns a list of data.tables and writes the report", {
-  output_dir <- tempfile("get_summary")
-  result <- tester(output_dir = output_dir)
+  output_path <- tempfile("get_summary")
+  result <- tester(output_path = output_path)
 
   expect_type(result, "list")
   expect_named(
@@ -142,10 +142,10 @@ test_that("returns a list of data.tables and writes the report", {
     as.numeric(nrow(gtfs$trips))
   )
 
-  expect_true(file.exists(file.path(output_dir, "gtfs_summary.html")))
-  expect_true(file.exists(file.path(output_dir, "gtfs_summary.md")))
+  expect_true(file.exists(file.path(output_path, "gtfs_summary.html")))
+  expect_true(file.exists(file.path(output_path, "gtfs_summary.md")))
   expect_true(
-    file.exists(file.path(output_dir, "gtfs_summary_calendar.png"))
+    file.exists(file.path(output_path, "gtfs_summary_calendar.png"))
   )
 
   # a path and the feed read from it give the same result
@@ -179,7 +179,7 @@ test_that("filters the feed", {
     totals_value(poa_dates, "vkt_total")
   )
 
-  agency_result <- tester(agency = "1")
+  agency_result <- tester(agency_id = "1")
   expect_identical(unique(agency_result$agency$agency_id), "1")
 
   # filter_by_time_of_day() moves the start of a 'frequencies' entry to
@@ -204,6 +204,30 @@ test_that("filters the feed", {
   window_vkt <- get_vkt(shifted_gtfs, from = "07:00:00", to = "09:00:00")
   expect_equal(totals_value(window_result, "vkt_total"), sum(window_vkt$vkt))
 
+  # a departure at 'to' is counted in the vkt, as by the time of day filter.
+  # on 2019-01-21, poa's route 176 has a single trip departing at 09:00:00
+
+  poa_gtfs <- read_gtfs(poa_path)
+  route_window <- function(to) {
+    tester(
+      poa_gtfs,
+      date = "2019-01-21",
+      route_id = "176",
+      from = "08:00:00",
+      to = to
+    )
+  }
+  at_to <- route_window("09:00:00")
+  before_to <- route_window("08:59:59")
+  expect_identical(
+    totals_value(at_to, "n_trips") - totals_value(before_to, "n_trips"),
+    1
+  )
+  expect_equal(
+    totals_value(at_to, "vkt_total") - totals_value(before_to, "vkt_total"),
+    get_trip_length(poa_gtfs, "176-1@1#900", unit = "km")$length
+  )
+
   # every spo trip is frequency-based, so its trips are all kept by the time
   # of day filter. poa's scheduled trips are filtered
 
@@ -213,9 +237,9 @@ test_that("filters the feed", {
     totals_value(poa_full, "n_trips")
   )
 
-  expect_identical(tester(mode = "bus"), tester(mode = 3))
+  expect_identical(tester(route_type = "bus"), tester(route_type = 3))
   expect_lt(
-    totals_value(tester(mode = "bus"), "n_routes"),
+    totals_value(tester(route_type = "bus"), "n_routes"),
     totals_value(full, "n_routes")
   )
 })
@@ -316,9 +340,9 @@ test_that("doesn't change given gtfs", {
 
   calls <- list(
     list(),
-    list(mode = "bus"),
+    list(route_type = "bus"),
     list(date = "2008-01-01"),
-    list(agency = "1"),
+    list(agency_id = "1"),
     list(route_id = "CPTM L07"),
     list(from = "07:00:00", to = "09:00:00"),
     list(by_route_type = TRUE),
@@ -374,7 +398,10 @@ test_that("handles blank agency_ids, unused shapes and missing times", {
 
   # and the feed's single agency can still be selected
 
-  agency_result <- tester(blank_agency, agency = blank_agency$agency$agency_id)
+  agency_result <- tester(
+    blank_agency,
+    agency_id = blank_agency$agency$agency_id
+  )
   expect_identical(
     totals_value(agency_result, "n_trips"),
     totals_value(result, "n_trips")
@@ -418,7 +445,7 @@ test_that("handles blank agency_ids, unused shapes and missing times", {
 })
 
 test_that("uses the default output directory", {
-  result <- get_summary(gtfs, open_browser = FALSE)
+  result <- get_summary(gtfs, html_preview = FALSE)
   expect_true(
     file.exists(file.path(tempdir(), "gtfstools", "gtfs_summary.html"))
   )
@@ -429,17 +456,21 @@ test_that("escapes markdown in the report", {
   odd_gtfs$agency <- data.table::copy(odd_gtfs$agency)
   odd_gtfs$agency[, agency_name := "A $x$ *b* [c]"]
 
-  output_dir <- tempfile("get_summary")
-  result <- tester(odd_gtfs, output_dir = output_dir)
-  md <- readLines(file.path(output_dir, "gtfs_summary.md"), encoding = "UTF-8")
+  output_path <- tempfile("get_summary")
+  result <- tester(odd_gtfs, route_type = "bus", output_path = output_path)
+  md <- readLines(file.path(output_path, "gtfs_summary.md"), encoding = "UTF-8")
   expect_true(
     any(grepl("A \\$x\\$ \\*b\\* \\[c\\]", md, fixed = TRUE))
   )
 
+  # the selection lists the given values, under the argument names
+
+  expect_match(md, "**route_type**: bus", fixed = TRUE, all = FALSE)
+
   # escaped brackets must not become display math in the HTML
 
   html <- readLines(
-    file.path(output_dir, "gtfs_summary.html"),
+    file.path(output_path, "gtfs_summary.html"),
     encoding = "UTF-8"
   )
   expect_false(any(grepl("math display", html, fixed = TRUE)))
@@ -472,9 +503,9 @@ test_that("works with other feeds", {
 })
 
 test_that("breaks down the summary by route_type", {
-  output_dir <- tempfile("get_summary")
+  output_path <- tempfile("get_summary")
   full <- tester()
-  result <- tester(output_dir = output_dir, by_route_type = TRUE)
+  result <- tester(output_path = output_path, by_route_type = TRUE)
 
   expect_named(
     result$totals,
@@ -521,7 +552,7 @@ test_that("breaks down the summary by route_type", {
   # each mode is described as if it were selected alone, except for the
   # headways, measured on the day and time of day of the whole selection
 
-  bus <- tester(mode = "bus")
+  bus <- tester(route_type = "bus")
   expect_identical(
     result$totals[indicator != "mean_route_headway", bus],
     bus$totals[indicator != "mean_route_headway", value]
@@ -537,8 +568,8 @@ test_that("breaks down the summary by route_type", {
 
   # the report renders with a row per mode in the frequency table
 
-  expect_true(file.exists(file.path(output_dir, "gtfs_summary.html")))
-  expect_true(file.exists(file.path(output_dir, "gtfs_summary_speed.png")))
+  expect_true(file.exists(file.path(output_path, "gtfs_summary.html")))
+  expect_true(file.exists(file.path(output_path, "gtfs_summary_speed.png")))
 
   # with unit = "mph", distances and speeds are in miles, and the vkt rows are
   # named vmt. counts, durations and headways don't change
@@ -592,7 +623,7 @@ test_that("names extended route_types by their code", {
   # a single mode has the same values as the whole selection
 
   bus_result <- suppressWarnings(
-    tester(ber_gtfs, mode = 3, by_route_type = TRUE)
+    tester(ber_gtfs, route_type = 3, by_route_type = TRUE)
   )
   expect_named(bus_result$totals, c("indicator", "bus", "all", "unit"))
   expect_identical(bus_result$totals$bus, bus_result$totals$all)

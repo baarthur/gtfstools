@@ -5,7 +5,7 @@ gtfs2 <- gtfstools::read_gtfs(system.file(
   package = "gtfstools"
 ))
 
-get_summary(gtfs2)
+get_summary(gtfs2, unit = "mph")
 
 a <- build_graph(
   gtfs2,

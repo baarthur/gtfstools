@@ -7,7 +7,7 @@ tester <- function(gtfs = hand_gtfs,
                    trip_id = NULL,
                    unit = "km/h",
                    ...) {
-  set_max_speed(gtfs, max_speed, route_id, trip_id, unit, ...)
+  set_max_speed(gtfs, max_speed, unit, route_id, trip_id, ...)
 }
 
 # creates a feed whose trips serve the same stops on the equator, along a

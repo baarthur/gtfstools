@@ -9,7 +9,7 @@ tester <- function(gtfs = get("gtfs", envir = parent.frame()),
                    from = NULL,
                    to = NULL,
                    date = NULL) {
-  get_vkt(gtfs, route_id, from, to, date)
+  get_vkt(gtfs, route_id, date, from, to)
 }
 
 # expected vkt of spo on a single date, independent of the calendar and
@@ -66,7 +66,7 @@ expected_poa_vkt <- function(dates, from, to) {
         by = trip_id
       ]
       departures <- departures[
-        departure_secs >= from_secs & departure_secs < to_secs
+        departure_secs >= from_secs & departure_secs <= to_secs
       ]
       lengths <- get_trip_length(
         day_gtfs,
@@ -175,8 +175,8 @@ test_that("counts departures within the time of day", {
   expect_identical(result$n_days, expected$n_days)
   expect_equal(result$vkt, expected$vkt)
 
-  # a departure at 'from' is counted, and one at 'to' isn't. they are the only
-  # trips of poa that depart at 07:00:00 or 09:00:00
+  # departures at 'from' and at 'to' are both counted. they are the only trips
+  # of poa that depart at 07:00:00 or 09:00:00
 
   route_vkt <- function(from, to, date) {
     result <- tester(poa_gtfs, "176", from = from, to = to, date = date)
@@ -194,8 +194,8 @@ test_that("counts departures within the time of day", {
   at_to <- get_trip_length(poa_gtfs, "176-1@1#900", unit = "km")$length
   expect_gt(at_to, 0)
   expect_equal(
-    route_vkt("08:00:00", "09:00:01", "2019-01-21") -
-      route_vkt("08:00:00", "09:00:00", "2019-01-21"),
+    route_vkt("08:00:00", "09:00:00", "2019-01-21") -
+      route_vkt("08:00:00", "08:59:59", "2019-01-21"),
     at_to
   )
 })

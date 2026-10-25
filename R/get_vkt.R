@@ -10,13 +10,13 @@
 #'   VKT calculated. If `NULL` (the default), the function calculates the VKT
 #'   of every `route_id` in the GTFS. `route_id`s not listed in `trips` are
 #'   ignored, with a warning.
-#' @param from,to Strings in the `"HH:MM:SS"` format. If given (both must be),
-#'   only the departures at or after `from` and before `to` are counted. If
-#'   `NULL` (the default), every departure is counted.
 #' @param date A `Date` vector (including `IDate`) or a character vector of
 #'   dates in the `"YYYYMMDD"` or `"YYYY-MM-DD"` formats. If given, only these
 #'   dates are counted. If `NULL` (the default), every day on which the
 #'   services of the routes run is counted.
+#' @param from,to Strings in the `"HH:MM:SS"` format. If given (both must be),
+#'   only the departures at or after `from` and at or before `to` are
+#'   counted. If `NULL` (the default), every departure is counted.
 #'
 #' @return A `data.table` with the columns `route_id`, `n_days` (the number of
 #'   counted days on which at least one counted departure of the route runs),
@@ -32,8 +32,8 @@
 #' its service runs, according to the `calendar` and `calendar_dates` tables.
 #' Departures are counted as in [get_route_frequency()]: trips listed in the
 #' `frequencies` table depart once per headway, the other trips depart once,
-#' and departures after midnight belong to the previous service day. Please
-#' note that the time of day doesn't include `to`, unlike in
+#' and departures after midnight belong to the previous service day. Unlike in
+#' [get_route_frequency()], the time of day includes `to`, as in
 #' [get_trip_length()]. An error is raised if the `frequencies` table has
 #' invalid entries for trips that run on the counted days.
 #'
@@ -66,17 +66,17 @@
 #' get_vkt(
 #'   gtfs,
 #'   route_id = c("CPTM L07", "2002-10"),
+#'   date = "2019-03-04",
 #'   from = "07:00:00",
-#'   to = "09:00:00",
-#'   date = "2019-03-04"
+#'   to = "09:00:00"
 #' )
 #'
 #' @export
 get_vkt <- function(gtfs,
                     route_id = NULL,
+                    date = NULL,
                     from = NULL,
-                    to = NULL,
-                    date = NULL) {
+                    to = NULL) {
   gtfs <- assert_and_assign_gtfs_object(gtfs)
   checkmate::assert_character(route_id, null.ok = TRUE, any.missing = FALSE)
 
@@ -199,7 +199,7 @@ calculate_vkt <- function(gtfs, trips, date, window, lengths = NULL) {
 
   if (!is.null(window)) {
     departures <- departures[
-      departure_secs >= window[1] & departure_secs < window[2]
+      departure_secs >= window[1] & departure_secs <= window[2]
     ]
   }
 

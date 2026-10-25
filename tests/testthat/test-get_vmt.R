@@ -7,7 +7,7 @@ tester <- function(gtfs = get("gtfs", envir = parent.frame()),
                    from = NULL,
                    to = NULL,
                    date = NULL) {
-  get_vmt(gtfs, route_id, from, to, date)
+  get_vmt(gtfs, route_id, date, from, to)
 }
 
 # tests -------------------------------------------------------------------

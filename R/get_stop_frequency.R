@@ -9,14 +9,14 @@
 #' @param stop_id A character vector including the `stop_id`s to have their
 #'   frequencies calculated. If `NULL` (the default), the function calculates
 #'   the frequency of every `stop_id` in the GTFS.
-#' @param by_route A logical. Whether the departures should be counted by
-#'   `route_id` (and by `direction_id`, if present in the `trips` table) at
-#'   each stop. Defaults to `FALSE`, in which case the departures of every route
-#'   that serves a stop are pooled together.
 #' @param from A string. The starting point of the time of day, in the
 #'   "HH:MM:SS" format.
 #' @param to A string. The ending point of the time of day, in the "HH:MM:SS"
 #'   format. Must be later than `from`.
+#' @param by_route A logical. Whether the departures should be counted by
+#'   `route_id` (and by `direction_id`, if present in the `trips` table) at
+#'   each stop. Defaults to `FALSE`, in which case the departures of every route
+#'   that serves a stop are pooled together.
 #'
 #' @return A `data.table` with the columns `stop_id`, `route_id` and
 #'   `direction_id` (only if `by_route` is `TRUE`, the latter only if present
@@ -82,18 +82,18 @@
 #' stop_frequency <- get_stop_frequency(
 #'   gtfs,
 #'   stop_id = stop_ids,
-#'   by_route = TRUE,
 #'   from = "07:00:00",
-#'   to = "09:00:00"
+#'   to = "09:00:00",
+#'   by_route = TRUE
 #' )
 #' stop_frequency
 #'
 #' @export
 get_stop_frequency <- function(gtfs,
                                stop_id = NULL,
-                               by_route = FALSE,
                                from,
-                               to) {
+                               to,
+                               by_route = FALSE) {
   gtfs <- assert_and_assign_gtfs_object(gtfs)
   checkmate::assert_character(stop_id, null.ok = TRUE, any.missing = FALSE)
   checkmate::assert_logical(by_route, any.missing = FALSE, len = 1)

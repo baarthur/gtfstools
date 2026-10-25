@@ -8,7 +8,7 @@ tester <- function(gtfs = get("gtfs", envir = parent.frame()),
                    by_route = FALSE,
                    from = "07:00:00",
                    to = "09:00:00") {
-  get_stop_frequency(gtfs, stop_id, by_route, from, to)
+  get_stop_frequency(gtfs, stop_id, from, to, by_route)
 }
 
 # small hand-built feed, whose expected results are listed in the tests below:

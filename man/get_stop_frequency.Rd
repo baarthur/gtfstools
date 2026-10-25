@@ -4,7 +4,7 @@
 \alias{get_stop_frequency}
 \title{Get stop frequency}
 \usage{
-get_stop_frequency(gtfs, stop_id = NULL, by_route = FALSE, from, to)
+get_stop_frequency(gtfs, stop_id = NULL, from, to, by_route = FALSE)
 }
 \arguments{
 \item{gtfs}{A GTFS object, as created by \code{\link[=read_gtfs]{read_gtfs()}}.}
@@ -13,16 +13,16 @@ get_stop_frequency(gtfs, stop_id = NULL, by_route = FALSE, from, to)
 frequencies calculated. If \code{NULL} (the default), the function calculates
 the frequency of every \code{stop_id} in the GTFS.}
 
-\item{by_route}{A logical. Whether the departures should be counted by
-\code{route_id} (and by \code{direction_id}, if present in the \code{trips} table) at
-each stop. Defaults to \code{FALSE}, in which case the departures of every route
-that serves a stop are pooled together.}
-
 \item{from}{A string. The starting point of the time of day, in the
 "HH:MM:SS" format.}
 
 \item{to}{A string. The ending point of the time of day, in the "HH:MM:SS"
 format. Must be later than \code{from}.}
+
+\item{by_route}{A logical. Whether the departures should be counted by
+\code{route_id} (and by \code{direction_id}, if present in the \code{trips} table) at
+each stop. Defaults to \code{FALSE}, in which case the departures of every route
+that serves a stop are pooled together.}
 }
 \value{
 A \code{data.table} with the columns \code{stop_id}, \code{route_id} and
@@ -97,9 +97,9 @@ stop_ids <- c("18848", "18960")
 stop_frequency <- get_stop_frequency(
   gtfs,
   stop_id = stop_ids,
-  by_route = TRUE,
   from = "07:00:00",
-  to = "09:00:00"
+  to = "09:00:00",
+  by_route = TRUE
 )
 stop_frequency
 

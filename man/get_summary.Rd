@@ -8,12 +8,12 @@ get_summary(
   gtfs,
   date = NULL,
   route_id = NULL,
-  mode = NULL,
-  agency = NULL,
+  route_type = NULL,
+  agency_id = NULL,
   from = NULL,
   to = NULL,
-  output_dir = NULL,
-  open_browser = TRUE,
+  output_path = NULL,
+  html_preview = TRUE,
   by_route_type = FALSE,
   unit = "km/h"
 )
@@ -30,14 +30,15 @@ the whole period covered by the feed is described.}
 \item{route_id}{A character vector. If given, only these routes are
 described. If \code{NULL} (the default), all routes are described.}
 
-\item{mode}{An integer vector of \code{route_type}s (see
-\code{\link[=filter_by_route_type]{filter_by_route_type()}}) or a character vector of mode names (\code{"tram"},
-\code{"subway"}, \code{"rail"}, \code{"bus"}, \code{"ferry"}, \code{"cable_tram"}, \code{"aerial_lift"},
-\code{"funicular"}, \code{"trolleybus"} and \code{"monorail"}, which correspond to the
-basic \code{route_type}s). If given, only routes of these modes are described.
-If \code{NULL} (the default), all modes are described.}
+\item{route_type}{An integer vector of \code{route_type}s (see
+\code{\link[=filter_by_route_type]{filter_by_route_type()}}) or, unlike in other functions, a character
+vector of mode names (\code{"tram"}, \code{"subway"}, \code{"rail"}, \code{"bus"}, \code{"ferry"},
+\code{"cable_tram"}, \code{"aerial_lift"}, \code{"funicular"}, \code{"trolleybus"} and
+\code{"monorail"}, which correspond to the basic \code{route_type}s). If given, only
+routes of these modes are described. If \code{NULL} (the default), all modes
+are described.}
 
-\item{agency}{A character vector of \code{agency_id}s. If given, only the
+\item{agency_id}{A character vector of \code{agency_id}s. If given, only the
 services of these agencies are described. If \code{NULL} (the default), all
 agencies are described.}
 
@@ -45,12 +46,12 @@ agencies are described.}
 only the trips that run within this time of day are described. If \code{NULL}
 (the default), the whole day is described.}
 
-\item{output_dir}{A string. The directory in which the report is saved
+\item{output_path}{A string. The directory in which the report is saved
 (created if needed). If \code{NULL} (the default), a \code{gtfstools} directory
 inside \code{\link[=tempdir]{tempdir()}} is used. Existing reports in this directory are
 overwritten.}
 
-\item{open_browser}{A logical. Whether to open the HTML report in the
+\item{html_preview}{A logical. Whether to open the HTML report in the
 browser, in interactive sessions (defaults to \code{TRUE}).}
 
 \item{by_route_type}{A logical. Whether to break down the totals, speeds,
@@ -106,7 +107,7 @@ of \code{totals} are named \code{vmt_total} and \code{vmt_daily_mean} (vehicle-m
 travelled).
 
 The report is saved as \code{gtfs_summary.md} and \code{gtfs_summary.html}
-(together with its figures) in \code{output_dir}.
+(together with its figures) in \code{output_path}.
 }
 \description{
 Runs a set of diagnostics on a GTFS feed (optionally restricted to some
@@ -141,14 +142,14 @@ of the trip on every counted day on which its service runs. The counted days
 are the given \code{date}s or, if \code{date} is \code{NULL}, every day on which the
 selected services run, and \code{vkt_daily_mean} is the mean over those on which
 at least one counted departure runs. With \code{from} and \code{to}, only the
-departures at or after \code{from} and before \code{to} are counted, as listed in the
-feed before it is filtered by time of day, so selected trips that depart
-before \code{from} add nothing to the VKT. If no selected trip departs on the
-counted days (within the time of day), \code{vkt_total} and \code{vkt_daily_mean} are
-\code{NA}. An error is raised if the \code{frequencies} table has invalid entries for
-selected trips that run on the counted days. With \code{unit = "mph"}, the VKT
-are instead the vehicle-miles travelled (VMT), as in \code{\link[=get_vmt]{get_vmt()}}, reported
-in the rows \code{vmt_total} and \code{vmt_daily_mean}.
+departures at or after \code{from} and at or before \code{to} are counted, as listed
+in the feed before it is filtered by time of day, so selected trips that
+depart before \code{from} add nothing to the VKT. If no selected trip departs on
+the counted days (within the time of day), \code{vkt_total} and \code{vkt_daily_mean}
+are \code{NA}. An error is raised if the \code{frequencies} table has invalid entries
+for selected trips that run on the counted days. With \code{unit = "mph"}, the
+VKT are instead the vehicle-miles travelled (VMT), as in \code{\link[=get_vmt]{get_vmt()}},
+reported in the rows \code{vmt_total} and \code{vmt_daily_mean}.
 
 The \code{services} summary and the calendar chart in the report describe the
 whole calendar of the selected services: when \code{date} is given, the
@@ -161,12 +162,13 @@ Route headways are calculated with \code{\link[=get_route_frequency]{get_route_f
 by \code{direction_id}, if the field is present in the \code{trips} table), on a
 single day: the day with the most trips among the given \code{date}s, or in the
 whole feed if \code{date} is \code{NULL} (the earliest one, in case of ties). They
-are measured within the given time of day or, if \code{from} and \code{to} are
-\code{NULL}, from the first to the last departure of that day, rounded out to
-whole hours. Trips that start on the previous day and run after midnight
-are not counted, and times are in the local time of each agency.
+are measured within the given time of day (not including \code{to}, as in
+\code{\link[=get_route_frequency]{get_route_frequency()}}, unlike the other indicators) or, if \code{from} and
+\code{to} are \code{NULL}, from the first to the last departure of that day, rounded
+out to whole hours. Trips that start on the previous day and run after
+midnight are not counted, and times are in the local time of each agency.
 
-With \code{by_route_type = TRUE}, modes are named as in the \code{mode} argument,
+With \code{by_route_type = TRUE}, modes are named as in the \code{route_type} argument,
 extended \code{route_type}s by their code, and trips whose \code{route_type} is
 unknown are grouped as \code{"unknown"}. Modes are ordered by \code{route_type}, with
 \code{"unknown"} last. Each mode is described as if it were selected alone
@@ -195,26 +197,26 @@ if (
 
   feed_summary <- get_summary(
     data_path,
-    output_dir = tempdir(),
-    open_browser = FALSE
+    output_path = tempdir(),
+    html_preview = FALSE
   )
   feed_summary$totals
 
   \donttest{
   feed_summary <- get_summary(
     data_path,
-    mode = "bus",
+    route_type = "bus",
     from = "07:00:00",
     to = "09:00:00",
-    output_dir = tempdir(),
-    open_browser = FALSE
+    output_path = tempdir(),
+    html_preview = FALSE
   )
   feed_summary$frequency
 
   feed_summary <- get_summary(
     data_path,
-    output_dir = tempdir(),
-    open_browser = FALSE,
+    output_path = tempdir(),
+    html_preview = FALSE,
     by_route_type = TRUE
   )
   feed_summary$totals

@@ -4,7 +4,7 @@
 \alias{get_vmt}
 \title{Get vehicle-miles travelled}
 \usage{
-get_vmt(gtfs, route_id = NULL, from = NULL, to = NULL, date = NULL)
+get_vmt(gtfs, route_id = NULL, date = NULL, from = NULL, to = NULL)
 }
 \arguments{
 \item{gtfs}{A GTFS object, as created by \code{\link[=read_gtfs]{read_gtfs()}}.}
@@ -14,14 +14,14 @@ VKT calculated. If \code{NULL} (the default), the function calculates the VKT
 of every \code{route_id} in the GTFS. \code{route_id}s not listed in \code{trips} are
 ignored, with a warning.}
 
-\item{from, to}{Strings in the \code{"HH:MM:SS"} format. If given (both must be),
-only the departures at or after \code{from} and before \code{to} are counted. If
-\code{NULL} (the default), every departure is counted.}
-
 \item{date}{A \code{Date} vector (including \code{IDate}) or a character vector of
 dates in the \code{"YYYYMMDD"} or \code{"YYYY-MM-DD"} formats. If given, only these
 dates are counted. If \code{NULL} (the default), every day on which the
 services of the routes run is counted.}
+
+\item{from, to}{Strings in the \code{"HH:MM:SS"} format. If given (both must be),
+only the departures at or after \code{from} and at or before \code{to} are
+counted. If \code{NULL} (the default), every departure is counted.}
 }
 \value{
 A \code{data.table} with the columns \code{route_id}, \code{n_days} (the number of
@@ -60,9 +60,9 @@ head(vmt)
 get_vmt(
   gtfs,
   route_id = c("CPTM L07", "2002-10"),
+  date = "2019-03-04",
   from = "07:00:00",
-  to = "09:00:00",
-  date = "2019-03-04"
+  to = "09:00:00"
 )
 
 }

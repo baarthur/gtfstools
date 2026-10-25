@@ -4,7 +4,7 @@
 \alias{get_vkt}
 \title{Get vehicle-kilometres travelled}
 \usage{
-get_vkt(gtfs, route_id = NULL, from = NULL, to = NULL, date = NULL)
+get_vkt(gtfs, route_id = NULL, date = NULL, from = NULL, to = NULL)
 }
 \arguments{
 \item{gtfs}{A GTFS object, as created by \code{\link[=read_gtfs]{read_gtfs()}}.}
@@ -14,14 +14,14 @@ VKT calculated. If \code{NULL} (the default), the function calculates the VKT
 of every \code{route_id} in the GTFS. \code{route_id}s not listed in \code{trips} are
 ignored, with a warning.}
 
-\item{from, to}{Strings in the \code{"HH:MM:SS"} format. If given (both must be),
-only the departures at or after \code{from} and before \code{to} are counted. If
-\code{NULL} (the default), every departure is counted.}
-
 \item{date}{A \code{Date} vector (including \code{IDate}) or a character vector of
 dates in the \code{"YYYYMMDD"} or \code{"YYYY-MM-DD"} formats. If given, only these
 dates are counted. If \code{NULL} (the default), every day on which the
 services of the routes run is counted.}
+
+\item{from, to}{Strings in the \code{"HH:MM:SS"} format. If given (both must be),
+only the departures at or after \code{from} and at or before \code{to} are
+counted. If \code{NULL} (the default), every departure is counted.}
 }
 \value{
 A \code{data.table} with the columns \code{route_id}, \code{n_days} (the number of
@@ -45,8 +45,8 @@ times its number of departures times the number of counted days on which
 its service runs, according to the \code{calendar} and \code{calendar_dates} tables.
 Departures are counted as in \code{\link[=get_route_frequency]{get_route_frequency()}}: trips listed in the
 \code{frequencies} table depart once per headway, the other trips depart once,
-and departures after midnight belong to the previous service day. Please
-note that the time of day doesn't include \code{to}, unlike in
+and departures after midnight belong to the previous service day. Unlike in
+\code{\link[=get_route_frequency]{get_route_frequency()}}, the time of day includes \code{to}, as in
 \code{\link[=get_trip_length]{get_trip_length()}}. An error is raised if the \code{frequencies} table has
 invalid entries for trips that run on the counted days.
 
@@ -77,9 +77,9 @@ head(vkt)
 get_vkt(
   gtfs,
   route_id = c("CPTM L07", "2002-10"),
+  date = "2019-03-04",
   from = "07:00:00",
-  to = "09:00:00",
-  date = "2019-03-04"
+  to = "09:00:00"
 )
 
 }
