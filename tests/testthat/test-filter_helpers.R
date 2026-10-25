@@ -107,3 +107,78 @@ test_that("fare_attributes are kept when the feed has no fare_rules", {
   expect_identical(nrow(result$agency), 0L)
   expect_identical(result$fare_attributes$fare_id, c("3", "4"))
 })
+
+test_that("filter_table_from_ids() keeps or drops rows by field", {
+  gtfs <- ggl_gtfs
+  gtfs$fare_rules <- data.table::data.table(
+    fare_id = c("a", "b", "c"),
+    route_id = c("r1", "r2", "")
+  )
+  in_ids <- `%chin%`
+  not_in_ids <- Negate(`%chin%`)
+
+  result <- filter_table_from_ids(gtfs, "fare_rules", "route_id", "r1", in_ids)
+  expect_identical(result$fare_rules$fare_id, "a")
+  result <- filter_table_from_ids(
+    gtfs,
+    "fare_rules",
+    "route_id",
+    "r1",
+    not_in_ids
+  )
+  expect_identical(result$fare_rules$fare_id, c("b", "c"))
+
+  # blank keys are kept under both operators with keep_blank
+
+  result <- filter_table_from_ids(
+    gtfs,
+    "fare_rules",
+    "route_id",
+    "r1",
+    in_ids,
+    keep_blank = TRUE
+  )
+  expect_identical(result$fare_rules$fare_id, c("a", "c"))
+  result <- filter_table_from_ids(
+    gtfs,
+    "fare_rules",
+    "route_id",
+    "r1",
+    not_in_ids,
+    keep_blank = TRUE
+  )
+  expect_identical(result$fare_rules$fare_id, c("b", "c"))
+
+  # NULL and empty ids, which unique() of an absent column yields
+
+  result <- filter_table_from_ids(gtfs, "fare_rules", "route_id", NULL, in_ids)
+  expect_identical(nrow(result$fare_rules), 0L)
+  result <- filter_table_from_ids(
+    gtfs,
+    "fare_rules",
+    "route_id",
+    NULL,
+    not_in_ids
+  )
+  expect_identical(result$fare_rules, gtfs$fare_rules)
+  result <- filter_table_from_ids(
+    gtfs,
+    "fare_rules",
+    "route_id",
+    character(0),
+    not_in_ids
+  )
+  expect_identical(result$fare_rules, gtfs$fare_rules)
+
+  # absent tables and fields leave the feed as is; a wrong class errors
+
+  result <- filter_table_from_ids(gtfs, "fares", "route_id", "r1", in_ids)
+  expect_identical(result, gtfs)
+  result <- filter_table_from_ids(gtfs, "fare_rules", "zone", "r1", in_ids)
+  expect_identical(result, gtfs)
+
+  gtfs$fare_rules[, route_id := 1L:3L]
+  expect_error(
+    filter_table_from_ids(gtfs, "fare_rules", "route_id", "r1", in_ids)
+  )
+})

@@ -72,7 +72,7 @@
   - rows whose blank keys mean "applies to all": zone `fare_rules` without `route_id`, `transfers` without `from_stop_id`/`to_stop_id` and `attributions` without `agency_id`;
   - the `agency` of single-agency feeds whose `routes.agency_id` is blank or absent;
   - the station entrances, generic nodes and boarding areas of kept stations and platforms, with their pathways and levels.
-- `filter_by_trip_id()` and the filters built on it no longer keep `fare_attributes` (and their agencies) whose `fare_rules` were all dropped by zone.
+- `filter_by_trip_id()`, `filter_by_service_id()` and `filter_by_shape_id()`, and the functions built on them (such as `filter_by_date()`, `filter_by_period()`, `filter_by_weekday()` and `filter_by_spatial_extent()`), no longer keep `fare_attributes` (and their agencies) whose `fare_rules` were all dropped by zone.
 - `filter_by_route_id()` and `filter_by_route_type()` filtered `fare_rules` by `level_id` instead of `route_id`.
 - `filter_by_time_of_day()`:
   - with `keep = TRUE`, now sets the `end_time` of `frequencies` entries that cross `to` to one second after `to`, so that a departure at `to` is no longer lost by `frequencies_to_stop_times()`;

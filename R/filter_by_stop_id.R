@@ -99,18 +99,9 @@ filter_by_stop_id <- function(gtfs,
 
   gtfs <- filter_stops_from_stop_id(gtfs, stop_id, `%ffilter%`)
 
-  # 'stops' allows us to filter by 'zone_id' and 'level_id'
+  # 'fare_rules' (zone_id) and 'levels' (level_id)
 
-  relevant_zones <- unique(gtfs$stops$zone_id)
-  relevant_levels <- unique(gtfs$stops$level_id)
-
-  # 'fare_rules' (zone_id)
-
-  gtfs <- filter_fare_rules_from_zone_id(gtfs, relevant_zones, `%chin%`)
-
-  # 'levels' (level_id)
-
-  gtfs <- filter_levels_from_level_id(gtfs, relevant_levels, `%chin%`)
+  gtfs <- filter_zones_levels_from_stops(gtfs)
 
   # 'stop_times' (stop_id)
 
@@ -142,36 +133,15 @@ filter_by_stop_id <- function(gtfs,
   gtfs <- filter_calend_dates_from_service_id(gtfs, relevant_services, `%chin%`)
 
   # 'routes', 'fare_rules' and 'transfers' (route_id)
-  #
-  # we can use 'routes' to filter agency via routes -> agency_id, but we can
-  # also use 'fare_rules' to filter it via fare_rules -> fare_id ->
-  # fare_attributes -> agency_id.
-  # so we create a 'relevant_agencies' vector that holds the relevant
-  # agency_ids from both paths and use all of them to filter agency later.
 
   gtfs <- filter_transfers_from_route_id(gtfs, relevant_routes, `%chin%`)
   gtfs <- filter_routes_from_route_id(gtfs, relevant_routes, `%chin%`)
   gtfs <- filter_fare_rules_from_route_id(gtfs, relevant_routes, `%chin%`)
-  relevant_agencies_from_routes <- unique(gtfs$routes$agency_id)
 
-  # 'fare_rules' allows us to filter by 'fare_id'
+  # 'fare_attributes' (fare_id) and 'agency' (agency_id, that comes both from
+  # routes and fare_attributes)
 
-  relevant_fares <- unique(gtfs$fare_rules$fare_id)
-
-  # 'fare_attributes' (fare_id)
-
-  gtfs <- filter_fare_attr_from_fare_id(gtfs, relevant_fares, `%chin%`)
-  relevant_agencies_from_fare_attr <- unique(gtfs$fare_attributes$agency_id)
-
-  # 'agency' (agency_id, that comes both from routes and fare_attributes)
-
-  relevant_agencies <- c(
-    relevant_agencies_from_routes,
-    relevant_agencies_from_fare_attr
-  )
-  relevant_agencies <- unique(relevant_agencies)
-
-  gtfs <- filter_agency_from_derived_agency_id(gtfs, relevant_agencies)
+  gtfs <- filter_fares_and_agency(gtfs)
 
   return(gtfs)
 }

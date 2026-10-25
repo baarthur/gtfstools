@@ -1,19 +1,37 @@
-filter_agency_from_agency_id <- function(gtfs, relevant_agencies, `%ffilter%`) {
-  # since agency_id is optional in many tables when the feed is only composed by
-  # one agency, we may have situations in which relevant_agencies is NULL (e.g.
-  # when trying to get gtfs$routes$agency_id from a routes table without an
-  # agency_id column).
-  # so if relevant_agencies is NULL, we keep the gtfs intact. otherwise, we
-  # would wrongfully subset agency down to an empty table.
+# keeps (or drops, through `%ffilter%`) the rows of 'file' whose 'field' is in
+# 'ids'. the file and the field are optional: when either is absent the feed
+# is returned as is. with keep_blank, rows whose field is "" are always kept,
+# because a blank key means "applies to all"
 
-  if (is.null(relevant_agencies)) return(gtfs)
+filter_table_from_ids <- function(gtfs,
+                                  file,
+                                  field,
+                                  ids,
+                                  `%ffilter%`,
+                                  keep_blank = FALSE) {
+  if (!gtfsio::check_field_exists(gtfs, file, field)) return(gtfs)
 
-  if (gtfsio::check_field_exists(gtfs, "agency", "agency_id")) {
-    gtfsio::assert_field_class(gtfs, "agency", "agency_id", "character")
-    gtfs$agency <- gtfs$agency[agency_id %ffilter% relevant_agencies]
-  }
+  gtfsio::assert_field_class(gtfs, file, field, "character")
+
+  values <- gtfs[[file]][[field]]
+  is_kept <- values %ffilter% ids
+  if (keep_blank) is_kept <- is_kept | values %chin% ""
+
+  gtfs[[file]] <- gtfs[[file]][is_kept]
 
   return(gtfs)
+}
+
+filter_agency_from_agency_id <- function(gtfs, ids, `%ffilter%`) {
+  # since agency_id is optional in many tables when the feed is only composed by
+  # one agency, we may have situations in which ids is NULL (e.g. when trying
+  # to get gtfs$routes$agency_id from a routes table without an agency_id
+  # column). so if ids is NULL, we keep the gtfs intact. otherwise, we would
+  # wrongfully subset agency down to an empty table.
+
+  if (is.null(ids)) return(gtfs)
+
+  return(filter_table_from_ids(gtfs, "agency", "agency_id", ids, `%ffilter%`))
 }
 
 filter_agency_from_derived_agency_id <- function(gtfs, relevant_agencies) {
@@ -25,15 +43,15 @@ filter_agency_from_derived_agency_id <- function(gtfs, relevant_agencies) {
   return(filter_agency_from_agency_id(gtfs, relevant_agencies, `%chin%`))
 }
 
-filter_attributions_from_agency_id <- function(gtfs,
-                                               relevant_agencies,
-                                               `%ffilter%`) {
-  if (gtfsio::check_field_exists(gtfs, "attributions", "agency_id")) {
-    gtfsio::assert_field_class(gtfs, "attributions", "agency_id", "character")
-    gtfs$attributions <- gtfs$attributions[
-      agency_id %chin% "" | agency_id %ffilter% relevant_agencies
-    ]
-  }
+filter_attributions_from_agency_id <- function(gtfs, ids, `%ffilter%`) {
+  gtfs <- filter_table_from_ids(
+    gtfs,
+    "attributions",
+    "agency_id",
+    ids,
+    `%ffilter%`,
+    keep_blank = TRUE
+  )
 
   return(gtfs)
 }
@@ -61,7 +79,7 @@ filter_fare_attr_from_agency_id <- function(gtfs,
   return(gtfs)
 }
 
-filter_fare_attr_from_fare_id <- function(gtfs, relevant_fares, `%ffilter%`) {
+filter_fare_attr_from_fare_id <- function(gtfs, ids, `%ffilter%`) {
   # fares of feeds without a 'fare_rules' table apply to every route of their
   # agency, so they are kept if their agency still has routes (or if they
   # have no agency). the callers filter 'fare_rules' before calling this
@@ -86,56 +104,44 @@ filter_fare_attr_from_fare_id <- function(gtfs, relevant_fares, `%ffilter%`) {
     return(gtfs)
   }
 
-  if (gtfsio::check_field_exists(gtfs, "fare_attributes", "fare_id")) {
-    gtfsio::assert_field_class(gtfs, "fare_attributes", "fare_id", "character")
-    gtfs$fare_attributes <- gtfs$fare_attributes[
-      fare_id %ffilter% relevant_fares
-    ]
-  }
+  gtfs <- filter_table_from_ids(
+    gtfs,
+    "fare_attributes",
+    "fare_id",
+    ids,
+    `%ffilter%`
+  )
 
   return(gtfs)
 }
 
-filter_routes_from_agency_id <- function(gtfs, relevant_agencies, `%ffilter%`) {
-  if (gtfsio::check_field_exists(gtfs, "routes", "agency_id")) {
-    gtfsio::assert_field_class(gtfs, "routes", "agency_id", "character")
-    gtfs$routes <- gtfs$routes[agency_id %ffilter% relevant_agencies]
-  }
+filter_routes_from_agency_id <- function(gtfs, ids, `%ffilter%`) {
+  return(filter_table_from_ids(gtfs, "routes", "agency_id", ids, `%ffilter%`))
+}
+
+filter_fare_rules_from_route_id <- function(gtfs, ids, `%ffilter%`) {
+  gtfs <- filter_table_from_ids(
+    gtfs,
+    "fare_rules",
+    "route_id",
+    ids,
+    `%ffilter%`,
+    keep_blank = TRUE
+  )
 
   return(gtfs)
 }
 
-filter_fare_rules_from_route_id <- function(gtfs,
-                                            relevant_routes,
-                                            `%ffilter%`) {
-  if (gtfsio::check_field_exists(gtfs, "fare_rules", "route_id")) {
-    gtfsio::assert_field_class(gtfs, "fare_rules", "route_id", "character")
-    gtfs$fare_rules <- gtfs$fare_rules[
-      route_id %chin% "" | route_id %ffilter% relevant_routes
-    ]
-  }
-
-  return(gtfs)
-}
-
-filter_fare_rules_from_zone_id <- function(gtfs, relevant_zones, `%ffilter%`) {
-  if (gtfsio::check_field_exists(gtfs, "fare_rules", "origin_id")) {
-    gtfsio::assert_field_class(gtfs, "fare_rules", "origin_id", "character")
-    gtfs$fare_rules <- gtfs$fare_rules[
-      origin_id %chin% "" | origin_id %ffilter% relevant_zones
-    ]
-  }
-
-  if (gtfsio::check_field_exists(gtfs, "fare_rules", "destination_id")) {
-    gtfsio::assert_field_class(
+filter_fare_rules_from_zone_id <- function(gtfs, ids, `%ffilter%`) {
+  for (zone_field in c("origin_id", "destination_id")) {
+    gtfs <- filter_table_from_ids(
       gtfs,
       "fare_rules",
-      "destination_id",
-      "character"
+      zone_field,
+      ids,
+      `%ffilter%`,
+      keep_blank = TRUE
     )
-    gtfs$fare_rules <- gtfs$fare_rules[
-      destination_id %chin% "" | destination_id %ffilter% relevant_zones
-    ]
   }
 
   # the spec mentions that if the same fare_id is associated to many zones in
@@ -164,7 +170,7 @@ filter_fare_rules_from_zone_id <- function(gtfs, relevant_zones, `%ffilter%`) {
     # must not be modified
 
     contains_ids <- gtfs$fare_rules$contains_id
-    .flagged <- contains_ids %chin% "" | contains_ids %ffilter% relevant_zones
+    .flagged <- contains_ids %chin% "" | contains_ids %ffilter% ids
 
     gtfs$fare_rules <- gtfs$fare_rules[
       gtfs$fare_rules[, .I[all(.flagged[.I])], by = .all_but_contains]$V1
@@ -174,13 +180,8 @@ filter_fare_rules_from_zone_id <- function(gtfs, relevant_zones, `%ffilter%`) {
   return(gtfs)
 }
 
-filter_trips_from_route_id <- function(gtfs, relevant_routes, `%ffilter%`) {
-  if (gtfsio::check_field_exists(gtfs, "trips", "route_id")) {
-    gtfsio::assert_field_class(gtfs, "trips", "route_id", "character")
-    gtfs$trips <- gtfs$trips[route_id %ffilter% relevant_routes]
-  }
-
-  return(gtfs)
+filter_trips_from_route_id <- function(gtfs, ids, `%ffilter%`) {
+  return(filter_table_from_ids(gtfs, "trips", "route_id", ids, `%ffilter%`))
 }
 
 filter_trips_from_shape_id <- function(gtfs, relevant_shapes, `%ffilter%`) {
@@ -198,78 +199,56 @@ filter_trips_from_shape_id <- function(gtfs, relevant_shapes, `%ffilter%`) {
   return(gtfs)
 }
 
-filter_trips_from_service_id <- function(gtfs, relevant_services, `%ffilter%`) {
-  if (gtfsio::check_field_exists(gtfs, "trips", "service_id")) {
-    gtfsio::assert_field_class(gtfs, "trips", "service_id", "character")
-    gtfs$trips <- gtfs$trips[service_id %ffilter% relevant_services]
-  }
+filter_trips_from_service_id <- function(gtfs, ids, `%ffilter%`) {
+  return(filter_table_from_ids(gtfs, "trips", "service_id", ids, `%ffilter%`))
+}
+
+filter_shapes_from_shape_id <- function(gtfs, ids, `%ffilter%`) {
+  return(filter_table_from_ids(gtfs, "shapes", "shape_id", ids, `%ffilter%`))
+}
+
+filter_calendar_from_service_id <- function(gtfs, ids, `%ffilter%`) {
+  gtfs <- filter_table_from_ids(
+    gtfs,
+    "calendar",
+    "service_id",
+    ids,
+    `%ffilter%`
+  )
 
   return(gtfs)
 }
 
-filter_shapes_from_shape_id <- function(gtfs, relevant_shapes, `%ffilter%`) {
-  if (gtfsio::check_field_exists(gtfs, "shapes", "shape_id")) {
-    gtfsio::assert_field_class(gtfs, "shapes", "shape_id", "character")
-    gtfs$shapes <- gtfs$shapes[shape_id %ffilter% relevant_shapes]
-  }
+filter_calend_dates_from_service_id <- function(gtfs, ids, `%ffilter%`) {
+  gtfs <- filter_table_from_ids(
+    gtfs,
+    "calendar_dates",
+    "service_id",
+    ids,
+    `%ffilter%`
+  )
 
   return(gtfs)
 }
 
-filter_calendar_from_service_id <- function(gtfs,
-                                            relevant_services,
-                                            `%ffilter%`) {
-  if (gtfsio::check_field_exists(gtfs, "calendar", "service_id")) {
-    gtfsio::assert_field_class(gtfs, "calendar", "service_id", "character")
-    gtfs$calendar <- gtfs$calendar[service_id %ffilter% relevant_services]
-  }
+filter_frequencies_from_trip_id <- function(gtfs, ids, `%ffilter%`) {
+  gtfs <- filter_table_from_ids(
+    gtfs,
+    "frequencies",
+    "trip_id",
+    ids,
+    `%ffilter%`
+  )
 
   return(gtfs)
 }
 
-filter_calend_dates_from_service_id <- function(gtfs,
-                                                relevant_services,
-                                                `%ffilter%`) {
-  if (gtfsio::check_field_exists(gtfs, "calendar_dates", "service_id")) {
-    gtfsio::assert_field_class(
-      gtfs,
-      "calendar_dates",
-      "service_id",
-      "character"
-    )
-    gtfs$calendar_dates <- gtfs$calendar_dates[
-      service_id %ffilter% relevant_services
-    ]
-  }
-
-  return(gtfs)
+filter_stop_times_from_trip_id <- function(gtfs, ids, `%ffilter%`) {
+  return(filter_table_from_ids(gtfs, "stop_times", "trip_id", ids, `%ffilter%`))
 }
 
-filter_frequencies_from_trip_id <- function(gtfs, relevant_trips, `%ffilter%`) {
-  if (gtfsio::check_field_exists(gtfs, "frequencies", "trip_id")) {
-    gtfsio::assert_field_class(gtfs, "frequencies", "trip_id", "character")
-    gtfs$frequencies <- gtfs$frequencies[trip_id %ffilter% relevant_trips]
-  }
-
-  return(gtfs)
-}
-
-filter_stop_times_from_trip_id <- function(gtfs, relevant_trips, `%ffilter%`) {
-  if (gtfsio::check_field_exists(gtfs, "stop_times", "trip_id")) {
-    gtfsio::assert_field_class(gtfs, "stop_times", "trip_id", "character")
-    gtfs$stop_times <- gtfs$stop_times[trip_id %ffilter% relevant_trips]
-  }
-
-  return(gtfs)
-}
-
-filter_stop_times_from_stop_id <- function(gtfs, relevant_stops, `%ffilter%`) {
-  if (gtfsio::check_field_exists(gtfs, "stop_times", "stop_id")) {
-    gtfsio::assert_field_class(gtfs, "stop_times", "stop_id", "character")
-    gtfs$stop_times <- gtfs$stop_times[stop_id %ffilter% relevant_stops]
-  }
-
-  return(gtfs)
+filter_stop_times_from_stop_id <- function(gtfs, ids, `%ffilter%`) {
+  return(filter_table_from_ids(gtfs, "stop_times", "stop_id", ids, `%ffilter%`))
 }
 
 filter_transfers_from_stop_id <- function(gtfs, relevant_stops, `%ffilter%`) {
@@ -293,49 +272,38 @@ filter_transfers_from_stop_id <- function(gtfs, relevant_stops, `%ffilter%`) {
   return(gtfs)
 }
 
-filter_transfers_from_route_id <- function(gtfs, relevant_routes, `%ffilter%`) {
-  if (gtfsio::check_field_exists(gtfs, "transfers", "from_route_id")) {
-    gtfsio::assert_field_class(gtfs, "transfers", "from_route_id", "character")
-    gtfs$transfers <- gtfs$transfers[
-      from_route_id %chin% "" | from_route_id %ffilter% relevant_routes
-    ]
-  }
-
-  if (gtfsio::check_field_exists(gtfs, "transfers", "to_route_id")) {
-    gtfsio::assert_field_class(gtfs, "transfers", "to_route_id", "character")
-    gtfs$transfers <- gtfs$transfers[
-      to_route_id %chin% "" | to_route_id %ffilter% relevant_routes
-    ]
+filter_transfers_from_route_id <- function(gtfs, ids, `%ffilter%`) {
+  for (field in c("from_route_id", "to_route_id")) {
+    gtfs <- filter_table_from_ids(
+      gtfs,
+      "transfers",
+      field,
+      ids,
+      `%ffilter%`,
+      keep_blank = TRUE
+    )
   }
 
   return(gtfs)
 }
 
-filter_transfers_from_trip_id <- function(gtfs, relevant_trips, `%ffilter%`) {
-  if (gtfsio::check_field_exists(gtfs, "transfers", "from_trip_id")) {
-    gtfsio::assert_field_class(gtfs, "transfers", "from_trip_id", "character")
-    gtfs$transfers <- gtfs$transfers[
-      from_trip_id %chin% "" | from_trip_id %ffilter% relevant_trips
-    ]
-  }
-
-  if (gtfsio::check_field_exists(gtfs, "transfers", "to_trip_id")) {
-    gtfsio::assert_field_class(gtfs, "transfers", "to_trip_id", "character")
-    gtfs$transfers <- gtfs$transfers[
-      to_trip_id %chin% "" | to_trip_id %ffilter% relevant_trips
-    ]
+filter_transfers_from_trip_id <- function(gtfs, ids, `%ffilter%`) {
+  for (field in c("from_trip_id", "to_trip_id")) {
+    gtfs <- filter_table_from_ids(
+      gtfs,
+      "transfers",
+      field,
+      ids,
+      `%ffilter%`,
+      keep_blank = TRUE
+    )
   }
 
   return(gtfs)
 }
 
-filter_stops_from_stop_id <- function(gtfs, relevant_stops, `%ffilter%`) {
-  if (gtfsio::check_field_exists(gtfs, "stops", "stop_id")) {
-    gtfsio::assert_field_class(gtfs, "stops", "stop_id", "character")
-    gtfs$stops <- gtfs$stops[stop_id %ffilter% relevant_stops]
-  }
-
-  return(gtfs)
+filter_stops_from_stop_id <- function(gtfs, ids, `%ffilter%`) {
+  return(filter_table_from_ids(gtfs, "stops", "stop_id", ids, `%ffilter%`))
 }
 
 filter_pathways_from_stop_id <- function(gtfs, relevant_stops, `%ffilter%`) {
@@ -355,31 +323,16 @@ filter_pathways_from_stop_id <- function(gtfs, relevant_stops, `%ffilter%`) {
   return(gtfs)
 }
 
-filter_levels_from_level_id <- function(gtfs, relevant_levels, `%ffilter%`) {
-  if (gtfsio::check_field_exists(gtfs, "levels", "level_id")) {
-    gtfsio::assert_field_class(gtfs, "levels", "level_id", "character")
-    gtfs$levels <- gtfs$levels[level_id %ffilter% relevant_levels]
-  }
-
-  return(gtfs)
+filter_levels_from_level_id <- function(gtfs, ids, `%ffilter%`) {
+  return(filter_table_from_ids(gtfs, "levels", "level_id", ids, `%ffilter%`))
 }
 
-filter_trips_from_trip_id <- function(gtfs, relevant_trips, `%ffilter%`) {
-  if (gtfsio::check_field_exists(gtfs, "trips", "trip_id")) {
-    gtfsio::assert_field_class(gtfs, "trips", "trip_id", "character")
-    gtfs$trips <- gtfs$trips[trip_id %ffilter% relevant_trips]
-  }
-
-  return(gtfs)
+filter_trips_from_trip_id <- function(gtfs, ids, `%ffilter%`) {
+  return(filter_table_from_ids(gtfs, "trips", "trip_id", ids, `%ffilter%`))
 }
 
-filter_routes_from_route_id <- function(gtfs, relevant_routes, `%ffilter%`) {
-  if (gtfsio::check_field_exists(gtfs, "routes", "route_id")) {
-    gtfsio::assert_field_class(gtfs, "routes", "route_id", "character")
-    gtfs$routes <- gtfs$routes[route_id %ffilter% relevant_routes]
-  }
-
-  return(gtfs)
+filter_routes_from_route_id <- function(gtfs, ids, `%ffilter%`) {
+  return(filter_table_from_ids(gtfs, "routes", "route_id", ids, `%ffilter%`))
 }
 
 
@@ -409,4 +362,58 @@ get_stops_and_parents <- function(gtfs) {
   }
 
   return(relevant_stops)
+}
+
+# the derived steps shared by the filter_by_*() cascades (not every filter
+# uses all three, and seed steps may come between them): once 'stop_times' is
+# final, the stop tables follow from it; the zones and levels follow from the
+# stops; the fares and agencies follow from the routes and fare rules. each
+# helper filters with %chin%, as the ids are derived from the feed
+
+# keeps the stops served by the remaining 'stop_times' and their parents (and
+# the entrances, nodes and boarding areas of kept stations), and filters
+# 'transfers', 'pathways' and 'stops' by them
+
+filter_stops_from_stop_times <- function(gtfs) {
+  relevant_stops <- get_stops_and_parents(gtfs)
+
+  gtfs <- filter_transfers_from_stop_id(gtfs, relevant_stops, `%chin%`)
+  gtfs <- filter_pathways_from_stop_id(gtfs, relevant_stops, `%chin%`)
+  gtfs <- filter_stops_from_stop_id(gtfs, relevant_stops, `%chin%`)
+
+  return(gtfs)
+}
+
+# filters 'fare_rules' by the zones and 'levels' by the levels of the
+# remaining 'stops'
+
+filter_zones_levels_from_stops <- function(gtfs) {
+  relevant_zones <- unique(gtfs$stops$zone_id)
+  relevant_levels <- unique(gtfs$stops$level_id)
+
+  gtfs <- filter_fare_rules_from_zone_id(gtfs, relevant_zones, `%chin%`)
+  gtfs <- filter_levels_from_level_id(gtfs, relevant_levels, `%chin%`)
+
+  return(gtfs)
+}
+
+# keeps the fares that the remaining 'fare_rules' refer to (or, in feeds
+# without 'fare_rules', the fares of the remaining routes' agencies), then the
+# agencies that the remaining routes and fares refer to: agency can be reached
+# via routes -> agency_id and via fare_rules -> fare_id -> fare_attributes ->
+# agency_id, so both paths are used (feeds with one agency always keep it,
+# and also keep all their fares when they have no 'fare_rules' table, see
+# filter_fare_attr_from_fare_id()). 'routes' and 'fare_rules' must already be
+# filtered
+
+filter_fares_and_agency <- function(gtfs) {
+  relevant_fares <- unique(gtfs$fare_rules$fare_id)
+  gtfs <- filter_fare_attr_from_fare_id(gtfs, relevant_fares, `%chin%`)
+
+  relevant_agencies <- unique(
+    c(gtfs$routes$agency_id, gtfs$fare_attributes$agency_id)
+  )
+  gtfs <- filter_agency_from_derived_agency_id(gtfs, relevant_agencies)
+
+  return(gtfs)
 }
