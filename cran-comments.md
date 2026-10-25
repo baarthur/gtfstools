@@ -1,7 +1,7 @@
 ## R CMD check results
 
-── R CMD check results ───────────────────────────────────────── gtfstools 2.0.0 ────
-Duration: 9m 23.3s
+── R CMD check results ──────────────────────────────────────────────────── gtfstools 1.4.0.9000 ────
+Duration: 7m 41.4s
 
 0 errors ✔ | 0 warnings ✔ | 0 notes ✔
 

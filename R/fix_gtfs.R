@@ -39,7 +39,7 @@
 #'    times follow the capped times. Interpolated times are rounded to the
 #'    second. Stops whose times can't be interpolated are left blank, with a
 #'    warning;
-#' 5. [set_dwell_time()], only if `min_dwell_time` is given, delays the
+#' 5. [set_min_dwell_time()], only if `min_dwell_time` is given, delays the
 #'    departure from each intermediate stop whose dwell time is shorter than
 #'    `min_dwell_time`, so that vehicles stay there for at least that long.
 #'    The minimum is rounded to the second. The later times of each changed
@@ -64,7 +64,7 @@
 #' raised more than once.
 #'
 #' @seealso [remove_duplicates()], [remove_unused_ids()], [set_max_speed()],
-#'   [interpolate_stop_times()], [set_dwell_time()],
+#'   [interpolate_stop_times()], [set_min_dwell_time()],
 #'   [interpolate_shape_dist_traveled()]
 #'
 #' @examplesIf requireNamespace("dplyr", quietly = TRUE)
@@ -152,44 +152,16 @@ fix_gtfs <- function(
   gtfs_fixed <- interpolate_stop_times(gtfs_fixed)
 
   # set a minimum dwell time at intermediate stops. this is done after
-  # interpolating, so the filled stops also get it. set_dwell_time() sets
-  # every given trip at every given stop, so each row temporarily gets a
-  # unique stop_id to select visits one by one. 'stop_times' is not the
+  # interpolating, so the filled stops also get it. 'stop_times' is not the
   # caller's table: the earlier steps return new tables
 
-  min_secs <- 0
   if (!is.null(min_dwell_time)) {
-    min_secs <- round(min_dwell_time * dwell_unit_factors[[dwell_time_unit]])
-  }
-
-  if (min_secs > 0) {
-    original_stop_id <- gtfs_fixed$stop_times$stop_id
-    gtfs_fixed$stop_times[, stop_id := as.character(.I)]
-
-    # the dwell times of the first and last visits with times are kept, so
-    # trips keep their start times. negative dwell times (e.g. times after
-    # midnight written as "00:30:00") are kept too
-
-    dwell <- get_dwell_time(gtfs_fixed)
-    dwell <- dwell[
-      !is.na(dwell_time) & !is.na(trip_id) & !is.na(stop_sequence)
-    ]
-    is_middle <- duplicated(dwell$trip_id) &
-      duplicated(dwell$trip_id, fromLast = TRUE)
-    to_raise <- dwell$stop_id[
-      is_middle & dwell$dwell_time >= 0 & dwell$dwell_time < min_secs
-    ]
-
-    if (length(to_raise) > 0) {
-      set_dwell_time(
-        gtfs_fixed,
-        stop_id = to_raise,
-        dwell_time = min_secs,
-        by_reference = TRUE
-      )
-    }
-
-    gtfs_fixed$stop_times[, stop_id := original_stop_id]
+    gtfs_fixed <- set_min_dwell_time(
+      gtfs_fixed,
+      min_dwell_time = min_dwell_time,
+      unit = dwell_time_unit,
+      by_reference = TRUE
+    )
   }
 
   # interpolate shape_dist_traveled. feeds without shapes have nothing to be

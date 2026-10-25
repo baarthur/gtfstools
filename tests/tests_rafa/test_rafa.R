@@ -1,3 +1,36 @@
+gtfs1 <- (system.file("extdata/spo_gtfs.zip", package = "gtfstools"))
+
+gtfs2 <- gtfstools::read_gtfs(system.file(
+  "extdata/poa_gtfs.zip",
+  package = "gtfstools"
+))
+
+get_summary(gtfs2)
+
+a <- build_graph(
+  gtfs2,
+  from = "08:00:00",
+  to = "10:00:00",
+  format = "tidygraph"
+)
+
+library(tidygraph)
+library(ggraph)
+library(sfnetworks)
+
+ggraph(a, layout = 'fr') +
+  geom_edge_link() +
+  geom_node_point()
+
+ggraph(a, layout = "manual", x = x_coord, y = y_coord) +
+  geom_edge_link() +
+  geom_node_point()
+
+
+net <- as_sfnetwork(a)
+plot(net)
+
+
 # Update documentation
 devtools::document(pkg = ".")
 

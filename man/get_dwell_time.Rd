@@ -113,5 +113,5 @@ get_dwell_time(ggl_gtfs, trip_id = "AWE1", unit = "min")
 
 }
 \seealso{
-\code{\link[=set_dwell_time]{set_dwell_time()}}
+\code{\link[=set_dwell_time]{set_dwell_time()}}, \code{\link[=set_min_dwell_time]{set_min_dwell_time()}}
 }

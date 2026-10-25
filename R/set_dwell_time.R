@@ -6,13 +6,6 @@
 #' of the trips accordingly.
 #'
 #' @template gtfs
-#' @param trip_id A character vector including the `trip_id`s to have their
-#'   dwell times set. If `NULL` (the default), the dwell times of every
-#'   `trip_id` in the GTFS (or of every trip of the given `route_type`s) are
-#'   set.
-#' @param stop_id A character vector including the `stop_id`s at which the
-#'   dwell times are set. If `NULL` (the default), the dwell times are set at
-#'   every `stop_id` in the GTFS.
 #' @param dwell_time A non-negative number, the dwell time to be set, in
 #'   `unit`. It's rounded to the nearest whole second and applies to every
 #'   specified visit (call the function once per value to set different dwell
@@ -20,6 +13,13 @@
 #' @param unit A string representing the time unit in which `dwell_time` is
 #'   given. One of `"s"` (seconds, the default), `"min"` (minutes), `"h"`
 #'   (hours) or `"d"` (days).
+#' @param trip_id A character vector including the `trip_id`s to have their
+#'   dwell times set. If `NULL` (the default), the dwell times of every
+#'   `trip_id` in the GTFS (or of every trip of the given `route_type`s) are
+#'   set.
+#' @param stop_id A character vector including the `stop_id`s at which the
+#'   dwell times are set. If `NULL` (the default), the dwell times are set at
+#'   every `stop_id` in the GTFS.
 #' @param from A string, in the "HH:MM:SS" format. Only visits whose arrival
 #'   time is at or after `from` are changed. If `NULL` (the default), there is
 #'   no lower limit.
@@ -50,7 +50,7 @@
 #' At its last stop, only the departure time changes. A stop visited more than
 #' once by the same trip (e.g. in a loop) has its dwell time set at each visit.
 #'
-#' Blank times are never filled, and later blank times stay blank. Selected
+#' Blank stop times are never filled, and later blank times stay blank. Selected
 #' visits with a blank arrival or departure time have no dwell time to change,
 #' so their dwell time is not set and they don't shift the later times. When
 #' `stop_id` is given, this raises a warning. Use [interpolate_stop_times()]
@@ -89,7 +89,7 @@
 #' in `stop_times` (e.g. created with [convert_time_to_seconds()]) are updated
 #' to match.
 #'
-#' @seealso [get_dwell_time()], [set_trip_speed()]
+#' @seealso [get_dwell_time()], [set_min_dwell_time()], [set_trip_speed()]
 #'
 #' @examplesIf requireNamespace("dplyr", quietly = TRUE)
 #' \dontshow{
@@ -149,15 +149,17 @@
 #' \dontshow{data.table::setDTthreads(old_dt_threads)}
 #'
 #' @export
-set_dwell_time <- function(gtfs,
-                           trip_id = NULL,
-                           stop_id = NULL,
-                           dwell_time,
-                           unit = "s",
-                           from = NULL,
-                           to = NULL,
-                           route_type = NULL,
-                           by_reference = FALSE) {
+set_dwell_time <- function(
+  gtfs,
+  dwell_time,
+  unit = "s",
+  trip_id = NULL,
+  stop_id = NULL,
+  from = NULL,
+  to = NULL,
+  route_type = NULL,
+  by_reference = FALSE
+) {
   gtfs <- assert_and_assign_gtfs_object(gtfs)
   checkmate::assert_character(trip_id, null.ok = TRUE, any.missing = FALSE)
   checkmate::assert_character(stop_id, null.ok = TRUE, any.missing = FALSE)
@@ -189,6 +191,40 @@ set_dwell_time <- function(gtfs,
 
   dwell_secs <- as.integer(round(dwell_time * dwell_unit_factors[[unit]]))
 
+  gtfs <- change_dwell_times(
+    gtfs,
+    dwell_secs,
+    trip_id,
+    stop_id,
+    window,
+    route_type,
+    by_reference
+  )
+
+  if (by_reference) {
+    return(invisible(gtfs))
+  }
+
+  return(gtfs)
+}
+
+
+
+# sets the dwell time of the selected visits to 'dwell_secs' and shifts the
+# later times of their trips, as described in set_dwell_time(). with
+# 'raise_only', only shorter dwell times are raised, as described in
+# set_min_dwell_time(). the arguments are validated by these functions
+
+change_dwell_times <- function(
+  gtfs,
+  dwell_secs,
+  trip_id,
+  stop_id,
+  window,
+  route_type,
+  by_reference,
+  raise_only = FALSE
+) {
   if (!is.null(route_type)) {
     type_routes <- route_type_ids(gtfs, route_type)
     type_trips <- gtfs$trips$trip_id[gtfs$trips$route_id %chin% type_routes]
@@ -240,8 +276,7 @@ set_dwell_time <- function(gtfs,
     }
 
     st <- stop_times[rows, .(trip_id, stop_sequence)]
-    st[
-      ,
+    st[,
       `:=`(
         row = rows,
         selected = if (is.null(stop_id)) TRUE else rows %in% selected_rows,
@@ -255,8 +290,7 @@ set_dwell_time <- function(gtfs,
     # be placed in the time of day, so they are not selected
 
     if (any(is.finite(window))) {
-      st[
-        ,
+      st[,
         selected := selected &
           !is.na(arr) &
           arr >= window[1] &
@@ -281,6 +315,26 @@ set_dwell_time <- function(gtfs,
         ),
         class = "gtfstools_blank_dwell_time"
       )
+    }
+
+    # a minimum skips the first and last visits with both times and negative
+    # dwell times. it comes after the blank warning, which needs the
+    # selection before it's narrowed
+
+    if (raise_only) {
+      timed <- st[
+        !is.na(arr) & !is.na(dep),
+        c("row", "trip_id", "stop_sequence")
+      ]
+      data.table::setorderv(timed, c("trip_id", "stop_sequence"))
+      is_middle <- duplicated(timed$trip_id) &
+        duplicated(timed$trip_id, fromLast = TRUE)
+      st[,
+        selected := selected &
+          row %in% timed$row[is_middle] &
+          dep >= arr &
+          dep - arr < dwell_secs
+      ]
     }
 
     # each selected call shifts its own departure and all the later times of
@@ -322,7 +376,8 @@ set_dwell_time <- function(gtfs,
             "order."
           )
         ),
-        class = "gtfstools_time_out_of_range"
+        class = "gtfstools_time_out_of_range",
+        call = parent.frame()
       )
     }
 
@@ -350,7 +405,9 @@ set_dwell_time <- function(gtfs,
     }
   }
 
-  if (by_reference) return(invisible(gtfs))
+  if (by_reference) {
+    return(invisible(gtfs))
+  }
 
   gtfs$stop_times <- stop_times
   return(gtfs)

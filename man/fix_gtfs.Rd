@@ -59,7 +59,7 @@ stops around them. Speeds are capped before interpolating, so the filled
 times follow the capped times. Interpolated times are rounded to the
 second. Stops whose times can't be interpolated are left blank, with a
 warning;
-\item \code{\link[=set_dwell_time]{set_dwell_time()}}, only if \code{min_dwell_time} is given, delays the
+\item \code{\link[=set_min_dwell_time]{set_min_dwell_time()}}, only if \code{min_dwell_time} is given, delays the
 departure from each intermediate stop whose dwell time is shorter than
 \code{min_dwell_time}, so that vehicles stay there for at least that long.
 The minimum is rounded to the second. The later times of each changed
@@ -115,6 +115,6 @@ fixed_gtfs$stop_times |>
 }
 \seealso{
 \code{\link[=remove_duplicates]{remove_duplicates()}}, \code{\link[=remove_unused_ids]{remove_unused_ids()}}, \code{\link[=set_max_speed]{set_max_speed()}},
-\code{\link[=interpolate_stop_times]{interpolate_stop_times()}}, \code{\link[=set_dwell_time]{set_dwell_time()}},
+\code{\link[=interpolate_stop_times]{interpolate_stop_times()}}, \code{\link[=set_min_dwell_time]{set_min_dwell_time()}},
 \code{\link[=interpolate_shape_dist_traveled]{interpolate_shape_dist_traveled()}}
 }

@@ -84,9 +84,9 @@ test_that("raises errors due to incorrect input types/value", {
   expect_error(tester(by_reference = NA))
   expect_error(tester(by_reference = c(TRUE, TRUE)))
 
-  # dwell_time comes after the ids, so it can't be given by position
+  # dwell_time is the second argument, so it can be given by position
 
-  expect_error(set_dwell_time(gtfs, 30))
+  expect_identical(set_dwell_time(gtfs, 30), tester())
   expect_error(set_dwell_time(gtfs))
 })
 
@@ -350,10 +350,11 @@ test_that("raises an error if times would be out of range", {
   )
   original_stop_times <- data.table::copy(bad_gtfs$stop_times)
 
-  expect_error(
+  err <- expect_error(
     tester(bad_gtfs, stop_id = "A", dwell_time = 0, by_reference = TRUE),
     class = "gtfstools_time_out_of_range"
   )
+  expect_identical(err$call[[1]], quote(set_dwell_time))
   expect_identical(bad_gtfs$stop_times, original_stop_times)
 
   # each dwell time is within the range of times that can be written, but

@@ -199,6 +199,7 @@ utils::globalVariables(
     "free_speed",
     "direction",
     "timed_weight",
-    "weighted_duration"
+    "weighted_duration",
+    "service_set"
   )
 )

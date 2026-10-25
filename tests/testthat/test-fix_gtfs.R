@@ -36,48 +36,6 @@ hand_feed <- function() {
 
 hand_gtfs <- hand_feed()
 
-# creates a feed with three trips whose intermediate stops have dwell times
-# below and above 30 seconds. trip A has a stop whose departure is written as
-# "00:01:00", after midnight, and trip C visits stop Y twice
-
-dwell_feed <- function() {
-  feed <- list(
-    routes = data.table::data.table(route_id = "r1"),
-    trips = data.table::data.table(
-      trip_id = c("A", "B", "C"),
-      route_id = "r1"
-    ),
-    stops = data.table::data.table(
-      stop_id = c("s0", "X", "Y", "Z", "s9"),
-      stop_lat = 0,
-      stop_lon = c(0, 0.01, 0.02, 0.03, 0.04)
-    ),
-    stop_times = data.table::data.table(
-      trip_id = rep(c("A", "B", "C"), c(5, 3, 4)),
-      arrival_time = c(
-        "08:00:00", "08:05:00", "08:10:00", "23:59:00", "24:10:00",
-        "09:00:00", "09:05:00", "09:10:00",
-        "10:00:00", "10:05:00", "10:10:00", "10:20:00"
-      ),
-      departure_time = c(
-        "08:00:00", "08:05:00", "08:12:00", "00:01:00", "24:10:00",
-        "09:00:00", "09:05:00", "09:10:00",
-        "10:00:00", "10:05:00", "10:12:00", "10:20:00"
-      ),
-      stop_id = c(
-        "s0", "X", "Y", "Z", "s9",
-        "s0", "Y", "s9",
-        "s0", "Y", "Y", "s9"
-      ),
-      stop_sequence = c(1:5, 1:3, 1:4)
-    )
-  )
-
-  return(gtfsio::new_gtfs(feed, "dt_gtfs"))
-}
-
-dwell_gtfs <- dwell_feed()
-
 spo_path <- system.file("extdata/spo_gtfs.zip", package = "gtfstools")
 
 tester <- function(gtfs = hand_gtfs,
@@ -184,68 +142,6 @@ test_that("doesn't cap speeds if max_speed is NULL", {
 
   expect_identical(times$arrival_time[c(1, 6)], c("08:00:00", "08:01:00"))
   expect_false(anyNA(secs(times$arrival_time)))
-})
-
-test_that("sets a minimum dwell time at intermediate stops", {
-  result <- tester(dwell_gtfs, max_speed = NULL, min_dwell_time = 30)
-  times <- result$stop_times
-
-  # dwell times below 30 seconds are raised and the later times shifted.
-  # longer and negative dwell times are kept, and so are the first and last
-  # stops of each trip
-
-  expect_identical(
-    times$arrival_time,
-    c(
-      "08:00:00", "08:05:00", "08:10:30", "23:59:30", "24:10:30",
-      "09:00:00", "09:05:00", "09:10:30",
-      "10:00:00", "10:05:00", "10:10:30", "10:20:30"
-    )
-  )
-  expect_identical(
-    times$departure_time,
-    c(
-      "08:00:00", "08:05:30", "08:12:30", "00:01:30", "24:10:30",
-      "09:00:00", "09:05:30", "09:10:30",
-      "10:00:00", "10:05:30", "10:12:30", "10:20:30"
-    )
-  )
-  expect_identical(times$stop_id, dwell_gtfs$stop_times$stop_id)
-
-  # nothing is below the minimum anymore, so fixing the result again changes
-  # nothing
-
-  expect_no_warning(
-    fixed_again <- tester(result, max_speed = NULL, min_dwell_time = 30)
-  )
-  expect_identical(fixed_again, result)
-})
-
-test_that("keeps the first stop with times when earlier stops stay blank", {
-  # the trip's first and last stops have no times to be interpolated from, so
-  # they stay blank. the first and last stops with times (X and Z) keep their
-  # dwell times
-
-  feed <- dwell_feed()
-  feed$stop_times <- data.table::data.table(
-    trip_id = "A",
-    arrival_time = c("", "08:00:00", "08:05:00", "08:10:00", ""),
-    departure_time = c("", "08:00:00", "08:05:00", "08:10:00", ""),
-    stop_id = c("s0", "X", "Y", "Z", "s9"),
-    stop_sequence = 1:5
-  )
-  result <- suppressWarnings(
-    tester(feed, max_speed = NULL, min_dwell_time = 30)
-  )
-
-  expect_identical(
-    result$stop_times$arrival_time,
-    c("", "08:00:00", "08:05:00", "08:10:30", "")
-  )
-  expect_identical(
-    result$stop_times$departure_time,
-    c("", "08:00:00", "08:05:30", "08:10:30", "")
-  )
 })
 
 test_that("sets the minimum dwell time at stops with interpolated times", {

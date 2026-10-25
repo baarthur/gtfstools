@@ -6,10 +6,10 @@
 \usage{
 set_dwell_time(
   gtfs,
-  trip_id = NULL,
-  stop_id = NULL,
   dwell_time,
   unit = "s",
+  trip_id = NULL,
+  stop_id = NULL,
   from = NULL,
   to = NULL,
   route_type = NULL,
@@ -19,15 +19,6 @@ set_dwell_time(
 \arguments{
 \item{gtfs}{A GTFS object, as created by \code{\link[=read_gtfs]{read_gtfs()}}.}
 
-\item{trip_id}{A character vector including the \code{trip_id}s to have their
-dwell times set. If \code{NULL} (the default), the dwell times of every
-\code{trip_id} in the GTFS (or of every trip of the given \code{route_type}s) are
-set.}
-
-\item{stop_id}{A character vector including the \code{stop_id}s at which the
-dwell times are set. If \code{NULL} (the default), the dwell times are set at
-every \code{stop_id} in the GTFS.}
-
 \item{dwell_time}{A non-negative number, the dwell time to be set, in
 \code{unit}. It's rounded to the nearest whole second and applies to every
 specified visit (call the function once per value to set different dwell
@@ -36,6 +27,15 @@ times).}
 \item{unit}{A string representing the time unit in which \code{dwell_time} is
 given. One of \code{"s"} (seconds, the default), \code{"min"} (minutes), \code{"h"}
 (hours) or \code{"d"} (days).}
+
+\item{trip_id}{A character vector including the \code{trip_id}s to have their
+dwell times set. If \code{NULL} (the default), the dwell times of every
+\code{trip_id} in the GTFS (or of every trip of the given \code{route_type}s) are
+set.}
+
+\item{stop_id}{A character vector including the \code{stop_id}s at which the
+dwell times are set. If \code{NULL} (the default), the dwell times are set at
+every \code{stop_id} in the GTFS.}
 
 \item{from}{A string, in the "HH:MM:SS" format. Only visits whose arrival
 time is at or after \code{from} are changed. If \code{NULL} (the default), there is
@@ -82,7 +82,7 @@ Setting the dwell time at a trip's first stop shifts the rest of the trip.
 At its last stop, only the departure time changes. A stop visited more than
 once by the same trip (e.g. in a loop) has its dwell time set at each visit.
 
-Blank times are never filled, and later blank times stay blank. Selected
+Blank stop times are never filled, and later blank times stay blank. Selected
 visits with a blank arrival or departure time have no dwell time to change,
 so their dwell time is not set and they don't shift the later times. When
 \code{stop_id} is given, this raises a warning. Use \code{\link[=interpolate_stop_times]{interpolate_stop_times()}}
@@ -182,5 +182,5 @@ gtfs$stop_times |>
 \dontshow{\}) # examplesIf}
 }
 \seealso{
-\code{\link[=get_dwell_time]{get_dwell_time()}}, \code{\link[=set_trip_speed]{set_trip_speed()}}
+\code{\link[=get_dwell_time]{get_dwell_time()}}, \code{\link[=set_min_dwell_time]{set_min_dwell_time()}}, \code{\link[=set_trip_speed]{set_trip_speed()}}
 }

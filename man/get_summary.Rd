@@ -14,7 +14,8 @@ get_summary(
   to = NULL,
   output_dir = NULL,
   open_browser = TRUE,
-  by_route_type = FALSE
+  by_route_type = FALSE,
+  unit = "km/h"
 )
 }
 \arguments{
@@ -55,6 +56,10 @@ browser, in interactive sessions (defaults to \code{TRUE}).}
 \item{by_route_type}{A logical. Whether to break down the totals, speeds,
 distances and frequencies by transport mode (\code{route_type}), in addition
 to the whole selection (defaults to \code{FALSE}).}
+
+\item{unit}{A string. Either \code{"km/h"} (the default), to report distances in
+km and speeds in km/h, or \code{"mph"}, to report them in miles and miles per
+hour.}
 }
 \value{
 A named list of \code{data.table}s (invisibly, if the report was opened
@@ -76,10 +81,13 @@ with the most trips and its number of trips) and \code{feed_start_date} and
 \code{feed_end_date} (from \code{feed_info}, \code{NA} if absent);
 \item \code{totals}: the columns \code{indicator}, \code{value} and \code{unit}, with the number
 of agencies, routes, trips and stops, the total and mean length of the
-shapes and of the trips (in km), the total duration of the trips (in
-hours), the mean duration of the trips (in minutes), the mean trip
-speed (in km/h) and the mean route headway (in minutes). The means are
-taken over the shapes and trips whose value is known. If
+shapes and of the trips (in km), the vehicle-kilometres travelled
+(\code{vkt_total}, in km) and their mean per day (\code{vkt_daily_mean}, in
+km/day), the total duration of the trips (in hours), the mean duration
+of the trips (in minutes), the mean trip speed (in km/h) and the mean
+route headway (in minutes). The means of lengths, durations and speeds
+are taken over the shapes and trips whose value is known, and
+\code{vkt_daily_mean} over the days with counted departures (see Details). If
 \code{by_route_type = TRUE}, \code{value} is replaced by one column per mode
 followed by the column \code{all} (codes of extended \code{route_type}s, such as
 \code{"700"}, are non-syntactic names, so they need backticks);
@@ -91,6 +99,11 @@ the day and the time of day in which the headways were measured. If
 \code{by_route_type = TRUE}, these tables start with a \code{mode} column and
 have one row per mode followed by the row \code{all}.
 }
+
+With \code{unit = "mph"}, distances are in miles (\code{mi} and \code{mi/day}) and speeds
+in miles per hour (\code{mph}), and the rows \code{vkt_total} and \code{vkt_daily_mean}
+of \code{totals} are named \code{vmt_total} and \code{vmt_daily_mean} (vehicle-miles
+travelled).
 
 The report is saved as \code{gtfs_summary.md} and \code{gtfs_summary.html}
 (together with its figures) in \code{output_dir}.
@@ -114,12 +127,26 @@ order. The time-of-day filter keeps the whole trips that run within it
 speeds and lengths refer to whole trips.
 
 Trip lengths, durations and speeds are calculated with \code{\link[=get_trip_length]{get_trip_length()}},
-\code{\link[=get_trip_duration]{get_trip_duration()}} and \code{\link[=get_trip_speed]{get_trip_speed()}}. Each trip is counted once,
-however many days it runs on and however many departures the \code{frequencies}
-table lists for it. Trips with a zero or negative duration count in the
-total and mean durations, but have no speed. The total and mean shape lengths
-count each shape used by the selected trips once, and the number of stops
-counts the stops visited by the selected trips.
+\code{\link[=get_trip_duration]{get_trip_duration()}} and \code{\link[=get_trip_speed]{get_trip_speed()}}. In their totals and means,
+each trip is counted once, however many days it runs on and however many
+departures the \code{frequencies} table lists for it. Trips with a zero or
+negative duration count in the total and mean durations, but have no speed.
+The total and mean shape lengths count each shape used by the selected trips
+once, and the number of stops counts the stops visited by the selected
+trips.
+
+The vehicle-kilometres travelled (VKT) are calculated as in \code{\link[=get_vkt]{get_vkt()}} for
+the selected trips: the length of each trip counts once for every departure
+of the trip on every counted day on which its service runs. The counted days
+are the given \code{date}s or, if \code{date} is \code{NULL}, every day on which the
+selected services run, and \code{vkt_daily_mean} is the mean over those on which
+at least one counted departure runs. With \code{from} and \code{to}, only the
+departures at or after \code{from} and before \code{to} are counted, as listed in the
+feed before it is filtered by time of day, so selected trips that depart
+before \code{from} add nothing to the VKT. If no selected trip departs on the
+counted days (within the time of day), \code{vkt_total} and \code{vkt_daily_mean} are
+\code{NA}. An error is raised if the \code{frequencies} table has invalid entries for
+selected trips that run on the counted days.
 
 The \code{services} summary and the calendar chart in the report describe the
 whole calendar of the selected services: when \code{date} is given, the
@@ -143,10 +170,11 @@ unknown are grouped as \code{"unknown"}. Modes are ordered by \code{route_type},
 \code{"unknown"} last. Each mode is described as if it were selected alone
 (except that the headways of all modes are measured on the same day and
 time of day), so stops, shapes and agencies shared by several modes count
-in each of them. Only the numbers of routes and trips and the total trip
-lengths and durations add up to the \code{all} column. Modes whose routes have
-blank \code{agency_id}s count all the agencies of the selection, and trips
-listed in \code{stop_times} but not in \code{trips} only count in \code{all}. In the
+in each of them. Only the numbers of routes and trips, the total trip
+lengths and durations and \code{vkt_total} add up to the \code{all} column. Modes
+whose routes have blank \code{agency_id}s count all the agencies of the
+selection, and trips listed in \code{stop_times} but not in \code{trips} only count in
+\code{all} (and not in the VKT, since they have no service). In the
 report, the histograms of the modes are overlaid.
 }
 

@@ -18,7 +18,8 @@ tester <- function(gtfs = get("gtfs", envir = parent.frame()),
                    to = NULL,
                    output_dir = tempfile("get_summary"),
                    open_browser = FALSE,
-                   by_route_type = FALSE) {
+                   by_route_type = FALSE,
+                   unit = "km/h") {
   get_summary(
     gtfs,
     date = date,
@@ -29,7 +30,8 @@ tester <- function(gtfs = get("gtfs", envir = parent.frame()),
     to = to,
     output_dir = output_dir,
     open_browser = open_browser,
-    by_route_type = by_route_type
+    by_route_type = by_route_type,
+    unit = unit
   )
 }
 
@@ -52,6 +54,8 @@ test_that("raises error due to incorrect input types", {
   expect_error(tester(open_browser = NA))
   expect_error(tester(by_route_type = NA))
   expect_error(tester(by_route_type = "yes"))
+  expect_error(tester(unit = "m/s"))
+  expect_error(tester(unit = c("km/h", "mph")))
 
   expect_error(
     tester(from = "07:00:00"),
@@ -76,6 +80,18 @@ test_that("raises error if no trips are selected", {
   expect_error(
     tester(mode = "funicular"),
     class = "gtfstools_empty_selection_error"
+  )
+})
+
+test_that("raises error if running trips have invalid frequencies", {
+  # 'frequencies' entries with a zero headway are invalid. the error is raised
+  # before the report is written
+
+  invalid_gtfs <- read_gtfs(spo_path)
+  invalid_gtfs$frequencies[trip_id == "6450-51-0", headway_secs := 0L]
+  expect_error(
+    suppressWarnings(tester(invalid_gtfs)),
+    class = "gtfstools_invalid_frequencies"
   )
 })
 
@@ -110,8 +126,8 @@ test_that("returns a list of data.tables and writes the report", {
     c(
       "n_agencies", "n_routes", "n_trips", "n_stops", "total_shape_length",
       "mean_shape_length", "total_trip_length", "mean_trip_length",
-      "total_trip_duration", "mean_trip_duration", "mean_trip_speed",
-      "mean_route_headway"
+      "vkt_total", "vkt_daily_mean", "total_trip_duration",
+      "mean_trip_duration", "mean_trip_speed", "mean_route_headway"
     )
   )
   expect_named(result$speed, stats_cols)
@@ -154,12 +170,39 @@ test_that("filters the feed", {
     totals_value(poa_full, "n_trips")
   )
 
+  # the vkt only counts the given dates, as get_vkt() does
+
+  poa_vkt <- get_vkt(read_gtfs(poa_path), date = "2019-01-19")
+  expect_equal(totals_value(poa_dates, "vkt_total"), sum(poa_vkt$vkt))
+  expect_equal(
+    totals_value(poa_dates, "vkt_daily_mean"),
+    totals_value(poa_dates, "vkt_total")
+  )
+
   agency_result <- tester(agency = "1")
   expect_identical(unique(agency_result$agency$agency_id), "1")
 
-  window_result <- tester(from = "07:00:00", to = "09:00:00")
+  # filter_by_time_of_day() moves the start of a 'frequencies' entry to
+  # 'from', which shifts its departures. the vkt counts the departures of the
+  # feed before the time of day filter, as get_vkt() does: from 05:00:00 every
+  # 7 minutes, the first departure after 07:00:00 is at 07:06:00
+
+  shifted_gtfs <- read_gtfs(spo_path)
+  shifted_gtfs$frequencies <- rbind(
+    shifted_gtfs$frequencies[trip_id != "CPTM L07-0"],
+    data.table::data.table(
+      trip_id = "CPTM L07-0",
+      start_time = "05:00:00",
+      end_time = "10:00:00",
+      headway_secs = 420L
+    )
+  )
+  window_result <- tester(shifted_gtfs, from = "07:00:00", to = "09:00:00")
   expect_identical(window_result$frequency$from, "07:00:00")
   expect_identical(window_result$frequency$to, "09:00:00")
+
+  window_vkt <- get_vkt(shifted_gtfs, from = "07:00:00", to = "09:00:00")
+  expect_equal(totals_value(window_result, "vkt_total"), sum(window_vkt$vkt))
 
   # every spo trip is frequency-based, so its trips are all kept by the time
   # of day filter. poa's scheduled trips are filtered
@@ -455,6 +498,14 @@ test_that("breaks down the summary by route_type", {
   expect_identical(unname(n_trips), expected_trips)
   expect_identical(unname(n_routes), expected_routes)
 
+  # the vkt of the modes adds up to that of the whole selection
+
+  vkt_total <- result$totals[indicator == "vkt_total"]
+  expect_equal(
+    sum(unlist(vkt_total[, ..mode_cols]), na.rm = TRUE),
+    vkt_total$all
+  )
+
   for (element in c("speed", "distance", "frequency")) {
     expect_identical(
       result[[element]]$mode,
@@ -487,6 +538,31 @@ test_that("breaks down the summary by route_type", {
 
   expect_true(file.exists(file.path(output_dir, "gtfs_summary.html")))
   expect_true(file.exists(file.path(output_dir, "gtfs_summary_speed.png")))
+
+  # with unit = "mph", distances and speeds are in miles, and the vkt rows are
+  # named vmt. counts, durations and headways don't change
+
+  km_per_mile <- 1.609344
+  mph <- tester(by_route_type = TRUE, unit = "mph")
+
+  expected_totals <- data.table::copy(result$totals)
+  conv <- expected_totals$unit %chin% c("km", "km/day", "km/h")
+  value_cols <- setdiff(names(expected_totals), c("indicator", "unit"))
+  for (col in value_cols) {
+    expected_totals[[col]][conv] <- expected_totals[[col]][conv] / km_per_mile
+  }
+  mile_units <- c(km = "mi", "km/day" = "mi/day", "km/h" = "mph")
+  expected_totals$unit[conv] <- unname(mile_units[expected_totals$unit[conv]])
+  expected_totals$indicator <- sub("^vkt_", "vmt_", expected_totals$indicator)
+  expect_equal(mph$totals, expected_totals)
+
+  stat_cols <- c("min", "q25", "median", "mean", "q75", "max")
+  for (element in c("speed", "distance")) {
+    expected <- data.table::copy(result[[element]])
+    for (col in stat_cols) expected[[col]] <- expected[[col]] / km_per_mile
+    expected$unit <- unname(mile_units[expected$unit])
+    expect_equal(mph[[element]], expected)
+  }
 })
 
 test_that("breaks down a time of day by route_type", {

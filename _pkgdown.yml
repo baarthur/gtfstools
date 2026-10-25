@@ -42,6 +42,7 @@ reference:
     - remove_unused_ids
     - fix_gtfs
     - set_dwell_time
+    - set_min_dwell_time
     - set_max_speed
     - set_route_frequency
     - set_trip_speed

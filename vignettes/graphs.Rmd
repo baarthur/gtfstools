@@ -81,10 +81,10 @@ first and the last stop of each trip, and the links between stops without times 
 of these inconsistencies. We also want to ensure that no trips exceed 25 km/h and that all trips have a minimum dwell time of 30 seconds to allow passengers to board and alight.
 
 ```{r, warning = FALSE, message = FALSE}
-gtfs <- fix_gtfs(gtfs)
+gtfs <- fix_gtfs(gtfs, max_speed = 25, min_dwell_time = 30)
 ```
 
-obs. in this case, `fix_gtfs()` throws a warning that refers to a few late night trips whose times go back to "00:00:00" after midnight, which depart outside the time of day used below:
+obs. in this case, `fix_gtfs()` throws two warnings that refer to a few late night trips whose times go back to "00:00:00" after midnight. These trips depart outside the time of day used below, so they don't affect the network.
 
 
 # Building a GMNS network

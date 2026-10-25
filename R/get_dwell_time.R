@@ -61,7 +61,7 @@
 #' Times are read from the time strings: existing `_secs` columns in
 #' `stop_times` (e.g. created with [convert_time_to_seconds()]) are not used.
 #'
-#' @seealso [set_dwell_time()]
+#' @seealso [set_dwell_time()], [set_min_dwell_time()]
 #'
 #' @examples
 #' \dontshow{

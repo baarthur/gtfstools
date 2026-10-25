@@ -36,6 +36,9 @@
 #' @param by_route_type A logical. Whether to break down the totals, speeds,
 #'   distances and frequencies by transport mode (`route_type`), in addition
 #'   to the whole selection (defaults to `FALSE`).
+#' @param unit A string. Either `"km/h"` (the default), to report distances in
+#'   km and speeds in km/h, or `"mph"`, to report them in miles and miles per
+#'   hour.
 #'
 #' @return A named list of `data.table`s (invisibly, if the report was opened
 #'   in the browser):
@@ -55,10 +58,13 @@
 #'     `feed_end_date` (from `feed_info`, `NA` if absent);
 #'   - `totals`: the columns `indicator`, `value` and `unit`, with the number
 #'     of agencies, routes, trips and stops, the total and mean length of the
-#'     shapes and of the trips (in km), the total duration of the trips (in
-#'     hours), the mean duration of the trips (in minutes), the mean trip
-#'     speed (in km/h) and the mean route headway (in minutes). The means are
-#'     taken over the shapes and trips whose value is known. If
+#'     shapes and of the trips (in km), the vehicle-kilometres travelled
+#'     (`vkt_total`, in km) and their mean per day (`vkt_daily_mean`, in
+#'     km/day), the total duration of the trips (in hours), the mean duration
+#'     of the trips (in minutes), the mean trip speed (in km/h) and the mean
+#'     route headway (in minutes). The means of lengths, durations and speeds
+#'     are taken over the shapes and trips whose value is known, and
+#'     `vkt_daily_mean` over the days with counted departures (see Details). If
 #'     `by_route_type = TRUE`, `value` is replaced by one column per mode
 #'     followed by the column `all` (codes of extended `route_type`s, such as
 #'     `"700"`, are non-syntactic names, so they need backticks);
@@ -69,6 +75,11 @@
 #'     the day and the time of day in which the headways were measured. If
 #'     `by_route_type = TRUE`, these tables start with a `mode` column and
 #'     have one row per mode followed by the row `all`.
+#'
+#'   With `unit = "mph"`, distances are in miles (`mi` and `mi/day`) and speeds
+#'   in miles per hour (`mph`), and the rows `vkt_total` and `vkt_daily_mean`
+#'   of `totals` are named `vmt_total` and `vmt_daily_mean` (vehicle-miles
+#'   travelled).
 #'
 #'   The report is saved as `gtfs_summary.md` and `gtfs_summary.html`
 #'   (together with its figures) in `output_dir`.
@@ -83,12 +94,26 @@
 #' speeds and lengths refer to whole trips.
 #'
 #' Trip lengths, durations and speeds are calculated with [get_trip_length()],
-#' [get_trip_duration()] and [get_trip_speed()]. Each trip is counted once,
-#' however many days it runs on and however many departures the `frequencies`
-#' table lists for it. Trips with a zero or negative duration count in the
-#' total and mean durations, but have no speed. The total and mean shape lengths
-#' count each shape used by the selected trips once, and the number of stops
-#' counts the stops visited by the selected trips.
+#' [get_trip_duration()] and [get_trip_speed()]. In their totals and means,
+#' each trip is counted once, however many days it runs on and however many
+#' departures the `frequencies` table lists for it. Trips with a zero or
+#' negative duration count in the total and mean durations, but have no speed.
+#' The total and mean shape lengths count each shape used by the selected trips
+#' once, and the number of stops counts the stops visited by the selected
+#' trips.
+#'
+#' The vehicle-kilometres travelled (VKT) are calculated as in [get_vkt()] for
+#' the selected trips: the length of each trip counts once for every departure
+#' of the trip on every counted day on which its service runs. The counted days
+#' are the given `date`s or, if `date` is `NULL`, every day on which the
+#' selected services run, and `vkt_daily_mean` is the mean over those on which
+#' at least one counted departure runs. With `from` and `to`, only the
+#' departures at or after `from` and before `to` are counted, as listed in the
+#' feed before it is filtered by time of day, so selected trips that depart
+#' before `from` add nothing to the VKT. If no selected trip departs on the
+#' counted days (within the time of day), `vkt_total` and `vkt_daily_mean` are
+#' `NA`. An error is raised if the `frequencies` table has invalid entries for
+#' selected trips that run on the counted days.
 #'
 #' The `services` summary and the calendar chart in the report describe the
 #' whole calendar of the selected services: when `date` is given, the
@@ -112,10 +137,11 @@
 #' `"unknown"` last. Each mode is described as if it were selected alone
 #' (except that the headways of all modes are measured on the same day and
 #' time of day), so stops, shapes and agencies shared by several modes count
-#' in each of them. Only the numbers of routes and trips and the total trip
-#' lengths and durations add up to the `all` column. Modes whose routes have
-#' blank `agency_id`s count all the agencies of the selection, and trips
-#' listed in `stop_times` but not in `trips` only count in `all`. In the
+#' in each of them. Only the numbers of routes and trips, the total trip
+#' lengths and durations and `vkt_total` add up to the `all` column. Modes
+#' whose routes have blank `agency_id`s count all the agencies of the
+#' selection, and trips listed in `stop_times` but not in `trips` only count in
+#' `all` (and not in the VKT, since they have no service). In the
 #' report, the histograms of the modes are overlaid.
 #'
 #' @examples
@@ -170,7 +196,8 @@ get_summary <- function(
   to = NULL,
   output_dir = NULL,
   open_browser = TRUE,
-  by_route_type = FALSE
+  by_route_type = FALSE,
+  unit = "km/h"
 ) {
   if (!report_deps_available()) {
     cli::cli_abort(
@@ -206,6 +233,11 @@ get_summary <- function(
   checkmate::assert_string(output_dir, null.ok = TRUE)
   checkmate::assert_flag(open_browser)
   checkmate::assert_flag(by_route_type)
+  checkmate::assert(
+    checkmate::check_string(unit),
+    checkmate::check_names(unit, subset.of = c("km/h", "mph")),
+    combine = "and"
+  )
 
   time_pattern <- "^\\d{2}:[0-5]\\d:[0-5]\\d$"
   checkmate::assert_string(from, pattern = time_pattern, null.ok = TRUE)
@@ -248,7 +280,7 @@ get_summary <- function(
   }
 
   progress_bar <- cli::cli_progress_bar(
-    total = 8,
+    total = 9,
     format = paste0(
       "{cli::pb_spin} Summarising GTFS feed {cli::pb_bar} ",
       "{cli::pb_current}/{cli::pb_total} | {cli::pb_status}"
@@ -311,6 +343,12 @@ get_summary <- function(
   if (!is.null(date)) {
     feed <- filter_by_date(feed, date)
   }
+
+  # filter_by_time_of_day() moves the start of 'frequencies' entries to 'from',
+  # which shifts their departures, so the vkt counts the departures of the
+  # selected trips in the feed as it was before this filter
+
+  untimed_feed <- feed
   if (!is.null(from)) {
     feed <- filter_by_time_of_day(feed, from, to, full_trips = TRUE)
   }
@@ -373,6 +411,18 @@ get_summary <- function(
 
   trip_stats <- get_trip_length(feed, unit = "km")
 
+  # with unit = "mph", the trip and shape lengths are converted to miles (1
+  # international mile = 1.609344 km) as soon as they are calculated, so that
+  # the speeds, the vmt and every distance derived from them are in miles too.
+  # calculate_vkt() must therefore always be given these lengths: without
+  # them, it would calculate lengths in km
+
+  km_per_mile <- 1.609344
+  length_unit <- if (unit == "mph") "mi" else "km"
+  if (unit == "mph") {
+    trip_stats[, length := length / km_per_mile]
+  }
+
   cli::cli_progress_update(
     id = progress_bar,
     status = "Calculating trip speeds"
@@ -387,6 +437,20 @@ get_summary <- function(
       NA_real_
     )
   ]
+
+  cli::cli_progress_update(id = progress_bar, status = "Calculating VKT")
+
+  vkt_window <- NULL
+  if (!is.null(from)) {
+    vkt_window <- time_of_day_window(from, to)
+  }
+  vkt <- calculate_vkt(
+    untimed_feed,
+    feed$trips[, .(trip_id, service_id, group = "all")],
+    date,
+    vkt_window,
+    lengths = trip_stats
+  )
 
   cli::cli_progress_update(
     id = progress_bar,
@@ -404,8 +468,14 @@ get_summary <- function(
   ) {
     shape_lengths <- get_shape_length(feed)
     shape_lengths <- shape_lengths[shape_id %chin% feed$trips$shape_id]
+    if (unit == "mph") {
+      shape_lengths[, length := length / km_per_mile]
+    }
     total_shape_length <- sum_or_na(shape_lengths$length)
-    mean_shape_length <- summarise_distribution(shape_lengths$length, "km")$mean
+    mean_shape_length <- summarise_distribution(
+      shape_lengths$length,
+      length_unit
+    )$mean
   }
 
   cli::cli_progress_update(
@@ -430,8 +500,8 @@ get_summary <- function(
 
   cli::cli_progress_update(id = progress_bar, status = "Writing the report")
 
-  speed <- summarise_distribution(trip_stats$speed, "km/h")
-  distance <- summarise_distribution(trip_stats$length, "km")
+  speed <- summarise_distribution(trip_stats$speed, unit)
+  distance <- summarise_distribution(trip_stats$length, length_unit)
 
   totals <- data.table::data.table(
     indicator = c(
@@ -443,6 +513,8 @@ get_summary <- function(
       "mean_shape_length",
       "total_trip_length",
       "mean_trip_length",
+      if (unit == "mph") "vmt_total" else "vkt_total",
+      if (unit == "mph") "vmt_daily_mean" else "vkt_daily_mean",
       "total_trip_duration",
       "mean_trip_duration",
       "mean_trip_speed",
@@ -457,12 +529,17 @@ get_summary <- function(
       mean_shape_length,
       sum_or_na(trip_stats$length),
       distance$mean,
+      vkt$vkt,
+      vkt$vkt_daily_mean,
       sum_or_na(trip_stats$duration),
       summarise_distribution(trip_stats$duration * 60, "min")$mean,
       speed$mean,
       frequency$stats$mean
     ),
-    unit = c(NA, NA, NA, NA, "km", "km", "km", "km", "h", "min", "km/h", "min")
+    unit = c(
+      NA, NA, NA, NA, rep(length_unit, 5), paste0(length_unit, "/day"), "h",
+      "min", unit, "min"
+    )
   )
 
   frequency_table <- cbind(
@@ -517,6 +594,21 @@ get_summary <- function(
       "agency_id" %chin% names(agency_table)
     trip_shapes <- feed$trips$shape_id
 
+    # calculate_vkt() returns a row for every mode, including those that don't
+    # run on any counted day
+
+    mode_vkt <- calculate_vkt(
+      untimed_feed,
+      data.table::data.table(
+        trip_id = trip_ids,
+        service_id = feed$trips$service_id,
+        group = trip_labels
+      ),
+      date,
+      vkt_window,
+      lengths = trip_stats
+    )
+
     mode_stats <- lapply(
       mode_labels,
       function(group_label) {
@@ -556,9 +648,11 @@ get_summary <- function(
           names(frequency$headways) %chin% mode_routes
         ]
 
-        mode_speed <- summarise_distribution(trip_stats$speed[in_stats], "km/h")
-        mode_distance <- summarise_distribution(mode_lengths, "km")
+        mode_speed <- summarise_distribution(trip_stats$speed[in_stats], unit)
+        mode_distance <- summarise_distribution(mode_lengths, length_unit)
         mode_frequency <- summarise_distribution(mode_headways, "min")
+
+        is_mode_vkt <- mode_vkt$group == group_label
 
         mode_totals <- c(
           n_agencies,
@@ -566,9 +660,11 @@ get_summary <- function(
           length(mode_trips),
           n_stops,
           sum_or_na(mode_shape_lengths),
-          summarise_distribution(mode_shape_lengths, "km")$mean,
+          summarise_distribution(mode_shape_lengths, length_unit)$mean,
           sum_or_na(mode_lengths),
           mode_distance$mean,
+          mode_vkt$vkt[is_mode_vkt],
+          mode_vkt$vkt_daily_mean[is_mode_vkt],
           sum_or_na(mode_durations),
           summarise_distribution(mode_durations * 60, "min")$mean,
           mode_speed$mean,
@@ -1049,12 +1145,17 @@ write_summary_report <- function(result, values, selection, output_dir) {
     md_table(result$totals),
     "## Trip speed",
     md_table(result$speed),
-    md_plot(values$speed, "Trip speed (km/h)", "speed", values$modes$speed),
+    md_plot(
+      values$speed,
+      paste0("Trip speed (", result$speed$unit[1], ")"),
+      "speed",
+      values$modes$speed
+    ),
     "## Trip distance",
     md_table(result$distance),
     md_plot(
       values$distance,
-      "Trip length (km)",
+      paste0("Trip length (", result$distance$unit[1], ")"),
       "distance",
       values$modes$distance
     ),
