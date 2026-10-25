@@ -119,8 +119,8 @@ set_route_frequency <- function(gtfs,
     lower = 1 / 60,
     upper = .Machine$integer.max / 60
   )
-  checkmate::assert_string(from, pattern = "^\\d{2}:[0-5]\\d:[0-5]\\d$")
-  checkmate::assert_string(to, pattern = "^\\d{2}:[0-5]\\d:[0-5]\\d$")
+  checkmate::assert_string(from, pattern = time_pattern)
+  checkmate::assert_string(to, pattern = time_pattern)
   checkmate::assert_integerish(
     route_type,
     min.len = 1,
@@ -153,17 +153,7 @@ set_route_frequency <- function(gtfs,
     group_cols <- c("route_id", "direction_id", "service_id")
   }
 
-  invalid_route_id <- route_id[! route_id %chin% gtfs$trips$route_id]
-
-  if (length(invalid_route_id) > 0) {
-    cli::cli_warn(
-      paste0(
-        "{.file trips} doesn't contain the following route_id{?s}: ",
-        "{.val {invalid_route_id}}."
-      ),
-      class = "gtfstools_invalid_route_id"
-    )
-  }
+  warn_invalid_ids(route_id, gtfs$trips$route_id, "trips", "route_id")
 
   # route_type restricts the given routes (or selects all the routes of these
   # types)
@@ -341,16 +331,7 @@ set_route_frequency <- function(gtfs,
       fill = TRUE
     )
 
-    for (time_col in c("start_time", "end_time")) {
-      secs_col <- paste0(time_col, "_secs")
-      if (secs_col %chin% names(frequencies)) {
-        data.table::set(
-          frequencies,
-          j = secs_col,
-          value = string_to_seconds(frequencies[[time_col]])
-        )
-      }
-    }
+    refresh_secs_columns(frequencies, c("start_time", "end_time"))
   } else {
     new_frequencies[, exact_times := 0L]
     frequencies <- new_frequencies

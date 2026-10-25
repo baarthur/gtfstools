@@ -107,17 +107,12 @@ convert_stops_to_shapes <- function(gtfs, trip_id = NULL) {
     target_trips <- gtfs$trips$trip_id[!trip_shape_id %chin% usable_shapes]
   } else {
     trip_id <- unique(trip_id)
-    invalid_trip_id <- trip_id[! trip_id %chin% gtfs$trips$trip_id]
-
-    if (length(invalid_trip_id) > 0) {
-      cli::cli_warn(
-        paste0(
-          "{.file trips} doesn't contain the following trip_id{?s}: ",
-          "{.val {invalid_trip_id}}."
-        ),
-        class = "gtfstools_invalid_trip_id"
-      )
-    }
+    invalid_trip_id <- warn_invalid_ids(
+      trip_id,
+      gtfs$trips$trip_id,
+      "trips",
+      "trip_id"
+    )
 
     target_trips <- setdiff(trip_id, invalid_trip_id)
   }

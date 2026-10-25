@@ -11,7 +11,8 @@ is_blank_time(x)
 }
 \value{
 A logical vector, \code{TRUE} where the time is \code{NA}, an empty or
-whitespace-only string, or \code{"NA"}, as in \code{\link[=interpolate_stop_times]{interpolate_stop_times()}}.
+whitespace-only string, or \code{"NA"}. \code{\link[=interpolate_stop_times]{interpolate_stop_times()}} uses the
+same rule.
 }
 \description{
 Check which time strings are blank

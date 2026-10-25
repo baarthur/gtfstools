@@ -146,6 +146,7 @@
   | `write_gtfs()` | 1.7 | 1.9 |
 
 - The package documentation website moved to <https://ipea.github.io/gtfstools/> and the GitHub repository to <https://github.com/ipea/gtfstools>. All links were updated.
+- The warnings about `route_id`s, `trip_id`s and `stop_id`s not found in a feed (classes `gtfstools_invalid_route_id`, `gtfstools_invalid_trip_id` and `gtfstools_invalid_stop_id`) now list each missing id once. `get_route_frequency()`, `get_stop_frequency()`, `get_vkt()` and `set_route_frequency()` used to list an id that was given twice, twice.
 
 # gtfstools 1.4.0
 

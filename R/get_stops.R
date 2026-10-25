@@ -69,19 +69,12 @@ get_stops <- function(gtfs, trip_id = NULL, route_id = NULL) {
 
   if (!is.null(trip_id)) {
     is_selected <- gtfs$stop_times$trip_id %chin% trip_id
-    invalid_trip_id <- unique(
-      trip_id[! trip_id %chin% gtfs$stop_times$trip_id[is_selected]]
+    warn_invalid_ids(
+      trip_id,
+      gtfs$stop_times$trip_id[is_selected],
+      "stop_times",
+      "trip_id"
     )
-
-    if (length(invalid_trip_id) > 0) {
-      cli::cli_warn(
-        paste0(
-          "{.file stop_times} doesn't contain the following trip_id{?s}: ",
-          "{.val {invalid_trip_id}}."
-        ),
-        class = "gtfstools_invalid_trip_id"
-      )
-    }
   }
 
   if (!is.null(route_id)) {
@@ -92,19 +85,7 @@ get_stops <- function(gtfs, trip_id = NULL, route_id = NULL) {
       rep("character", 2)
     )
 
-    invalid_route_id <- unique(
-      route_id[! route_id %chin% gtfs$trips$route_id]
-    )
-
-    if (length(invalid_route_id) > 0) {
-      cli::cli_warn(
-        paste0(
-          "{.file trips} doesn't contain the following route_id{?s}: ",
-          "{.val {invalid_route_id}}."
-        ),
-        class = "gtfstools_invalid_route_id"
-      )
-    }
+    warn_invalid_ids(route_id, gtfs$trips$route_id, "trips", "route_id")
 
     route_trips <- gtfs$trips$trip_id[gtfs$trips$route_id %chin% route_id]
     route_trips <- route_trips[!is.na(route_trips)]

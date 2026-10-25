@@ -129,17 +129,7 @@ set_route_speed <- function(
   # warn about invalid routes after set_trip_speed() has validated the other
   # arguments, so that errors come first
 
-  invalid_route_id <- unique(route_id[!route_id %chin% gtfs$trips$route_id])
-
-  if (length(invalid_route_id) > 0) {
-    cli::cli_warn(
-      paste0(
-        "{.file trips} doesn't contain the following route_id{?s}: ",
-        "{.val {invalid_route_id}}."
-      ),
-      class = "gtfstools_invalid_route_id"
-    )
-  }
+  warn_invalid_ids(route_id, gtfs$trips$route_id, "trips", "route_id")
 
   if (by_reference) {
     return(invisible(result))

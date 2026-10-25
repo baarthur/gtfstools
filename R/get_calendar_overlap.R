@@ -297,16 +297,6 @@ get_calendar_overlap <- function(gtfs, resolution = "daily", plot = FALSE) {
 #'
 #' @keywords internal
 get_service_days <- function(gtfs, count_trips = TRUE) {
-  weekday_cols <- c(
-    "monday",
-    "tuesday",
-    "wednesday",
-    "thursday",
-    "friday",
-    "saturday",
-    "sunday"
-  )
-
   # each service weighs the number of trips it runs on a day. without trips,
   # or when they aren't counted, every service used by a trip (or every
   # service, without trips) weighs 1. services are referred to by their row in

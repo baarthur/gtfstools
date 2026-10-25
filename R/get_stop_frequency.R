@@ -97,8 +97,8 @@ get_stop_frequency <- function(gtfs,
   gtfs <- assert_and_assign_gtfs_object(gtfs)
   checkmate::assert_character(stop_id, null.ok = TRUE, any.missing = FALSE)
   checkmate::assert_logical(by_route, any.missing = FALSE, len = 1)
-  checkmate::assert_string(from, pattern = "^\\d{2}:[0-5]\\d:[0-5]\\d$")
-  checkmate::assert_string(to, pattern = "^\\d{2}:[0-5]\\d:[0-5]\\d$")
+  checkmate::assert_string(from, pattern = time_pattern)
+  checkmate::assert_string(to, pattern = time_pattern)
 
   window <- time_of_day_window(from, to)
   from_secs <- window[1]
@@ -136,17 +136,12 @@ get_stop_frequency <- function(gtfs,
   # stop_id doesn't exist in 'stop_times'
 
   if (!is.null(stop_id)) {
-    invalid_stop_id <- stop_id[! stop_id %chin% gtfs$stop_times$stop_id]
-
-    if (!identical(invalid_stop_id, character(0))) {
-      cli::cli_warn(
-        paste0(
-          "{.file stop_times} doesn't contain the following stop_id{?s}: ",
-          "{.val {invalid_stop_id}}."
-        ),
-        class = "gtfstools_invalid_stop_id"
-      )
-    }
+    warn_invalid_ids(
+      stop_id,
+      gtfs$stop_times$stop_id,
+      "stop_times",
+      "stop_id"
+    )
 
     relevant_stops <- stop_id
     relevant_trips <- gtfs$stop_times$trip_id[

@@ -82,8 +82,8 @@
 get_route_frequency <- function(gtfs, route_id = NULL, from, to) {
   gtfs <- assert_and_assign_gtfs_object(gtfs)
   checkmate::assert_character(route_id, null.ok = TRUE, any.missing = FALSE)
-  checkmate::assert_string(from, pattern = "^\\d{2}:[0-5]\\d:[0-5]\\d$")
-  checkmate::assert_string(to, pattern = "^\\d{2}:[0-5]\\d:[0-5]\\d$")
+  checkmate::assert_string(from, pattern = time_pattern)
+  checkmate::assert_string(to, pattern = time_pattern)
 
   window <- time_of_day_window(from, to)
   from_secs <- window[1]
@@ -111,17 +111,7 @@ get_route_frequency <- function(gtfs, route_id = NULL, from, to) {
   trips <- gtfs$trips[, c("trip_id", group_cols), with = FALSE]
 
   if (!is.null(route_id)) {
-    invalid_route_id <- route_id[! route_id %chin% trips$route_id]
-
-    if (!identical(invalid_route_id, character(0))) {
-      cli::cli_warn(
-        paste0(
-          "{.file trips} doesn't contain the following route_id{?s}: ",
-          "{.val {invalid_route_id}}."
-        ),
-        class = "gtfstools_invalid_route_id"
-      )
-    }
+    warn_invalid_ids(route_id, trips$route_id, "trips", "route_id")
 
     relevant_routes <- route_id
     trips <- trips[route_id %chin% relevant_routes]

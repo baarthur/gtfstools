@@ -237,3 +237,69 @@ test_that("warn_missing_ids() warns about missing ids for its caller", {
   expect_invisible(suppressWarnings(result <- f(c("a", "c", "c"))))
   expect_identical(result, c("c", "c"))
 })
+
+
+
+# warn_invalid_ids --------------------------------------------------------
+
+
+test_that("warn_invalid_ids() warns about the distinct missing ids with cli", {
+  f <- function(x) warn_invalid_ids(x, c("a", "b"), "trips", "route_id")
+
+  expect_silent(f("a"))
+  expect_silent(f(character(0)))
+  expect_silent(f(NULL))
+  expect_identical(f("a"), character(0))
+
+  # the expected messages pin the rendering (singular and plural) that the
+  # users of the callers see
+
+  w <- tryCatch(f("c"), warning = function(w) w)
+  expect_s3_class(w, "gtfstools_invalid_route_id")
+  expect_identical(
+    conditionMessage(w),
+    "'trips' doesn't contain the following route_id: \"c\"."
+  )
+
+  w <- tryCatch(f(c("a", "c", "d", "c")), warning = function(w) w)
+  expect_identical(
+    conditionMessage(w),
+    "'trips' doesn't contain the following route_ids: \"c\" and \"d\"."
+  )
+
+  g <- function(x) warn_invalid_ids(x, "t1", "stop_times", "trip_id")
+  expect_warning(g("t2"), class = "gtfstools_invalid_trip_id")
+
+  expect_invisible(suppressWarnings(result <- f(c("a", "c", "c"))))
+  expect_identical(result, "c")
+})
+
+
+
+# refresh_secs_columns ----------------------------------------------------
+
+
+test_that("refresh_secs_columns() syncs existing *_secs columns by reference", {
+  dt <- data.table::data.table(
+    departure_time = c("00:00:10", "00:01:00", "00:02:00"),
+    arrival_time = c("00:00:05", "00:00:50", "00:01:50"),
+    departure_time_secs = 0L
+  )
+
+  # only the given rows are refreshed, and only the columns that exist
+
+  refresh_secs_columns(dt, c("departure_time", "arrival_time"), 2:3)
+  expect_identical(dt$departure_time_secs, c(0L, 60L, 120L))
+  expect_false("arrival_time_secs" %in% names(dt))
+
+  # NULL rows means all rows, and an empty selection is a silent no-op
+
+  refresh_secs_columns(dt, "departure_time")
+  expect_identical(dt$departure_time_secs, c(10L, 60L, 120L))
+
+  expect_silent(refresh_secs_columns(dt, "departure_time", integer(0)))
+  expect_identical(dt$departure_time_secs, c(10L, 60L, 120L))
+
+  expect_invisible(result <- refresh_secs_columns(dt, "departure_time"))
+  expect_identical(result, dt)
+})

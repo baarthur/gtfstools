@@ -136,6 +136,14 @@ parse_dates <- function(date, call = parent.frame(), arg = "date") {
 
 
 
+# the weekday columns of 'calendar', in GTFS order
+
+weekday_cols <- c(
+  "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"
+)
+
+
+
 #' Get the services that run on the given days
 #'
 #' Returns the services that run on each of the given days, according to the
@@ -151,16 +159,6 @@ parse_dates <- function(date, call = parent.frame(), arg = "date") {
 #'
 #' @keywords internal
 get_services_on_days <- function(gtfs, days) {
-  weekday_cols <- c(
-    "monday",
-    "tuesday",
-    "wednesday",
-    "thursday",
-    "friday",
-    "saturday",
-    "sunday"
-  )
-
   # 1970-01-01 was a thursday, so (day + 3) %% 7 is 0 on mondays, which gives
   # the weekday of a day (1 is monday) regardless of the locale
 

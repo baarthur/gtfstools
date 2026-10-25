@@ -27,9 +27,9 @@ string_to_seconds <- function(string) {
     )
   }
 
-  seconds_from_midgnight <- unique_seconds[idx]
+  seconds_from_midnight <- unique_seconds[idx]
 
-  return(seconds_from_midgnight)
+  return(seconds_from_midnight)
 }
 
 
@@ -201,6 +201,79 @@ warn_missing_ids <- function(id, existing_id, table, id_name) {
   }
 
   return(invisible(invalid_id))
+}
+
+
+
+#' Warn about ids missing from a table, with cli
+#'
+#' The cli counterpart of [warn_missing_ids()], whose base `warning()` text
+#' the older callers keep. Raises a warning of class
+#' `gtfstools_invalid_<id_name>` listing the distinct elements of `id` not
+#' found in `existing_id`.
+#'
+#' @param id A character vector of ids given by the user, or `NULL`.
+#' @param existing_id A character vector of the ids that exist in the table.
+#' @param table The name of the table, used in the warning message.
+#' @param id_name The name of the id field, used in the warning message and
+#'   in the condition class.
+#'
+#' @return The distinct missing ids, invisibly (`NULL` if `id` is `NULL`).
+#'
+#' @keywords internal
+warn_invalid_ids <- function(id, existing_id, table, id_name) {
+  invalid_id <- unique(id[! id %chin% existing_id])
+
+  # the table and field names are pasted in as text, not interpolated, so
+  # that {?s} takes its quantity from the ids and not from these scalars
+
+  if (length(invalid_id) > 0) {
+    cli::cli_warn(
+      paste0(
+        "{.file ", table, "} doesn't contain the following ", id_name,
+        "{?s}: {.val {invalid_id}}."
+      ),
+      class = paste0("gtfstools_invalid_", id_name)
+    )
+  }
+
+  return(invisible(invalid_id))
+}
+
+
+
+#' Refresh the `*_secs` columns of a table after its time strings changed
+#'
+#' Functions that rewrite time strings keep any pre-existing `<time>_secs`
+#' columns in sync, because other functions use these columns as-is (see
+#' [convert_time_to_seconds()]). Columns that don't exist are skipped.
+#'
+#' @param dt A `data.table`, modified by reference.
+#' @param time_cols A character vector with the names of the time string
+#'   columns (e.g. `"departure_time"`).
+#' @param rows An integer vector with the rows whose times changed, or `NULL`
+#'   for all rows.
+#'
+#' @return The table, invisibly.
+#'
+#' @keywords internal
+refresh_secs_columns <- function(dt, time_cols, rows = NULL) {
+  for (time_col in time_cols) {
+    secs_col <- paste0(time_col, "_secs")
+    if (!secs_col %chin% names(dt)) next
+
+    times <- dt[[time_col]]
+    if (!is.null(rows)) times <- times[rows]
+
+    data.table::set(
+      dt,
+      i = rows,
+      j = secs_col,
+      value = string_to_seconds(times)
+    )
+  }
+
+  return(invisible(dt))
 }
 
 #' Raise the deprecation condition of the `sort_sequence` argument

@@ -83,19 +83,7 @@ get_route_speed <- function(gtfs,
   trip_id <- NULL
 
   if (!is.null(route_id)) {
-    invalid_route_id <- unique(
-      route_id[! route_id %chin% gtfs$trips$route_id]
-    )
-
-    if (length(invalid_route_id) > 0) {
-      cli::cli_warn(
-        paste0(
-          "{.file trips} doesn't contain the following route_id{?s}: ",
-          "{.val {invalid_route_id}}."
-        ),
-        class = "gtfstools_invalid_route_id"
-      )
-    }
+    warn_invalid_ids(route_id, gtfs$trips$route_id, "trips", "route_id")
 
     # select the trips of the given routes that have stop times, so that
     # get_trip_speed() doesn't warn about trips without them. a non-character

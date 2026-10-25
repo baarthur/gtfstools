@@ -80,7 +80,6 @@ get_vkt <- function(gtfs,
   gtfs <- assert_and_assign_gtfs_object(gtfs)
   checkmate::assert_character(route_id, null.ok = TRUE, any.missing = FALSE)
 
-  time_pattern <- "^\\d{2}:[0-5]\\d:[0-5]\\d$"
   checkmate::assert_string(from, pattern = time_pattern, null.ok = TRUE)
   checkmate::assert_string(to, pattern = time_pattern, null.ok = TRUE)
   if (!is.null(date)) {
@@ -111,17 +110,7 @@ get_vkt <- function(gtfs,
   trips <- gtfs$trips[, .(trip_id, service_id, group = route_id)]
 
   if (!is.null(route_id)) {
-    invalid_route_id <- route_id[! route_id %chin% trips$group]
-
-    if (!identical(invalid_route_id, character(0))) {
-      cli::cli_warn(
-        paste0(
-          "{.file trips} doesn't contain the following route_id{?s}: ",
-          "{.val {invalid_route_id}}."
-        ),
-        class = "gtfstools_invalid_route_id"
-      )
-    }
+    warn_invalid_ids(route_id, trips$group, "trips", "route_id")
 
     relevant_routes <- route_id
     trips <- trips[group %chin% relevant_routes]

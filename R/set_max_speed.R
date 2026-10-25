@@ -131,16 +131,8 @@ set_max_speed <- function(
   )
   checkmate::assert_string(first_stop, min.chars = 1, null.ok = TRUE)
   checkmate::assert_string(last_stop, min.chars = 1, null.ok = TRUE)
-  checkmate::assert_string(
-    from,
-    pattern = "^\\d{2}:[0-5]\\d:[0-5]\\d$",
-    null.ok = TRUE
-  )
-  checkmate::assert_string(
-    to,
-    pattern = "^\\d{2}:[0-5]\\d:[0-5]\\d$",
-    null.ok = TRUE
-  )
+  checkmate::assert_string(from, pattern = time_pattern, null.ok = TRUE)
+  checkmate::assert_string(to, pattern = time_pattern, null.ok = TRUE)
   checkmate::assert_integerish(
     route_type,
     min.len = 1,
@@ -148,18 +140,9 @@ set_max_speed <- function(
     null.ok = TRUE
   )
 
-  from_secs <- if (is.null(from)) -Inf else string_to_seconds(from)
-  to_secs <- if (is.null(to)) Inf else string_to_seconds(to)
-
-  if (from_secs > to_secs) {
-    cli::cli_abort(
-      paste0(
-        "{.arg from} ({.val {from}}) must not be later than {.arg to} ",
-        "({.val {to}})."
-      ),
-      class = "gtfstools_invalid_time_of_day"
-    )
-  }
+  window <- dwell_time_window(from, to)
+  from_secs <- window[1]
+  to_secs <- window[2]
 
   has_stop_args <- !is.null(first_stop) || !is.null(last_stop)
   has_window <- !is.null(from) || !is.null(to)
@@ -206,19 +189,7 @@ set_max_speed <- function(
         c("character", "character")
       )
 
-      invalid_route_id <- unique(
-        route_id[!route_id %chin% gtfs$trips$route_id]
-      )
-
-      if (length(invalid_route_id) > 0) {
-        cli::cli_warn(
-          paste0(
-            "{.file trips} doesn't contain the following route_id{?s}: ",
-            "{.val {invalid_route_id}}."
-          ),
-          class = "gtfstools_invalid_route_id"
-        )
-      }
+      warn_invalid_ids(route_id, gtfs$trips$route_id, "trips", "route_id")
 
       # only trips with stop times, so get_trip_length() doesn't warn about
       # the others
@@ -479,15 +450,11 @@ set_max_speed <- function(
 
   # refresh pre-existing *_secs columns, which other functions use as-is
 
-  for (time_col in c("departure_time", "arrival_time")) {
-    secs_col <- paste0(time_col, "_secs")
-    if (secs_col %chin% names(stop_times)) {
-      stop_times[
-        timed$row,
-        (secs_col) := string_to_seconds(get(time_col))
-      ]
-    }
-  }
+  refresh_secs_columns(
+    stop_times,
+    c("departure_time", "arrival_time"),
+    timed$row
+  )
 
   gtfs$stop_times <- stop_times
   return(gtfs)

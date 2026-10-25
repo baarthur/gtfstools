@@ -243,7 +243,6 @@ get_summary <- function(
     combine = "and"
   )
 
-  time_pattern <- "^\\d{2}:[0-5]\\d:[0-5]\\d$"
   checkmate::assert_string(from, pattern = time_pattern, null.ok = TRUE)
   checkmate::assert_string(to, pattern = time_pattern, null.ok = TRUE)
   if (xor(is.null(from), is.null(to))) {

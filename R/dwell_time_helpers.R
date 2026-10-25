@@ -11,6 +11,12 @@ max_time_secs <- 9999L * 3600L + 59L * 60L + 59L
 
 
 
+# "HH:MM:SS" (hours may exceed 23), as checked by every time-of-day argument
+
+time_pattern <- "^\\d{2}:[0-5]\\d:[0-5]\\d$"
+
+
+
 # returns the rows of 'stop_times' of the given trips at the given stops (all
 # of them, if NULL), warning about ids that are not in 'stop_times'. each
 # column is scanned once, and its matches are reused to find the missing ids
@@ -20,36 +26,22 @@ select_dwell_time_calls <- function(stop_times, trip_id, stop_id) {
 
   if (!is.null(trip_id)) {
     is_selected <- stop_times$trip_id %chin% trip_id
-    invalid_trip_id <- unique(
-      trip_id[! trip_id %chin% stop_times$trip_id[is_selected]]
+    warn_invalid_ids(
+      trip_id,
+      stop_times$trip_id[is_selected],
+      "stop_times",
+      "trip_id"
     )
-
-    if (length(invalid_trip_id) > 0) {
-      cli::cli_warn(
-        paste0(
-          "{.file stop_times} doesn't contain the following trip_id{?s}: ",
-          "{.val {invalid_trip_id}}."
-        ),
-        class = "gtfstools_invalid_trip_id"
-      )
-    }
   }
 
   if (!is.null(stop_id)) {
     in_stops <- stop_times$stop_id %chin% stop_id
-    invalid_stop_id <- unique(
-      stop_id[! stop_id %chin% stop_times$stop_id[in_stops]]
+    warn_invalid_ids(
+      stop_id,
+      stop_times$stop_id[in_stops],
+      "stop_times",
+      "stop_id"
     )
-
-    if (length(invalid_stop_id) > 0) {
-      cli::cli_warn(
-        paste0(
-          "{.file stop_times} doesn't contain the following stop_id{?s}: ",
-          "{.val {invalid_stop_id}}."
-        ),
-        class = "gtfstools_invalid_stop_id"
-      )
-    }
 
     if (is.null(is_selected)) {
       is_selected <- in_stops
@@ -65,21 +57,13 @@ select_dwell_time_calls <- function(stop_times, trip_id, stop_id) {
 
 
 
-# validates the 'from' and 'to' arguments of get_dwell_time(),
-# set_dwell_time() and the trip duration, length and speed functions as in
-# set_trip_speed(), and returns them in seconds. a NULL end means no limit
+# validates the 'from' and 'to' time-of-day arguments of the dwell time,
+# duration, length and speed functions and returns them in seconds. a NULL
+# end means no limit
 
 dwell_time_window <- function(from, to) {
-  checkmate::assert_string(
-    from,
-    pattern = "^\\d{2}:[0-5]\\d:[0-5]\\d$",
-    null.ok = TRUE
-  )
-  checkmate::assert_string(
-    to,
-    pattern = "^\\d{2}:[0-5]\\d:[0-5]\\d$",
-    null.ok = TRUE
-  )
+  checkmate::assert_string(from, pattern = time_pattern, null.ok = TRUE)
+  checkmate::assert_string(to, pattern = time_pattern, null.ok = TRUE)
 
   from_secs <- if (is.null(from)) -Inf else string_to_seconds(from)
   to_secs <- if (is.null(to)) Inf else string_to_seconds(to)

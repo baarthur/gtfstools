@@ -421,6 +421,14 @@ get_stop_node_keys <- function(stop_id, parent_station, ignored_parents) {
 
 
 
+# the sphere used by the haversine distances (as in {s2}), shared by the
+# clustering bound and the pair search so that they agree
+
+earth_radius <- 6371010
+to_radians <- pi / 180
+
+
+
 #' Cluster stop nodes by distance
 #'
 #' Finds the pairs of nodes within `max_dist` of each other with
@@ -437,9 +445,6 @@ get_stop_node_keys <- function(stop_id, parent_station, ignored_parents) {
 #' @keywords internal
 cluster_stop_nodes <- function(lat, lon, max_dist) {
   n_nodes <- length(lat)
-  earth_radius <- 6371010
-  to_radians <- pi / 180
-
   has_coords <- !is.na(lat) & !is.na(lon)
   node <- which(has_coords)
   lat_rad <- lat[node] * to_radians
@@ -473,35 +478,7 @@ cluster_stop_nodes <- function(lat, lon, max_dist) {
   env <- environment()
 
   check_n_pairs <- function(n_pairs) {
-    if (n_pairs > .Machine$integer.max) {
-      cli::cli_abort(
-        c(
-          "Too many pairs of stops to compare.",
-          "x" = "{format(n_pairs, big.mark = ',', scientific = FALSE)} pairs
-                 would have to be compared.",
-          "i" = "Please use a smaller {.arg max_dist}."
-        ),
-        class = "gtfstools_too_many_stops",
-        call = env
-      )
-    }
-
-    if (n_pairs > max_stop_pairs_without_warning()) {
-      memory_gb <- signif(n_pairs * 64 / 1e9, 2)
-
-      cli::cli_warn(
-        c(
-          "Merging stops with a {.arg max_dist} of {max_dist} m may use a lot
-           of memory.",
-          "i" = "{format(n_pairs, big.mark = ',', scientific = FALSE)} pairs of
-                 stops need at least about {memory_gb} GB.",
-          "i" = "Consider using a smaller {.arg max_dist}."
-        ),
-        class = "gtfstools_many_stops_warning"
-      )
-    }
-
-    return(invisible(NULL))
+    check_stop_pair_count(n_pairs, max_dist, "max_dist", "Merging stops", env)
   }
 
   pairs <- find_stop_pairs_within(lat, lon, max_dist, check_n_pairs)
@@ -510,6 +487,57 @@ cluster_stop_nodes <- function(lat, lon, max_dist) {
   cluster <- cpp_merge_stop_clusters(n_nodes, pairs$from, pairs$to)
 
   return(cluster)
+}
+
+
+
+#' Check the number of pairs of stops before comparing them
+#'
+#' Raises an error if the pairs can't be indexed, and a warning if comparing
+#' them may use a lot of memory (each pair takes about 64 bytes at the peak).
+#'
+#' @param n_pairs A number, the pairs of stops to be compared.
+#' @param max_dist A number, the distance given by the user, in meters.
+#' @param arg_name The name of the user-facing distance argument.
+#' @param action A string that starts the warning, e.g. `"Merging stops"`.
+#' @param call The environment of the user-facing function, so that the error
+#'   mentions it.
+#'
+#' @return Invisibly returns `NULL`, if it doesn't raise an error.
+#'
+#' @keywords internal
+check_stop_pair_count <- function(n_pairs, max_dist, arg_name, action, call) {
+  if (n_pairs > .Machine$integer.max) {
+    cli::cli_abort(
+      c(
+        "Too many pairs of stops to compare.",
+        "x" = "{format(n_pairs, big.mark = ',', scientific = FALSE)} pairs
+               would have to be compared.",
+        "i" = "Please use a smaller {.arg {arg_name}}."
+      ),
+      class = "gtfstools_too_many_stops",
+      call = call
+    )
+  }
+
+  if (n_pairs > max_stop_pairs_without_warning()) {
+    memory_gb <- signif(n_pairs * 64 / 1e9, 2)
+
+    cli::cli_warn(
+      c(
+        paste0(
+          action,
+          " with a {.arg {arg_name}} of {max_dist} m may use a lot of memory."
+        ),
+        "i" = "{format(n_pairs, big.mark = ',', scientific = FALSE)} pairs of
+               stops need at least about {memory_gb} GB.",
+        "i" = "Consider using a smaller {.arg {arg_name}}."
+      ),
+      class = "gtfstools_many_stops_warning"
+    )
+  }
+
+  return(invisible(NULL))
 }
 
 
@@ -532,9 +560,6 @@ cluster_stop_nodes <- function(lat, lon, max_dist) {
 #'
 #' @keywords internal
 find_stop_pairs_within <- function(lat, lon, max_dist, check_n_pairs) {
-  earth_radius <- 6371010
-  to_radians <- pi / 180
-
   has_coords <- !is.na(lat) & !is.na(lon)
   node <- which(has_coords)
   lat_rad <- lat[node] * to_radians

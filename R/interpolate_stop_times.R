@@ -116,16 +116,10 @@ interpolate_stop_times <- function(gtfs, trip_id = NULL, method = "shapes") {
   }
 
   # blanks are detected in the time strings, as in string_to_seconds(), so
-  # malformed times are neither filled nor used as timepoints. time columns
-  # have few distinct values, so only these are trimmed
+  # malformed times are neither filled nor used as timepoints
 
-  is_blank <- function(x) {
-    unique_x <- unique(x)
-    blank_x <- unique_x[is.na(unique_x) | trimws(unique_x) %chin% c("", "NA")]
-    return(x %chin% blank_x)
-  }
-  blank_arr <- is_blank(stop_times$arrival_time)
-  blank_dep <- is_blank(stop_times$departure_time)
+  blank_arr <- is_blank_time(stop_times$arrival_time)
+  blank_dep <- is_blank_time(stop_times$departure_time)
 
   has_blank <- is_relevant & (blank_arr | blank_dep)
   if (!any(has_blank)) return(gtfs)

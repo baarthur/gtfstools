@@ -340,11 +340,17 @@ crop_gtfs <- function(gtfs, geom, trim_shapes = TRUE) {
 #' @param x A character vector of time strings.
 #'
 #' @return A logical vector, `TRUE` where the time is `NA`, an empty or
-#'   whitespace-only string, or `"NA"`, as in [interpolate_stop_times()].
+#'   whitespace-only string, or `"NA"`. [interpolate_stop_times()] uses the
+#'   same rule.
 #'
 #' @keywords internal
 is_blank_time <- function(x) {
-  return(is.na(x) | trimws(x) %chin% c("", "NA"))
+  # time columns have few distinct values, so only these are trimmed
+
+  unique_x <- unique(x)
+  blank_x <- unique_x[is.na(unique_x) | trimws(unique_x) %chin% c("", "NA")]
+
+  return(x %chin% blank_x)
 }
 
 

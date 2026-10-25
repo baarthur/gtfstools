@@ -87,17 +87,8 @@
 #' \dontshow{data.table::setDTthreads(old_dt_threads)}
 #' @export
 filter_by_weekday <- function(gtfs, weekday, combine = "or", keep = TRUE) {
-  days <- c(
-    "monday",
-    "tuesday",
-    "wednesday",
-    "thursday",
-    "friday",
-    "saturday",
-    "sunday"
-  )
   gtfs <- assert_and_assign_gtfs_object(gtfs)
-  checkmate::assert_names(weekday, subset.of = days)
+  checkmate::assert_names(weekday, subset.of = weekday_cols)
   checkmate::assert_string(combine)
   checkmate::assert_names(combine, subset.of = c("or", "and"))
   checkmate::assert_logical(keep, len = 1, any.missing = FALSE)

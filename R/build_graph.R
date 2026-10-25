@@ -190,8 +190,8 @@ build_graph <- function(gtfs,
                         max_walk_dist = 300,
                         walk_speed = 5) {
   gtfs <- assert_and_assign_gtfs_object(gtfs)
-  checkmate::assert_string(from, pattern = "^\\d{2}:[0-5]\\d:[0-5]\\d$")
-  checkmate::assert_string(to, pattern = "^\\d{2}:[0-5]\\d:[0-5]\\d$")
+  checkmate::assert_string(from, pattern = time_pattern)
+  checkmate::assert_string(to, pattern = time_pattern)
   checkmate::assert_string(format)
   checkmate::assert_names(format, subset.of = c("gmns", "igraph", "tidygraph"))
   checkmate::assert_number(max_walk_dist, lower = 0, finite = TRUE)
@@ -649,35 +649,13 @@ build_service_network <- function(gtfs,
   # transfer links connect nearby stops in both directions
 
   check_n_pairs <- function(n_pairs) {
-    if (n_pairs > .Machine$integer.max) {
-      cli::cli_abort(
-        c(
-          "Too many pairs of stops to compare.",
-          "x" = "{format(n_pairs, big.mark = ',', scientific = FALSE)} pairs
-                 would have to be compared.",
-          "i" = "Please use a smaller {.arg max_walk_dist}."
-        ),
-        class = "gtfstools_too_many_stops",
-        call = call
-      )
-    }
-
-    if (n_pairs > max_stop_pairs_without_warning()) {
-      memory_gb <- signif(n_pairs * 64 / 1e9, 2)
-
-      cli::cli_warn(
-        c(
-          "Building transfer links with a {.arg max_walk_dist} of
-           {max_walk_dist} m may use a lot of memory.",
-          "i" = "{format(n_pairs, big.mark = ',', scientific = FALSE)} pairs of
-                 stops need at least about {memory_gb} GB.",
-          "i" = "Consider using a smaller {.arg max_walk_dist}."
-        ),
-        class = "gtfstools_many_stops_warning"
-      )
-    }
-
-    return(invisible(NULL))
+    check_stop_pair_count(
+      n_pairs,
+      max_walk_dist,
+      "max_walk_dist",
+      "Building transfer links",
+      call
+    )
   }
 
   pairs <- find_stop_pairs_within(
