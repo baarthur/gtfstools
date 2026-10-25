@@ -61,13 +61,15 @@ We will use the sample feed of Porto Alegre, included in the package, and build
 the network of the morning peak, from 7am to 10am. `build_graph()` pools the
 trips of every service in the feed. In this example, we will remove services running on weekends with `filter_by_weekday()`:
 
-```{r}
+```{r, warning = FALSE, message = FALSE}
 library(gtfstools)
 library(dplyr)
 
+# read GTFS feed
 path <- system.file("extdata/poa_gtfs.zip", package = "gtfstools")
 gtfs <- read_gtfs(path)
 
+# drop weekends
 gtfs <- filter_by_weekday(
   gtfs,
   weekday = c("saturday", "sunday"), 
@@ -120,7 +122,7 @@ links have the travel time as an attribute. We use it to calculate the shortest
 travel times between every pair of stops, which include the waiting time at
 the stops where vehicles are boarded:
 
-```{r, eval = has_igraph}
+```{r, warning = FALSE, message = FALSE, eval = has_igraph}
 library(igraph)
 
 g_igraph <- build_graph(
@@ -131,7 +133,6 @@ g_igraph <- build_graph(
   )
 
 # get stop nodes
-# stop_nodes <- igraph::V(g_igraph)[igraph::V(g_igraph)$node_type == "stop"]
 stop_nodes <- igraph::V(g_igraph)[node_type == "stop"]
 
 # get travel times between stops

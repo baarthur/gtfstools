@@ -113,7 +113,9 @@
 #' before `from` add nothing to the VKT. If no selected trip departs on the
 #' counted days (within the time of day), `vkt_total` and `vkt_daily_mean` are
 #' `NA`. An error is raised if the `frequencies` table has invalid entries for
-#' selected trips that run on the counted days.
+#' selected trips that run on the counted days. With `unit = "mph"`, the VKT
+#' are instead the vehicle-miles travelled (VMT), as in [get_vmt()], reported
+#' in the rows `vmt_total` and `vmt_daily_mean`.
 #'
 #' The `services` summary and the calendar chart in the report describe the
 #' whole calendar of the selected services: when `date` is given, the
@@ -138,10 +140,10 @@
 #' (except that the headways of all modes are measured on the same day and
 #' time of day), so stops, shapes and agencies shared by several modes count
 #' in each of them. Only the numbers of routes and trips, the total trip
-#' lengths and durations and `vkt_total` add up to the `all` column. Modes
-#' whose routes have blank `agency_id`s count all the agencies of the
-#' selection, and trips listed in `stop_times` but not in `trips` only count in
-#' `all` (and not in the VKT, since they have no service). In the
+#' lengths and durations and `vkt_total` (or `vmt_total`) add up to the `all`
+#' column. Modes whose routes have blank `agency_id`s count all the agencies of
+#' the selection, and trips listed in `stop_times` but not in `trips` only
+#' count in `all` (and not in the VKT, since they have no service). In the
 #' report, the histograms of the modes are overlaid.
 #'
 #' @examples

@@ -321,7 +321,8 @@ test_that("doesn't change given gtfs", {
     list(agency = "1"),
     list(route_id = "CPTM L07"),
     list(from = "07:00:00", to = "09:00:00"),
-    list(by_route_type = TRUE)
+    list(by_route_type = TRUE),
+    list(unit = "mph")
   )
   for (call_args in calls) {
     result <- do.call(tester, c(list(gtfs), call_args))

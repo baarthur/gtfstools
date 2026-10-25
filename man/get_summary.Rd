@@ -146,7 +146,9 @@ feed before it is filtered by time of day, so selected trips that depart
 before \code{from} add nothing to the VKT. If no selected trip departs on the
 counted days (within the time of day), \code{vkt_total} and \code{vkt_daily_mean} are
 \code{NA}. An error is raised if the \code{frequencies} table has invalid entries for
-selected trips that run on the counted days.
+selected trips that run on the counted days. With \code{unit = "mph"}, the VKT
+are instead the vehicle-miles travelled (VMT), as in \code{\link[=get_vmt]{get_vmt()}}, reported
+in the rows \code{vmt_total} and \code{vmt_daily_mean}.
 
 The \code{services} summary and the calendar chart in the report describe the
 whole calendar of the selected services: when \code{date} is given, the
@@ -171,10 +173,10 @@ unknown are grouped as \code{"unknown"}. Modes are ordered by \code{route_type},
 (except that the headways of all modes are measured on the same day and
 time of day), so stops, shapes and agencies shared by several modes count
 in each of them. Only the numbers of routes and trips, the total trip
-lengths and durations and \code{vkt_total} add up to the \code{all} column. Modes
-whose routes have blank \code{agency_id}s count all the agencies of the
-selection, and trips listed in \code{stop_times} but not in \code{trips} only count in
-\code{all} (and not in the VKT, since they have no service). In the
+lengths and durations and \code{vkt_total} (or \code{vmt_total}) add up to the \code{all}
+column. Modes whose routes have blank \code{agency_id}s count all the agencies of
+the selection, and trips listed in \code{stop_times} but not in \code{trips} only
+count in \code{all} (and not in the VKT, since they have no service). In the
 report, the histograms of the modes are overlaid.
 }
 
