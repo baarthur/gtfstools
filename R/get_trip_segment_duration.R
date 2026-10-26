@@ -99,37 +99,32 @@ get_trip_segment_duration <- function(gtfs,
     c("character", "character", "character", "integer")
   )
 
-  # select trip_ids to get segment's duration of and raise warning if a given
-  # trip_id doesn't exist in 'stop_times'
+  # select the trips to get the segments' durations of and raise a warning if
+  # a given trip_id doesn't exist in 'stop_times'
+
+  stop_times <- gtfs$stop_times
 
   if (!is.null(trip_id)) {
-    relevant_trips <- trip_id
-
-    warn_missing_ids(trip_id, gtfs$stop_times$trip_id, "stop_times", "trip_id")
+    warn_missing_ids(trip_id, stop_times$trip_id, "stop_times", "trip_id")
 
     # the selection index is created outside of `[` so that {data.table}
-    # doesn't add an index to the original table
+    # doesn't add an index to the given table
 
-    is_relevant <- gtfs$stop_times$trip_id %chin% relevant_trips
-    durations <- gtfs$stop_times[is_relevant]
-  } else {
-    durations <- gtfs$stop_times
+    is_relevant <- stop_times$trip_id %chin% trip_id
+    stop_times <- stop_times[which(is_relevant)]
   }
 
-  # create auxiliary columns if needed
+  # the times in seconds go into a new table (using the existing '_secs'
+  # columns, if any), so that the given 'stop_times' is never modified.
+  # data.table() copies the vectors, so sorting the new table is safe
 
-  if (!gtfsio::check_field_exists(gtfs, "stop_times", "departure_time_secs")) {
-    durations[, departure_time_secs := string_to_seconds(departure_time)]
-    created_departure_secs <- TRUE
-  }
-
-  if (!gtfsio::check_field_exists(gtfs, "stop_times", "arrival_time_secs")) {
-    durations[, arrival_time_secs := string_to_seconds(arrival_time)]
-    created_arrival_secs <- TRUE
-  }
-
-  if (is.null(trip_id)) durations <- data.table::copy(durations)
-  durations <- data.table::setorderv(durations, c("trip_id", "stop_sequence"))
+  durations <- data.table::data.table(
+    trip_id = stop_times$trip_id,
+    stop_sequence = stop_times$stop_sequence,
+    departure_time_secs = time_secs(stop_times, "departure_time"),
+    arrival_time_secs = time_secs(stop_times, "arrival_time")
+  )
+  data.table::setorderv(durations, c("trip_id", "stop_sequence"))
 
   # each stop but the last of each trip starts a segment, in the order the
   # segments are returned below. the rows of each trip are contiguous after
@@ -162,12 +157,6 @@ get_trip_segment_duration <- function(gtfs,
     durations <- durations[in_window]
   }
 
-  # select desired columns and convert duration to desired unit
-
-  desired_cols <- c("trip_id", "segment", "duration")
-  durations <- durations[, setdiff(names(durations), desired_cols) := NULL]
-  data.table::setcolorder(durations, desired_cols)
-
   # {units} converts element by element, which is slow on long vectors, so we
   # get the conversion factor from a single value and multiply by it
 
@@ -176,23 +165,6 @@ get_trip_segment_duration <- function(gtfs,
       units::set_units(units::as_units(1, "s"), unit, mode = "standard")
     )
     durations[, duration := duration * unit_factor]
-  }
-
-  # the function may have created some colums to gtfs$stop_times if a copy
-  # wasn't made when creating the durations table, so we need to clean them up
-
-  if (
-    gtfsio::check_field_exists(gtfs, "stop_times", "departure_time_secs") &&
-    exists("created_departure_secs")
-  ) {
-    gtfs$stop_times[, departure_time_secs := NULL]
-  }
-
-  if (
-    gtfsio::check_field_exists(gtfs, "stop_times", "arrival_time_secs") &&
-    exists("created_arrival_secs")
-  ) {
-    gtfs$stop_times[, arrival_time_secs := NULL]
   }
 
   return(durations[])

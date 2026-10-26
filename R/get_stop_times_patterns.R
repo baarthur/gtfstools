@@ -127,21 +127,8 @@ get_stop_times_patterns <- function(gtfs,
   if (type == "spatial") {
     columns <- list(stop_codes)
   } else {
-    if (
-      !gtfsio::check_field_exists(gtfs, "stop_times", "departure_time_secs")
-    ) {
-      patterns[, departure_time_secs := string_to_seconds(departure_time)]
-      created_departure_secs <- TRUE
-    }
-    if (
-      !gtfsio::check_field_exists(gtfs, "stop_times", "arrival_time_secs")
-    ) {
-      patterns[, arrival_time_secs := string_to_seconds(arrival_time)]
-      created_arrival_secs <- TRUE
-    }
-
-    dep <- patterns$departure_time_secs
-    arr <- patterns$arrival_time_secs
+    dep <- time_secs(patterns, "departure_time")
+    arr <- time_secs(patterns, "arrival_time")
 
     # times are compared relative to the first departure of each trip: its
     # smallest non-NA departure, found by sorting the departures within each
@@ -170,20 +157,6 @@ get_stop_times_patterns <- function(gtfs,
       to_codes(dep - first_departure),
       to_codes(arr - first_departure)
     )
-
-    if (
-      gtfsio::check_field_exists(gtfs, "stop_times", "departure_time_secs") &&
-      exists("created_departure_secs")
-    ) {
-      gtfs$stop_times[, departure_time_secs := NULL]
-    }
-
-    if (
-      gtfsio::check_field_exists(gtfs, "stop_times", "arrival_time_secs") &&
-      exists("created_arrival_secs")
-    ) {
-      gtfs$stop_times[, arrival_time_secs := NULL]
-    }
   }
 
   patterns <- data.table::data.table(

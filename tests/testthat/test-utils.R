@@ -303,3 +303,22 @@ test_that("refresh_secs_columns() syncs existing *_secs columns by reference", {
   expect_invisible(result <- refresh_secs_columns(dt, "departure_time"))
   expect_identical(result, dt)
 })
+
+
+
+# time_secs ---------------------------------------------------------------
+
+
+test_that("time_secs() uses an existing _secs column as-is or converts", {
+  dt <- data.table::data.table(
+    departure_time = c("00:00:10", "00:01:00"),
+    arrival_time = c("00:00:05", NA),
+    departure_time_secs = c(10.5, 60)
+  )
+  expect_identical(time_secs(dt, "departure_time"), dt$departure_time_secs)
+  expect_identical(time_secs(dt, "arrival_time"), c(5L, NA))
+  expect_identical(time_secs(dt[0], "arrival_time"), integer(0))
+
+  dt[, departure_time_secs := c(10L, 60L)]
+  expect_identical(time_secs(dt, "departure_time"), c(10L, 60L))
+})

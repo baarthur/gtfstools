@@ -276,6 +276,32 @@ refresh_secs_columns <- function(dt, time_cols, rows = NULL) {
   return(invisible(dt))
 }
 
+
+
+#' Get the times of a column in seconds after midnight
+#'
+#' Returns the existing `<time_col>_secs` column as-is when the table has one
+#' (other functions use these columns as-is, see [convert_time_to_seconds()])
+#' and converts the time strings otherwise. The vector returned may be the
+#' table's own column, so callers must only read it or put it in a new table.
+#'
+#' @param dt A `data.table` with a time column (e.g. `stop_times`).
+#' @param time_col The name of the time string column (e.g.
+#'   `"departure_time"`).
+#'
+#' @return An integer (or, from an existing column, possibly double) vector
+#'   of seconds after midnight.
+#'
+#' @keywords internal
+time_secs <- function(dt, time_col) {
+  secs_col <- paste0(time_col, "_secs")
+  if (secs_col %chin% names(dt)) return(dt[[secs_col]])
+
+  return(string_to_seconds(dt[[time_col]]))
+}
+
+
+
 #' Raise the deprecation condition of the `sort_sequence` argument
 #'
 #' `sort_sequence` was deprecated after gtfstools 1.4.0: the functions that

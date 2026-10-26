@@ -67,7 +67,7 @@
 
 - `download_validator()` and `list_validator_versions()` now fail gracefully on network problems, as CRAN requires: they retry transient failures and, if GitHub still can't be reached, inform that with a message (class `gtfstools_validator_download_failure`) and invisibly return `NULL`, instead of raising an error. Previously, `download_validator()` reported any network problem as a misleading "invalid URL" error. A version that doesn't exist still raises an error, now with its own class (`gtfstools_invalid_validator_version`).
 - `download_validator()` now downloads the validator only once, instead of twice. When an explicit `version` was already downloaded to `path`, it no longer goes online at all. With `quiet = FALSE`, it now shows a progress bar.
-- `get_trip_duration()` no longer adds temporary columns to the `stop_times` table of the given GTFS object, which could be left behind if an error happened during the calculation.
+- `get_trip_duration()`, `get_trip_segment_duration()` and `filter_by_time_of_day()` no longer add temporary columns to the `stop_times` table (and, in `filter_by_time_of_day()`, the `frequencies` table) of the given GTFS object, which could be left behind if an error happened during the calculation.
 - The `filter_by_*()` functions no longer drop:
   - rows whose blank keys mean "applies to all": zone `fare_rules` without `route_id`, `transfers` without `from_stop_id`/`to_stop_id` and `attributions` without `agency_id`;
   - the `agency` of single-agency feeds whose `routes.agency_id` is blank or absent;

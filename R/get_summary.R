@@ -291,22 +291,10 @@ get_summary <- function(
     status = "Reading the feed"
   )
 
-  # filter_by_time_of_day() adds and drops columns on the 'stop_times' and
-  # 'frequencies' tables it receives by reference, so these tables of a given
-  # feed are copied before it's filtered by time of day (the list itself is
-  # copied on modification, so the caller's isn't changed)
-
   if (is.character(gtfs)) {
     gtfs <- read_gtfs(gtfs)
   } else {
     gtfs <- assert_and_assign_gtfs_object(gtfs)
-
-    if (!is.null(from)) {
-      copied_tables <- intersect(c("stop_times", "frequencies"), names(gtfs))
-      for (table in copied_tables) {
-        gtfs[[table]] <- data.table::copy(gtfs[[table]])
-      }
-    }
   }
 
   # filter_by_agency_id() doesn't filter the routes of feeds whose 'routes'

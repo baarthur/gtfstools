@@ -335,8 +335,8 @@ test_that("doesn't change given gtfs", {
   gtfs <- read_gtfs(spo_path)
   expect_identical(original_gtfs, gtfs)
 
-  # filter_by_time_of_day() adds columns by reference, so the time-of-day
-  # filter is checked along with the other filters and the default call
+  # every filter, the time-of-day one included, is checked along with the
+  # default call, to prove none of them adds columns to the given tables
 
   calls <- list(
     list(),

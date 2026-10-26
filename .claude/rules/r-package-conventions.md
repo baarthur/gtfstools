@@ -102,16 +102,18 @@ filter_by_something <- function(gtfs, something, keep = TRUE) {
   Before any in-place update, either `data.table::copy()` the table, or expose
   an explicit `by_reference = FALSE` argument (see
   `convert_time_to_seconds()`).
-- **Legacy exceptions, not models:** `filter_by_time_of_day()` (on
-  `frequencies` and `stop_times`), `frequencies_to_stop_times()` and
-  `filter_fare_rules_from_zone_id()` in `R/filter_helpers.R` (`.flagged` on
-  `fare_rules`) add temporary columns to the caller's tables by reference and drop them
-  afterwards. That leaves junk columns if they error midway. New code copies
-  first.
+- **No function adds temporary columns to the caller's tables.** Prefer
+  `time_secs()` (`R/utils.R`) to read the seconds into local vectors or a new
+  table. A table built with `setDT(list(...))` from another table's columns
+  shares them, so never sort or modify it (`data.table()` and `dt[, .(...)]`
+  copy).
 - Filtering subsets (`dt[i]`) produce new tables and leave the caller's data
-  alone. data.table auto-indexing may still add an `index` attribute to the
-  caller's table. That is accepted: don't add `copy()` calls to prevent it,
-  because that costs performance for no data safety.
+  alone, except `dt[TRUE]` (a length-one logical, e.g. on a one-row table),
+  which shares the columns, so a sub-assignment or `setorder*()` on it writes
+  into the caller's data: select with `which()`. data.table auto-indexing may
+  still add an `index` attribute to the caller's table. That is accepted:
+  don't add `copy()` calls to prevent it, because that costs performance for
+  no data safety.
 - Use `:=` for in-place updates of tables the function already owns. Use
   `%chin%` for character membership. Filters use this two-line idiom and pass
   `` `%ffilter%` `` to the helpers in `R/filter_helpers.R` as an argument:

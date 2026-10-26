@@ -214,9 +214,12 @@ filter_by_time_of_day <- function(gtfs,
   )
 
   # frequency-based trips whose frequencies entries were all filtered out must
-  # not be judged by their template times, so they are dropped altogether
+  # not be judged by their template times, so they are dropped altogether. the
+  # selection is created outside of `[` for consistency with the helpers above
+  # (this table is already the function's own)
 
-  gtfs$stop_times <- gtfs$stop_times[!trip_id %chin% lost_frequency_trips]
+  is_lost_trip <- gtfs$stop_times$trip_id %chin% lost_frequency_trips
+  gtfs$stop_times <- gtfs$stop_times[which(!is_lost_trip)]
 
   relevant_trips <- unique(gtfs$stop_times$trip_id)
   invalid_trip_id <- relevant_trips[
@@ -243,17 +246,19 @@ filter_frequencies <- function(gtfs,
                                to_secs,
                                keep,
                                update_frequencies) {
-  # conditionally create time-in-seconds columns, depending if they exist before
-  # or not. if they didn't exist beforehand, they have to be removed afterwards
+  # the table is small, so it's copied: the columns added below never touch
+  # the given table. the time-in-seconds columns are created only if they
+  # didn't exist before, and are removed again at the end in that case
 
-  if (!gtfsio::check_field_exists(gtfs, "frequencies", "start_time_secs")) {
-    gtfs$frequencies[, start_time_secs := string_to_seconds(start_time)]
-    created_start_secs <- TRUE
+  frequencies <- data.table::copy(gtfs$frequencies)
+
+  has_start_secs <- "start_time_secs" %chin% names(frequencies)
+  has_end_secs <- "end_time_secs" %chin% names(frequencies)
+  if (!has_start_secs) {
+    frequencies[, start_time_secs := string_to_seconds(start_time)]
   }
-
-  if (!gtfsio::check_field_exists(gtfs, "frequencies", "end_time_secs")) {
-    gtfs$frequencies[, end_time_secs := string_to_seconds(end_time)]
-    created_end_secs <- TRUE
+  if (!has_end_secs) {
+    frequencies[, end_time_secs := string_to_seconds(end_time)]
   }
 
   # how we filter the frequencies table depend on the 'keep' argument.
@@ -266,7 +271,7 @@ filter_frequencies <- function(gtfs,
   # end_time), but want to drop the entries in which both start_time and
   # end_time are between 'from' and 'to'
 
-  gtfs$frequencies[
+  frequencies[
     ,
     `:=`(
       from_within = from_secs > start_time_secs & from_secs < end_time_secs,
@@ -276,20 +281,14 @@ filter_frequencies <- function(gtfs,
   ]
 
   if (keep) {
-    filtered_frequencies <- gtfs$frequencies[
+    filtered_frequencies <- frequencies[
       from_within == TRUE | to_within == TRUE | within_from_to == TRUE
     ]
   } else {
-    filtered_frequencies <- gtfs$frequencies[
+    filtered_frequencies <- frequencies[
       from_within == TRUE | to_within == TRUE | within_from_to == FALSE
     ]
   }
-
-  # when every row is selected, the subset may share its columns with the
-  # given table, which is then modified by the updates below. the table is
-  # small, so it's copied
-
-  filtered_frequencies <- data.table::copy(filtered_frequencies)
 
   # update the start and end time in the frequencies table if update_frequencies
   # is TRUE
@@ -303,21 +302,12 @@ filter_frequencies <- function(gtfs,
     )
   }
 
-  # conditionally remove time-in-seconds columns
+  # remove the time-in-seconds columns that didn't exist before, and the
+  # auxiliary columns
 
-  if (exists("created_start_secs")) {
-    gtfs$frequencies[, start_time_secs := NULL]
-    filtered_frequencies[, start_time_secs := NULL]
-  }
+  if (!has_start_secs) filtered_frequencies[, start_time_secs := NULL]
+  if (!has_end_secs) filtered_frequencies[, end_time_secs := NULL]
 
-  if (exists("created_end_secs")) {
-    gtfs$frequencies[, end_time_secs := NULL]
-    filtered_frequencies[, end_time_secs := NULL]
-  }
-
-  # and remove the auxiliary columns
-
-  gtfs$frequencies[, c("from_within", "to_within", "within_from_to") := NULL]
   filtered_frequencies[
     ,
     c("from_within", "to_within", "within_from_to") := NULL
@@ -513,75 +503,48 @@ filter_stop_times <- function(gtfs,
                               keep,
                               full_trips,
                               frequency_trips) {
-  # conditionally create time-in-seconds columns, depending if they exist before
-  # or not. if they didn't exist beforehand, they have to be removed afterwards
+  # the times in seconds (from the existing '_secs' columns, if any) and the
+  # selections are local vectors, so the given table is never modified and
+  # {data.table} doesn't add an index to it. which() is used on every
+  # selection, so that a one-row table never yields a subset that shares its
+  # columns
 
-  if (!gtfsio::check_field_exists(gtfs, "stop_times", "departure_time_secs")) {
-    gtfs$stop_times[, departure_time_secs := string_to_seconds(departure_time)]
-    created_departure_secs <- TRUE
-  }
-
-  if (!gtfsio::check_field_exists(gtfs, "stop_times", "arrival_time_secs")) {
-    gtfs$stop_times[, arrival_time_secs := string_to_seconds(arrival_time)]
-    created_arrival_secs <- TRUE
-  }
+  stop_times <- gtfs$stop_times
+  dep_secs <- time_secs(stop_times, "departure_time")
+  arr_secs <- time_secs(stop_times, "arrival_time")
 
   # when filtering the stop_times table, we have to pay attention to the
   # full_trips and keep parameters. if both are TRUE, then we keep the trips
   # that have any of their stops visited inside the specified time of day. if
   # full_trips is TRUE and keep is FALSE, we drop the trips that have any of
   # their stops visited inside the time interval, and if full_trips is FALSE, we
-  # keep/drop only the stops that fall outside the time interval
+  # keep/drop only the stops that fall outside the time interval. the
+  # frequency-based trips are always kept
+
+  is_frequency_trip <- stop_times$trip_id %chin% frequency_trips
+  is_within <- (dep_secs >= from_secs | arr_secs >= from_secs) &
+    (dep_secs <= to_secs | arr_secs <= to_secs)
 
   if (keep) {
-    filtered_stop_times <- gtfs$stop_times[
-      (!(trip_id %chin% frequency_trips) &
-        (departure_time_secs >= from_secs | arrival_time_secs >= from_secs) &
-        (departure_time_secs <= to_secs | arrival_time_secs <= to_secs)) |
-      trip_id %chin% frequency_trips
-    ]
+    filtered_stop_times <- stop_times[which(is_frequency_trip | is_within)]
 
     if (full_trips) {
-      trips_kept <- unique(filtered_stop_times$trip_id)
-      filtered_stop_times <- gtfs$stop_times[trip_id %chin% trips_kept]
+      is_kept_trip <- stop_times$trip_id %chin% filtered_stop_times$trip_id
+      filtered_stop_times <- stop_times[which(is_kept_trip)]
     }
   } else {
-    filtered_stop_times <- gtfs$stop_times[
-      (!(trip_id %chin% frequency_trips) &
-        ((departure_time_secs < from_secs & arrival_time_secs < from_secs) |
-        (departure_time_secs > to_secs & arrival_time_secs > to_secs))) |
-      trip_id %chin% frequency_trips
-    ]
+    is_outside <- (dep_secs < from_secs & arr_secs < from_secs) |
+      (dep_secs > to_secs & arr_secs > to_secs)
+    filtered_stop_times <- stop_times[which(is_frequency_trip | is_outside)]
 
     if (full_trips) {
-      # we drop exactly the trips that keep = TRUE would keep, using the same
-      # predicate. which() treats NA as FALSE, so untimed entries don't cause
-      # their trips to be dropped
+      # we drop exactly the trips that keep = TRUE would keep. which() treats
+      # NA as FALSE, so untimed entries don't cause their trips to be dropped
 
-      trips_to_drop <- unique(
-        gtfs$stop_times[
-          which(
-            !(trip_id %chin% frequency_trips) &
-              (departure_time_secs >= from_secs |
-                 arrival_time_secs >= from_secs) &
-              (departure_time_secs <= to_secs | arrival_time_secs <= to_secs)
-          )
-        ]$trip_id
-      )
-      filtered_stop_times <- gtfs$stop_times[!trip_id %chin% trips_to_drop]
+      trips_to_drop <- stop_times$trip_id[which(!is_frequency_trip & is_within)]
+      is_dropped_trip <- stop_times$trip_id %chin% trips_to_drop
+      filtered_stop_times <- stop_times[which(!is_dropped_trip)]
     }
-  }
-
-  # conditionally remove time-in-seconds columns
-
-  if (exists("created_departure_secs")) {
-    gtfs$stop_times[, departure_time_secs := NULL]
-    filtered_stop_times[, departure_time_secs := NULL]
-  }
-
-  if (exists("created_arrival_secs")) {
-    gtfs$stop_times[, arrival_time_secs := NULL]
-    filtered_stop_times[, arrival_time_secs := NULL]
   }
 
   return(filtered_stop_times)
