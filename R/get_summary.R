@@ -967,6 +967,12 @@ summarise_route_frequency <- function(feed, service_days, date, from, to) {
 write_summary_report <- function(result, values, selection, output_dir) {
   dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
 
+  # large numbers (e.g. the vkt) are shown in full, not in scientific notation,
+  # in the tables and in the axes of the figures
+
+  old_options <- options(scipen = 999)
+  on.exit(options(old_options), add = TRUE)
+
   # text from the feed is escaped so that pandoc doesn't read it as markdown
   # (e.g. "$...$" as math). pipes are escaped by knitr::kable(), and the
   # escaped brackets aren't read as math because tex_math_single_backslash is
@@ -995,7 +1001,7 @@ write_summary_report <- function(result, values, selection, output_dir) {
       x,
       format = "pipe",
       digits = 2,
-      format.args = list(drop0trailing = TRUE)
+      format.args = list(drop0trailing = TRUE, big.mark = ",")
     )
     return(c("", as.character(table), ""))
   }

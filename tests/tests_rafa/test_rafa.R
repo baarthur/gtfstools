@@ -1,9 +1,14 @@
-gtfs1 <- (system.file("extdata/spo_gtfs.zip", package = "gtfstools"))
-
-gtfs2 <- gtfstools::read_gtfs(system.file(
+gtfs1 <- gtfstools::read_gtfs(system.file(
   "extdata/poa_gtfs.zip",
   package = "gtfstools"
 ))
+
+gtfs2 <- gtfstools::read_gtfs(system.file(
+  "extdata/spo_gtfs.zip",
+  package = "gtfstools"
+))
+
+gtfstools::get_calendar_overlap(list(gtfs1, gtfs2), plot = T)
 
 get_summary(gtfs2, unit = "mph")
 
