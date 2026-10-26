@@ -63,18 +63,7 @@ convert_stops_to_shapes <- function(gtfs, trip_id = NULL) {
   checkmate::assert_character(trip_id, null.ok = TRUE, any.missing = FALSE)
 
   gtfsio::assert_field_class(gtfs, "trips", "trip_id", "character")
-  gtfsio::assert_field_class(
-    gtfs,
-    "stop_times",
-    c("trip_id", "stop_id", "stop_sequence"),
-    c("character", "character", "integer")
-  )
-  gtfsio::assert_field_class(
-    gtfs,
-    "stops",
-    c("stop_id", "stop_lat", "stop_lon"),
-    c("character", "numeric", "numeric")
-  )
+  assert_trip_stops_fields(gtfs)
 
   has_shape_id <- gtfsio::check_field_exists(gtfs, "trips", "shape_id")
   if (has_shape_id) {
@@ -85,14 +74,7 @@ convert_stops_to_shapes <- function(gtfs, trip_id = NULL) {
   # shapes can't coerce them
 
   has_shapes <- gtfsio::check_file_exists(gtfs, "shapes")
-  if (has_shapes) {
-    gtfsio::assert_field_class(
-      gtfs,
-      "shapes",
-      c("shape_id", "shape_pt_lat", "shape_pt_lon", "shape_pt_sequence"),
-      c("character", "numeric", "numeric", "integer")
-    )
-  }
+  if (has_shapes) assert_shapes_fields(gtfs, trips = FALSE)
 
   # the trips that get new shapes: the given ones, or those not linked to a
   # usable shape
@@ -248,34 +230,4 @@ convert_stops_to_shapes <- function(gtfs, trip_id = NULL) {
   }
 
   return(gtfs)
-}
-
-
-
-#' Get the usable shapes of a shapes table
-#'
-#' Returns the shapes with at least two distinct points with coordinates. This
-#' is the single definition of a usable shape, used by both
-#' `convert_stops_to_shapes()` and `locate_stops_along_shapes()`.
-#'
-#' @param shapes A GTFS `shapes` table.
-#'
-#' @return A character vector with the `shape_id`s of the usable shapes.
-#'
-#' @keywords internal
-get_usable_shapes <- function(shapes) {
-  # distinct points are flagged instead of selected into a new table, to avoid
-  # copying the shapes. a point with coordinates can only duplicate another
-  # point with coordinates, so points without them don't affect the flags
-
-  has_coords <- !is.na(shapes$shape_pt_lat) & !is.na(shapes$shape_pt_lon)
-  is_distinct_point <- has_coords & !duplicated(
-    shapes,
-    by = c("shape_id", "shape_pt_lat", "shape_pt_lon")
-  )
-
-  n_distinct_points <- table(shapes$shape_id[is_distinct_point])
-  usable_shapes <- names(n_distinct_points)[n_distinct_points >= 2]
-
-  return(usable_shapes)
 }

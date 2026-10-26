@@ -800,25 +800,6 @@ summarise_distribution <- function(x, unit) {
 
 
 
-#' Sum a vector, or return NA if it has no values
-#'
-#' @param x A numeric vector. Non-finite values (`NA`, `Inf`, `-Inf`) are
-#'   ignored.
-#'
-#' @return The sum of the finite values of `x`, or `NA` if there are none.
-#'
-#' @keywords internal
-sum_or_na <- function(x) {
-  x <- x[is.finite(x)]
-  if (length(x) == 0) {
-    return(NA_real_)
-  }
-
-  return(sum(x))
-}
-
-
-
 #' Summarise the calendar of the services of a feed
 #'
 #' @param feed A `dt_gtfs` object, already filtered.

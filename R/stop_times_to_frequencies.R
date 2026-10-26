@@ -172,18 +172,9 @@ stop_times_to_frequencies <- function(gtfs, trip_id = NULL) {
     departure_secs <- string_to_seconds(stop_times$departure_time)
   }
 
-  has_departure <- !is.na(departure_secs)
-  if (!any(has_departure)) return(gtfs)
-
-  trips_info <- data.table::data.table(
-    trip_id = stop_times$trip_id[has_departure],
-    departure_secs = departure_secs[has_departure]
-  )
-  trips_info <- trips_info[
-    ,
-    .(first_departure = min(departure_secs)),
-    by = trip_id
-  ]
+  trips_info <- first_departure_per_trip(stop_times$trip_id, departure_secs)
+  if (nrow(trips_info) == 0L) return(gtfs)
+  data.table::setnames(trips_info, "departure_secs", "first_departure")
 
   # second step: group the trips by route, service, direction and shape (the
   # last two only if present in 'trips'), by their sequence of stops and by the

@@ -110,54 +110,21 @@ get_trip_geometry <- function(gtfs,
     combine = "or"
   )
 
-  gtfsio::assert_field_class(
-    gtfs,
-    "stop_times",
-    c("trip_id", "stop_id", "stop_sequence"),
-    c("character", "character", "integer")
-  )
-  gtfsio::assert_field_class(
-    gtfs,
-    "stops",
-    c("stop_id", "stop_lat", "stop_lon"),
-    c("character", "numeric", "numeric")
-  )
+  assert_trip_stops_fields(gtfs)
 
   # geometries along the shapes require a 'shapes' table and a 'shape_id'
   # column in 'trips'. if any of them is missing, fall back to straight lines
 
-  if (method == "shapes" && !has_shapes(gtfs)) {
-    cli::cli_warn(
-      c(
-        paste0(
-          "The GTFS object doesn't have a {.file shapes} table, or its ",
-          "{.file trips} table doesn't have a {.field shape_id} column."
-        ),
-        "i" = paste0(
-          "Generating {.val euclidean} geometries (straight lines between ",
-          "consecutive stops) instead of geometries along the shapes."
-        )
-      ),
-      class = "gtfstools_shapes_unavailable"
+  method <- resolve_shapes_method(
+    gtfs,
+    method,
+    fallback = paste0(
+      "Generating {.val euclidean} geometries (straight lines between ",
+      "consecutive stops) instead of geometries along the shapes."
     )
-    method <- "euclidean"
-  }
+  )
 
-  if (method == "shapes") {
-    gtfsio::assert_field_class(
-      gtfs,
-      "trips",
-      c("trip_id", "shape_id"),
-      c("character", "character")
-    )
-
-    gtfsio::assert_field_class(
-      gtfs,
-      "shapes",
-      c("shape_id", "shape_pt_lat", "shape_pt_lon", "shape_pt_sequence"),
-      c("character", "numeric", "numeric", "integer")
-    )
-  }
+  if (method == "shapes") assert_shapes_fields(gtfs)
 
   st <- prepare_trip_stops(gtfs, trip_id)
 
@@ -229,133 +196,4 @@ get_trip_geometry <- function(gtfs,
   trips_sf <- sf::st_as_sf(trips_sf)
 
   return(trips_sf)
-}
-
-
-
-#' Build the geometries of parts of shapes
-#'
-#' @param cuts A `data.table` with the `shape_id` of each part and the
-#'   positions, in meters from the start of the shape, where it starts
-#'   (`from`) and ends (`to`).
-#' @param shape_points The `"shape_points"` attribute of the output of
-#'   `locate_stops_along_shapes()`, on which the positions were measured.
-#'
-#' @return A `sfc_LINESTRING` in WGS 84 with the geometry of each part.
-#'
-#' @keywords internal
-build_shape_cuts <- function(cuts, shape_points) {
-  # the cumulative distance of each point of the relevant shapes is calculated
-  # in C++ with the same distances as cpp_locate_stops_on_shapes(), but summed
-  # in long double, as R's cumsum() does, while cpp_locate_stops_on_shapes()
-  # sums in double. so the positions of the last stops may slightly exceed the
-  # cumulative distance of the last shape point. hence the interpolation
-  # factors are clamped to [0, 1] below
-
-  if (nrow(cuts) == 0) return(build_linestrings(cuts, "shape_id"))
-
-  relevant_shapes <- unique(cuts$shape_id)
-  shape_rows <- shape_points$rows[relevant_shapes]
-  rows <- unlist(shape_rows, use.names = FALSE)
-
-  lat <- shape_points$shapes$shape_pt_lat[rows]
-  lon <- shape_points$shapes$shape_pt_lon[rows]
-
-  # each part goes from the point at 'from' to the point at 'to', interpolated
-  # along the shape, through the shape points in between ('inner' points,
-  # whose cumulative distance is strictly between 'from' and 'to'). the shape
-  # segments that contain 'from' and 'to' and the range of inner points are
-  # found in C++ for all the parts at once. indices are global (into 'cum',
-  # 'lat' and 'lon')
-
-  n_cuts <- nrow(cuts)
-  segments <- cpp_shape_cut_segments(
-    lat,
-    lon,
-    lengths(shape_rows),
-    match(cuts$shape_id, relevant_shapes),
-    cuts$from,
-    cuts$to
-  )
-  cum <- segments$cum
-  from_segment <- segments$from_segment
-  to_segment <- segments$to_segment
-  first_inner <- segments$first_inner
-  last_inner <- segments$last_inner
-
-  interpolate <- function(position, segment) {
-    segment_length <- cum[segment + 1L] - cum[segment]
-    fraction <- (position - cum[segment]) / segment_length
-    fraction[!(segment_length > 0)] <- 0
-    fraction <- pmin(pmax(fraction, 0), 1)
-
-    list(
-      lon = lon[segment] + fraction * (lon[segment + 1L] - lon[segment]),
-      lat = lat[segment] + fraction * (lat[segment + 1L] - lat[segment])
-    )
-  }
-  start_point <- interpolate(cuts$from, from_segment)
-  end_point <- interpolate(cuts$to, to_segment)
-
-  # the points of each part: its start point, its inner points and its end
-  # point
-
-  n_inner <- pmax(last_inner - first_inner + 1L, 0L)
-  n_cut_points <- n_inner + 2L
-  cut_id <- rep.int(seq_len(n_cuts), n_cut_points)
-  point_position <- sequence(n_cut_points)
-  is_start <- point_position == 1L
-  is_end <- point_position == n_cut_points[cut_id]
-
-  point_idx <- first_inner[cut_id] + point_position - 2L
-  point_idx[is_start | is_end] <- NA_integer_
-
-  cut_lon <- lon[point_idx]
-  cut_lat <- lat[point_idx]
-  cut_lon[is_start] <- start_point$lon
-  cut_lat[is_start] <- start_point$lat
-  cut_lon[is_end] <- end_point$lon
-  cut_lat[is_end] <- end_point$lat
-
-  cut_points <- data.table::data.table(
-    cut = cut_id,
-    lon = cut_lon,
-    lat = cut_lat
-  )
-
-  return(build_linestrings(cut_points, "cut"))
-}
-
-
-
-#' Build linestrings from sequences of points
-#'
-#' @param points A `data.table` with the coordinates of each point and an
-#'   integer column identifying the linestring of each point. The points of
-#'   each linestring must be contiguous and the ids increasing.
-#' @param id_col The name of the column that identifies the linestrings.
-#' @param x_col,y_col The names of the columns with the longitude and the
-#'   latitude of each point.
-#'
-#' @return A `sfc_LINESTRING` in WGS 84, with one linestring per id.
-#'
-#' @keywords internal
-build_linestrings <- function(points, id_col, x_col = "lon", y_col = "lat") {
-  # the condition for nrow == 0 prevents an sfheaders error
-
-  if (nrow(points) == 0) {
-    built <- sf::st_sfc(crs = 4326)
-    class(built)[1] <- "sfc_LINESTRING"
-    return(built)
-  }
-
-  built <- sfheaders::sfc_linestring(
-    points,
-    x = x_col,
-    y = y_col,
-    linestring_id = id_col
-  )
-  built <- sf::st_set_crs(built, 4326)
-
-  return(built)
 }

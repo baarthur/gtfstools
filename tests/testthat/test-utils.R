@@ -322,3 +322,33 @@ test_that("time_secs() uses an existing _secs column as-is or converts", {
   dt[, departure_time_secs := c(10L, 60L)]
   expect_identical(time_secs(dt, "departure_time"), c(10L, 60L))
 })
+
+
+
+# first_departure_per_trip ------------------------------------------------
+
+
+test_that("first_departure_per_trip() ignores missing departures", {
+  trip_id <- c("b", "a", "a", "c", "b")
+  secs <- c(NA, 30L, 10L, NA, 5L)
+  expected <- data.table::data.table(
+    trip_id = c("a", "b"),
+    departure_secs = c(10L, 5L)
+  )
+
+  # trips without any departure are left out, and the others are listed in
+  # the order of first appearance of their timed rows
+
+  expect_identical(first_departure_per_trip(trip_id, secs), expected)
+  expect_identical(
+    first_departure_per_trip(character(0), integer(0)),
+    expected[0]
+  )
+  expect_identical(first_departure_per_trip("c", NA_integer_), expected[0])
+
+  # the same without data.table's GForce optimisation of min()
+
+  old_options <- options(datatable.optimize = 0L)
+  on.exit(options(old_options), add = TRUE)
+  expect_identical(first_departure_per_trip(trip_id, secs), expected)
+})

@@ -94,6 +94,17 @@ test_that("doesn't change the given gtfs", {
   expect_identical(original_gtfs, gtfs)
   result <- tester(gtfs, shape_id = "17846")
   expect_identical(original_gtfs, gtfs)
+
+  # the same on a one-row shapes table
+
+  original_gtfs$shapes <- original_gtfs$shapes[1]
+  gtfs$shapes <- gtfs$shapes[1]
+  expect_identical(original_gtfs, gtfs)
+
+  result <- tester(gtfs)
+  expect_identical(original_gtfs, gtfs)
+  result <- tester(gtfs, shape_id = gtfs$shapes$shape_id)
+  expect_identical(original_gtfs, gtfs)
 })
 
 test_that("results don't depend on the number of threads", {

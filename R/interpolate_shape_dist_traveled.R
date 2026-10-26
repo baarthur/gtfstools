@@ -46,18 +46,7 @@
 interpolate_shape_dist_traveled <- function(gtfs) {
   gtfs <- assert_and_assign_gtfs_object(gtfs)
 
-  gtfsio::assert_field_class(
-    gtfs,
-    "stop_times",
-    c("trip_id", "stop_id", "stop_sequence"),
-    c("character", "character", "integer")
-  )
-  gtfsio::assert_field_class(
-    gtfs,
-    "stops",
-    c("stop_id", "stop_lat", "stop_lon"),
-    c("character", "numeric", "numeric")
-  )
+  assert_trip_stops_fields(gtfs)
 
   if (!has_shapes(gtfs)) {
     cli::cli_abort(
@@ -69,18 +58,7 @@ interpolate_shape_dist_traveled <- function(gtfs) {
     )
   }
 
-  gtfsio::assert_field_class(
-    gtfs,
-    "trips",
-    c("trip_id", "shape_id"),
-    c("character", "character")
-  )
-  gtfsio::assert_field_class(
-    gtfs,
-    "shapes",
-    c("shape_id", "shape_pt_lat", "shape_pt_lon", "shape_pt_sequence"),
-    c("character", "numeric", "numeric", "integer")
-  )
+  assert_shapes_fields(gtfs)
 
   # the position of each stop along its trip's shape, written back to the
   # stop_times rows they came from. rows without a trip_id are not located
@@ -113,14 +91,12 @@ interpolate_shape_dist_traveled <- function(gtfs) {
   )
   data.table::setorderv(shapes, c("shape_id", "shape_pt_sequence"))
 
-  distance <- rcpp_distance_haversine(
-    data.table::shift(shapes$shape_pt_lat),
-    data.table::shift(shapes$shape_pt_lon),
+  distance <- shape_point_distances(
+    shapes$shape_id,
     shapes$shape_pt_lat,
     shapes$shape_pt_lon
   )
   is_first_point <- !duplicated(shapes$shape_id)
-  distance[is_first_point] <- 0
 
   # the points of each shape are contiguous, so the cumulative distances are
   # calculated per group of consecutive points

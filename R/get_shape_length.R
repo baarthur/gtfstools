@@ -48,43 +48,21 @@ get_shape_length <- function(gtfs, shape_id = NULL, unit = "km") {
     combine = "and"
   )
 
-  shapes_cols <- c(
-    "shape_id",
-    "shape_pt_lat",
-    "shape_pt_lon",
-    "shape_pt_sequence"
-  )
-  gtfsio::assert_field_class(
-    gtfs,
-    "shapes",
-    shapes_cols,
-    c("character", "numeric", "numeric", "integer")
-  )
-
-  # select the relevant shapes rows into a new table, so the given gtfs is not
-  # modified. the selection index is created outside of `[` so that
-  # {data.table} doesn't add an index to the original table
+  assert_shapes_fields(gtfs, trips = FALSE)
 
   if (!is.null(shape_id)) {
     warn_missing_ids(shape_id, gtfs$shapes$shape_id, "shapes", "shape_id")
-    is_relevant <- gtfs$shapes$shape_id %chin% shape_id
-  } else {
-    is_relevant <- rep(TRUE, nrow(gtfs$shapes))
   }
-
-  shapes <- gtfs$shapes[is_relevant, .SD, .SDcols = shapes_cols]
-  data.table::setorderv(shapes, c("shape_id", "shape_pt_sequence"))
+  shapes <- prepare_shape_points(gtfs, shape_id)
 
   # distance from each point to the previous one. the first point of each shape
   # is 0 meters away from its "previous" point
 
-  distance <- rcpp_distance_haversine(
-    data.table::shift(shapes$shape_pt_lat),
-    data.table::shift(shapes$shape_pt_lon),
+  distance <- shape_point_distances(
+    shapes$shape_id,
     shapes$shape_pt_lat,
     shapes$shape_pt_lon
   )
-  distance[!duplicated(shapes$shape_id)] <- 0
   if (unit == "km") distance <- distance / 1000
 
   lengths <- data.table::data.table(

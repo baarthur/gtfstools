@@ -39,30 +39,15 @@ get_shapes_geometry <- function(
     combine = "or"
   )
 
-  gtfsio::assert_field_class(
-    gtfs,
-    "shapes",
-    c("shape_id", "shape_pt_lat", "shape_pt_lon", "shape_pt_sequence"),
-    c("character", "numeric", "numeric", "integer")
-  )
+  assert_shapes_fields(gtfs, trips = FALSE)
 
-  # select relevant shape_ids and raise warning/error if given shape_ids don't
-  # exist in shapes
+  # select the relevant shape points into a new table, so the given gtfs is not
+  # modified, and raise a warning if given shape_ids don't exist in shapes
 
   if (!is.null(shape_id)) {
-    relevant_shapes <- shape_id
-
     warn_missing_ids(shape_id, gtfs$shapes$shape_id, "shapes", "shape_id")
-
-    shapes <- gtfs$shapes[shape_id %chin% relevant_shapes]
-  } else {
-    shapes <- gtfs$shapes
   }
-
-  if (is.null(shape_id)) {
-    shapes <- data.table::copy(shapes)
-  }
-  shapes <- data.table::setorderv(shapes, c("shape_id", "shape_pt_sequence"))
+  shapes <- prepare_shape_points(gtfs, shape_id)
 
   # create an empty LINESTRING sf if shapes is empty
 

@@ -99,12 +99,13 @@ test_that("shapes are sorted by shape_pt_sequence", {
   expect_identical(get_shapes_geometry(unordered_gtfs), shapes_sf)
 })
 
-test_that("doesn't change passed gtfs object (only the index of gtfs$shapes)", {
+test_that("doesn't change the given gtfs", {
   original_gtfs <- read_gtfs(data_path)
   gtfs <- read_gtfs(data_path)
-  shapes_sf <- get_shapes_geometry(gtfs)
+  expect_identical(original_gtfs, gtfs)
 
-  # 'shape_id' is set as gtfs$shapes index because of data.table subset
-  data.table::setindex(gtfs$shapes, NULL)
+  shapes_sf <- get_shapes_geometry(gtfs)
+  expect_identical(original_gtfs, gtfs)
+  shapes_sf <- get_shapes_geometry(gtfs, shape_id = "17846")
   expect_identical(original_gtfs, gtfs)
 })

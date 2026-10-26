@@ -184,28 +184,16 @@ build_timetable <- function(gtfs,
     data.table::set(timetable, j = ".departure_secs", value = departure_secs)
   }
 
-  # the first departure of each trip is calculated only from its non-empty
-  # times, because min() of an empty vector is Inf, with a warning
+  # trips without any departure get NA (see first_departure_per_trip())
 
   if (".first_departure_secs" %in% sort_by) {
-    first_departure_secs <- rep(NA_integer_, nrow(timetable))
-    is_timed <- !is.na(departure_secs)
-
-    if (any(is_timed)) {
-      first_departures <- data.table::data.table(
-        trip_id = timetable$trip_id[is_timed],
-        departure_time_secs = departure_secs[is_timed]
-      )
-      first_departures <- first_departures[
-        ,
-        .(departure_time_secs = min(departure_time_secs, na.rm = TRUE)),
-        by = trip_id
-      ]
-
-      first_departure_secs <- first_departures$departure_time_secs[
-        data.table::chmatch(timetable$trip_id, first_departures$trip_id)
-      ]
-    }
+    first_departures <- first_departure_per_trip(
+      timetable$trip_id,
+      departure_secs
+    )
+    first_departure_secs <- first_departures$departure_secs[
+      data.table::chmatch(timetable$trip_id, first_departures$trip_id)
+    ]
 
     data.table::set(
       timetable,

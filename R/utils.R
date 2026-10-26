@@ -378,3 +378,103 @@ route_type_ids <- function(gtfs, route_type) {
 
   return(gtfs$routes$route_id[gtfs$routes$route_type %in% route_type])
 }
+
+
+
+#' Map the deprecated `file` argument to `method`
+#'
+#' Raises a deprecation warning and returns the `method` that corresponds to
+#' the given `file`.
+#'
+#' @param file The value given to the deprecated `file` argument.
+#' @param fn_name The name of the function whose argument is deprecated.
+#' @param details A string describing how the results differ from those
+#'   obtained with `file`.
+#'
+#' @return Either `"shapes"`, if `"shapes"` is included in `file`, or
+#'   `"euclidean"`.
+#'
+#' @keywords internal
+map_deprecated_file <- function(file,
+                                fn_name,
+                                details = paste0(
+                                  "Lengths are now measured from the first ",
+                                  "to the last stop of each trip. Use ",
+                                  "{.fun get_shape_length} to calculate the ",
+                                  "length of the entire shapes."
+                                )) {
+  checkmate::assert_character(file, min.len = 1, any.missing = FALSE)
+  checkmate::assert_names(file, subset.of = c("shapes", "stop_times"))
+
+  method <- ifelse("shapes" %in% file, "shapes", "euclidean")
+
+  message <- c(
+    "The {.arg file} argument of {.fun {fn_name}} is deprecated.",
+    "i" = "Please use {.arg method} = {.val {method}} instead.",
+    "i" = details
+  )
+  if (length(file) > 1) {
+    message <- c(
+      message,
+      "i" = paste0(
+        "Only {.val shapes} was used. To use both methods, call ",
+        "{.fun {fn_name}} once with each of them."
+      )
+    )
+  }
+
+  cli::cli_warn(message, class = "deprecated_file")
+
+  return(method)
+}
+
+
+
+#' Sum a vector, or return NA if it has no values
+#'
+#' @param x A numeric vector. Non-finite values (`NA`, `Inf`, `-Inf`) are
+#'   ignored.
+#'
+#' @return The sum of the finite values of `x`, or `NA` if there are none.
+#'
+#' @keywords internal
+sum_or_na <- function(x) {
+  x <- x[is.finite(x)]
+  if (length(x) == 0) {
+    return(NA_real_)
+  }
+
+  return(sum(x))
+}
+
+
+
+#' Get the earliest departure of each trip
+#'
+#' @param trip_id,departure_secs The `trip_id` and the departure time (in
+#'   seconds) of each `stop_times` row.
+#'
+#' @return A `data.table` with the columns `trip_id` and `departure_secs` (the
+#'   earliest non-missing departure of the trip), with one row per trip with
+#'   at least one departure, in order of first appearance of the timed rows.
+#'
+#' @keywords internal
+first_departure_per_trip <- function(trip_id, departure_secs) {
+  # min() of an empty vector is Inf, with a warning, so trips without any
+  # departure are left out instead of aggregated
+
+  is_timed <- !is.na(departure_secs)
+  departures <- data.table::data.table(
+    trip_id = trip_id[is_timed],
+    departure_secs = departure_secs[is_timed]
+  )
+  if (nrow(departures) == 0L) return(departures)
+
+  departures <- departures[
+    ,
+    .(departure_secs = min(departure_secs)),
+    by = trip_id
+  ]
+
+  return(departures)
+}

@@ -206,17 +206,11 @@ get_stop_frequency <- function(gtfs,
     )
   }
 
-  first_departures <- stop_times[
-    trip_id %chin% frequency_trips & !is.na(departure_secs),
-    .(trip_id, first_secs = departure_secs)
-  ]
-  if (nrow(first_departures) > 0) {
-    first_departures <- first_departures[
-      ,
-      .(first_secs = min(first_secs)),
-      by = trip_id
-    ]
-  }
+  is_frequency_row <- stop_times$trip_id %chin% frequency_trips
+  first_departures <- first_departure_per_trip(
+    stop_times$trip_id[is_frequency_row],
+    stop_times$departure_secs[is_frequency_row]
+  )
 
   is_frequency_trip <- stop_departures$trip_id %chin% frequency_trips
 
@@ -227,7 +221,7 @@ get_stop_frequency <- function(gtfs,
   frequency_departures[
     first_departures,
     on = "trip_id",
-    secs_offset := departure_secs - i.first_secs
+    secs_offset := departure_secs - i.departure_secs
   ]
   frequency_departures <- get_trip_departures(gtfs, frequency_trips)[
     frequency_departures[, .(trip_id, stop_id, secs_offset)],

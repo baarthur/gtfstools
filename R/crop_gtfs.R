@@ -112,20 +112,7 @@ crop_gtfs <- function(gtfs, geom, trim_shapes = TRUE) {
 
   should_trim <- trim_shapes && has_shapes(gtfs)
 
-  if (should_trim) {
-    gtfsio::assert_field_class(
-      gtfs,
-      "trips",
-      c("trip_id", "shape_id"),
-      c("character", "character")
-    )
-    gtfsio::assert_field_class(
-      gtfs,
-      "shapes",
-      c("shape_id", "shape_pt_lat", "shape_pt_lon", "shape_pt_sequence"),
-      c("character", "numeric", "numeric", "integer")
-    )
-  }
+  if (should_trim) assert_shapes_fields(gtfs)
 
   if (sf::st_crs(geom) != sf::st_crs(4326)) {
     cli::cli_abort(

@@ -87,18 +87,7 @@ get_route_geometry <- function(gtfs,
     c("character", "character")
   )
 
-  gtfsio::assert_field_class(
-    gtfs,
-    "stop_times",
-    c("trip_id", "stop_id", "stop_sequence"),
-    c("character", "character", "integer")
-  )
-  gtfsio::assert_field_class(
-    gtfs,
-    "stops",
-    c("stop_id", "stop_lat", "stop_lon"),
-    c("character", "numeric", "numeric")
-  )
+  assert_trip_stops_fields(gtfs)
 
   # shapes are only used if they are available. otherwise get_trip_geometry()
   # warns and falls back to straight lines, which don't depend on the shapes

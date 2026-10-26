@@ -95,13 +95,11 @@ calculate_shape_dist_traveled <- function(shapes) {
   # {s2}. the first point of each shape is 0 meters away from its "previous"
   # point
 
-  distance_to_prev_point <- rcpp_distance_haversine(
-    data.table::shift(shapes$y),
-    data.table::shift(shapes$x),
+  distance_to_prev_point <- shape_point_distances(
+    shapes$shape_id,
     shapes$y,
     shapes$x
   )
-  distance_to_prev_point[!duplicated(shapes$shape_id)] <- 0
 
   shapes[
     ,
