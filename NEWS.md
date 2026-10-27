@@ -2,154 +2,135 @@
 
 ## Breaking changes
 
-- With `prefix = FALSE`, the default, `merge_gtfs()` now keeps rows that are identical in every column only once (as `remove_duplicates()` does), and raises an error when the GTFS objects share ids whose data differ (such as a `stop_id` with different coordinates, or a `trip_id` with different `stop_times`). Merging a feed with itself, or feeds that share identical stops, now works, but merging versions of the same feed, or unrelated feeds that use simple ids (e.g. both have an `agency_id` `"1"`), usually raises the error. Such shared ids made the merged feed inconsistent and broke functions such as `get_summary()`. Use `prefix = TRUE` to make the ids of each GTFS object unique. For the same reason, a character `prefix` must now have unique elements.
-- `filter_by_sf()`, deprecated in version 1.3.0, is now defunct. Use `filter_by_spatial_extent()`, which takes the same arguments.
-- The `full_trips` argument of `filter_by_stop_id()`, deprecated in version 1.3.0, is now defunct, and the function always filters by the given stops. To keep entire trips, pass the `trip_id`s that serve these stops to `filter_by_trip_id()` (#75).
-- `get_trip_length()` now measures each trip from its first to its last stop, instead of along its entire shape, so lengths are usually shorter. `get_trip_speed()` and `set_trip_speed()` use these lengths, so speeds are usually slightly lower, and they now also require the `stops` table. Use the new `get_shape_length()` for the length of entire shapes.
-- `get_trip_geometry()` now returns, by default, the part of each trip's shape between its first and last stops, matching `get_trip_length()`, and requires the `stop_times` and `stops` tables. Use `get_shapes_geometry()` for entire shapes.
-- `get_trip_geometry()`, `get_trip_length()` and `get_trip_speed()` now return one result per trip, without the `origin_file` column. Their new `method` argument (and `by`, in the last two) comes right after `trip_id`, so `unit` and `file` must now be passed by name.
+- With `prefix = FALSE`, the default, `merge_gtfs()` now keeps rows that are identical in every column only once and raises an error when the GTFS objects share ids whose data differ (e.g. a `stop_id` with different coordinates, or a `trip_id` with different `stop_times`), which used to produce inconsistent feeds. Merging a feed with itself now works, but merging versions of the same feed, or feeds with simple ids (e.g. both with an `agency_id` `"1"`), usually raises the error: use `prefix = TRUE`. A character `prefix` must now have unique elements.
+- `filter_by_sf()` and the `full_trips` argument of `filter_by_stop_id()`, deprecated in version 1.3.0, are now defunct. Use `filter_by_spatial_extent()`, which takes the same arguments. `filter_by_stop_id()` now always keeps only the `stop_times` entries at the given stops (by default, it used to keep entire trips): to keep entire trips, pass the `trip_id`s that serve the stops to `filter_by_trip_id()` (#75).
+- `get_trip_length()` now measures each trip from its first to its last stop, instead of along its entire shape, so lengths are usually shorter, and the speeds of `get_trip_speed()` and `set_trip_speed()` slightly lower. Likewise, `get_trip_geometry()` now returns, by default, the part of the shape between the first and last stops. These functions now require the `stops` table (and `get_trip_length()` and `get_trip_geometry()` also `stop_times`). Use the new `get_shape_length()` and `get_shapes_geometry()` for entire shapes.
+- `get_trip_geometry()`, `get_trip_length()` and `get_trip_speed()` now return one result per trip, without the `origin_file` column. Their new `method` argument (and `by`, in the last two) comes right after `trip_id`, so `unit` and `file` must be passed by name. `get_trip_speed()` also returns `route_id` as its first column, and so requires the `trips` table.
 - The `by_reference` argument of `set_trip_speed()` must now be passed by name (#89).
-- `get_trip_speed()` now returns the `route_id` of each trip (or segment) as its first column, so it now also requires the `trips` table.
-- `convert_shapes_to_sf()`, `get_trip_geometry()`, `get_trip_length()`, `get_trip_speed()`, `get_trip_segment_duration()` and `get_stop_times_patterns()` now always order `shapes` and `stop_times` by `shape_pt_sequence`/`stop_sequence`, so these columns are required. Results only change for feeds not ordered by these columns, whose previous results were incorrect. Their `sort_sequence` argument is deprecated: `sort_sequence = TRUE` raises a warning and `sort_sequence = FALSE` raises an error (#94).
+- `convert_shapes_to_sf()`, `get_trip_geometry()`, `get_trip_length()`, `get_trip_speed()`, `get_trip_segment_duration()` and `get_stop_times_patterns()` now always order `shapes` and `stop_times` by `shape_pt_sequence`/`stop_sequence`, which are therefore required. Results only change for feeds not ordered by these columns, which were previously wrong. Their `sort_sequence` argument is deprecated: `TRUE` raises a warning and `FALSE` an error (#94).
 
 ## Feature deprecation
 
-- `convert_shapes_to_sf()` and `convert_stops_to_sf()` are deprecated in favour of `get_shapes_geometry()` and `get_stops_geometry()`, which take the same arguments (except the deprecated `sort_sequence`) and return the same results. Calling them raises a warning.
-- The `file` argument of `get_trip_geometry()`, `get_trip_length()` and `get_trip_speed()` is deprecated in favour of `method` (`file = "stop_times"` corresponds to `method = "euclidean"`).
+- `convert_shapes_to_sf()` and `convert_stops_to_sf()` are deprecated in favour of `get_shapes_geometry()` and `get_stops_geometry()`, which take the same arguments (except `sort_sequence`) and return the same results.
+- The `file` argument of `get_trip_geometry()`, `get_trip_length()` and `get_trip_speed()` is deprecated in favour of `method` (`file = "stop_times"` is `method = "euclidean"`).
 
 ## New features
 
-- New function `build_graph()`, which builds a frequency-based transit network from the trips that depart within a time of day and returns it as the node, link and config tables of the General Modeling Network Specification (GMNS), or as an `{igraph}` or `{tidygraph}` graph (these packages are suggested, and the function offers to install them in interactive sessions). The network has a node for each stop and for each route and direction at each stop, linked by in-vehicle links (with the mean travel time between stops), boarding links (with the number of departures and the mean waiting time), alighting links and walking transfer links between nearby stops. The direction of trips without `direction_id` is inferred from the stops they share. See the new "Building transit network graphs" vignette, which also shows how to calculate the centrality of stops and how to map the network with `{sfnetworks}` and `{ggraph}`.
-- New function `combine_nearby_stops()`, which combines the stops within a given distance of each other into a single stop. Stops are first merged into their parent stations, and then by distance, closest pairs first, comparing each station at the mean of its platforms' coordinates. A merged stop gets the ids and names of its stops joined by `"-"` and the mean of their coordinates, and the ids of merged stops are replaced in `stop_times`, `transfers` and the other files that refer to stops. Stations are replaced by the stop merged from their platforms, and entrances, generic nodes, boarding areas and `pathways` are removed.
-- The `path` argument of `download_validator()` now defaults to `tempdir()`, so the validator is downloaded to a temporary directory unless another one is given.
-- New function `crop_gtfs()`, which crops a feed to a spatial extent: it keeps the stops inside it (and their parent stations) and the parts of the trips that serve them, and, by default, trims the trips' shapes to their first and last remaining stops. Unlike `filter_by_spatial_extent()`, which keeps entire trips, trips that leave the spatial extent are cut. Blank times at the new ends of cropped trips are interpolated, and the `frequencies` of trips whose first stop is dropped are shifted accordingly (#44). Thanks to @luukvdmeer for the proposal and discussion.
-- New function `get_summary()`, which summarises a feed (its files, agencies, service calendar, totals, including the vehicle-kilometres (or vehicle-miles) travelled, and the distributions of trip speeds, trip lengths and route headways), optionally restricted to some dates, routes, modes, agencies and a time of day. It returns a list of `data.table`s and writes an HTML report with tables and figures (requires `{ggplot2}`, `{knitr}`, `{rmarkdown}` and Pandoc). With `by_route_type = TRUE`, the totals, speeds, lengths and headways are also broken down by transport mode (#127). Distances and speeds are reported in km and km/h, or in miles and mph with `unit = "mph"`.
-- New function `get_vkt()`, which returns the vehicle-kilometres travelled (VKT) by each route: the length of each of its trips, counted once for every departure (including each departure listed in `frequencies`) on every day on which its service runs. VKT can be restricted to some dates and to a time of day. `get_vmt()` returns the same measure in vehicle-miles travelled (VMT).
-- New function `get_route_speed()`, which returns the minimum, mean, median, maximum and standard deviation of the speeds of the trips of each route, as calculated by `get_trip_speed()`.
-- New function `filter_by_date()`, which filters a feed by the services that run on the given dates.
-- New function `filter_by_period()`, which filters a feed by the services that run on at least one day of a period, given by its first and last dates. By default (`trim = TRUE`), the calendars of the kept services are cut to the period, so the feed has no service outside it.
-- New function `get_shapes_geometry()`, which converts the `shapes` table to a `LINESTRING sf` object. It replaces `convert_shapes_to_sf()`.
-- New function `get_stops_geometry()`, which converts the `stops` table to a `POINT sf` object. It replaces `convert_stops_to_sf()`.
-- New function `get_stops()`, which returns the stops visited by the given trips and/or routes.
-- New function `get_stop_distances()`, which returns the great-circle distances between each pair of stops visited by the given trips and/or routes.
-- New function `convert_stops_to_shapes()`, which creates shapes that link the consecutive stops of trips along straight lines, for trips not linked to a usable shape (or for the given trips), and assigns them to the trips.
-- New function `get_dates()`, which returns the dates on which a feed has service, as `Date`s or as `"YYYYMMDD"` strings.
-- New function `get_active_services()`, which returns the services active on the given dates.
-- New function `get_start_and_end_times()`, which returns the earliest departure time and the latest arrival time in `stop_times`, optionally restricted to the given trips and dates.
-- New functions `get_stop_timetable()` and `get_route_timetable()`, which return the timetables of the given stops and routes on the given dates: the stop times of the trips that run on each date, with the trip information.
-- New function `get_calendar_overlap()`, which returns the number of trips each GTFS feed runs on each of its service days (counting the departures listed in `frequencies`) and whether all feeds have service on that day, helping to pick a date on which several feeds can be analysed together (e.g. in routing and accessibility analyses). With `resolution = "periods"`, it returns the periods in which all feeds have service. `plot = TRUE` plots either result (requires `{ggplot2}`): a box plot of when each feed's trips run, or a timeline of its service periods. A message is printed when the feeds have no day with service in all of them. Feeds may be given as paths or as a list of GTFS objects. See the new "Checking the calendar overlap of GTFS feeds" vignette (#85). Thanks @higgicd for the suggestion and the original `check_gtfs_overlap()` code.
-- New functions `get_route_frequency()` and `get_stop_frequency()`, which return the number of departures and the mean headway of each route and at each stop within a time of day (#53).
-- New function `stop_times_to_frequencies()`, the counterpart of `frequencies_to_stop_times()`, which approximates scheduled trips by frequency-based ones (#69).
-- New function `interpolate_stop_times()`, which fills blank `arrival_time`s and `departure_time`s in `stop_times`, assuming a constant speed between stops with known times.
-- New function `interpolate_shape_dist_traveled()`, which calculates the distance, in meters, from the start of each shape to each stop and shape point, and writes it to the `shape_dist_traveled` columns of `stop_times` and `shapes`, replacing any existing values. Stops are located along the shapes as in `get_trip_length()`.
-- New function `convert_seconds_to_time()`, the counterpart of `convert_time_to_seconds()`, which converts seconds after midnight to strings in the "HH:MM:SS" format.
-- New function `set_route_frequency()`, the editing counterpart of `get_route_frequency()`, which sets the headway of routes within a time of day by replacing their trips in it with a frequency-based template trip. Departures outside the time of day don't change. With `route_type`, it changes only the routes of the given transport modes (all of them if `route_id` is not given).
-- New function `set_route_speed()`, the route counterpart of `set_trip_speed()`, which sets the average speed of all trips of the given routes (optionally only of a segment between two stops, only of trips departing within a time of day, and only of the given transport modes, with `route_type`).
-- New functions `get_dwell_time()` and `set_dwell_time()`, which return and set how long vehicles stay at stops, optionally within a time of day. `set_dwell_time()` shifts the later times of each trip accordingly, and can be restricted to the trips of the given transport modes (`route_type`).
-- New function `set_max_speed()`, which caps the speed of the given trips and/or routes. Each part of a trip faster than the maximum speed is slowed down to it, and the later times of the trip are shifted accordingly. Like `set_trip_speed()`, it can cap speeds only between two stops (`first_stop`, `last_stop`), for trips departing within a time of day (`from`, `to`), and for trips of the given transport modes (`route_type`).
-- New function `set_min_dwell_time()`, which makes vehicles stay at least a minimum time at the intermediate stops of the given trips, raising only shorter dwell times and shifting the later times of each trip accordingly.
-- New function `fix_gtfs()`, a wrapper that cleans a feed in one call: it removes duplicated entries and unused ids, optionally caps the speed of trips with `set_max_speed()`, fills blank stop times with `interpolate_stop_times()`, optionally sets a minimum dwell time at the intermediate stops of each trip with `set_min_dwell_time()` and, in feeds with shapes, recalculates the distances travelled along shapes with `interpolate_shape_dist_traveled()`, replacing any existing `shape_dist_traveled` values.
-- New function `get_shape_length()`, which returns the length of each shape.
-- New function `get_route_geometry()`, which returns the distinct trip geometries of each route (e.g. each direction and short-turn service), as generated by `get_trip_geometry()`, with the `trip_id` that identifies each of them (`trip_pattern`, the first `trip_id` of the trips that follow it) and the number of trips that follow each of them.
-- New function `remove_unused_ids()`, which removes unused ids from all files (#55).
-- New function `list_validator_versions()`, which lists the available validator versions. PR contribution by @baarthur.
-- `get_trip_length()` and `get_trip_speed()` gain the `by` argument, to calculate lengths and speeds between consecutive stops. They and `get_trip_geometry()` gain the `method` argument, to measure along the trip's shape or as straight lines between stops. Without shapes, they now fall back to straight lines with a warning, instead of raising an error.
-- `set_trip_speed()` gains the `first_stop`, `last_stop`, `from` and `to` arguments, to change speeds only between two stops and only for trips departing within a time of day (#89).
-- `set_trip_speed()` gains the `route_type` argument, to change only the trips of the given transport modes. It restricts the trips given in `trip_id`, or, on its own, sets the speed of all the trips of these modes, so `trip_id` is now optional.
-- `get_trip_speed()` and `set_trip_speed()` now accept `unit = "mph"`, for speeds in miles per hour.
-- `get_trip_speed()`, `get_route_speed()`, `get_trip_duration()`, `get_trip_length()` and `get_trip_segment_duration()` gain the `from` and `to` arguments, as in `get_dwell_time()`, to include only the trips that depart from their first stop within a time of day (or, for segment results, only the segments that depart within it).
-- `frequencies_to_stop_times()` gains the `strategy` argument, to shift the departures of frequency-based trips by half the headway or by a random offset (#56).
-- `write_gtfs()` gains the `compression_level` argument. Its default, 6 (previously always 9), makes writing about 2 to 3 times faster for files of very similar size.
-- New vignette "Editing GTFS feeds", which lists the functions that edit feeds and demonstrates `set_route_frequency()`, `set_trip_speed()`, `stop_times_to_frequencies()`, `interpolate_stop_times()` and `fix_gtfs()`.
-- New vignette "Querying GTFS feeds", which demonstrates `get_route_frequency()`, `get_stop_frequency()`, `get_stop_timetable()`, `get_trip_length()`, `get_trip_duration()`, `get_trip_speed()`, `get_route_speed()` and `get_summary()`.
-- New vignette "Mapping GTFS feeds", which maps the transit network, routes by speed and stops by frequency with `get_shapes_geometry()`, `get_route_geometry()`, `get_route_speed()` and `get_stops_geometry()`.
+- New functions to query feeds:
+  - `get_summary()` summarises a feed (files, agencies, service calendar, totals including the vehicle-kilometres travelled, and the distributions of trip speeds, trip lengths and route headways), optionally restricted to some dates, routes, modes, agencies and a time of day, as a list of `data.table`s and an HTML report (requires `{ggplot2}`, `{knitr}`, `{rmarkdown}` and Pandoc). `by_route_type = TRUE` breaks results down by transport mode (#127), and `unit = "mph"` reports miles and mph.
+  - `get_vkt()` and `get_vmt()` return the vehicle-kilometres (or vehicle-miles) travelled by each route, counting every departure (including those in `frequencies`) on every day its service runs, optionally restricted to some dates and a time of day.
+  - `get_route_frequency()` and `get_stop_frequency()` return the number of departures and the mean headway of each route and at each stop within a time of day (#53).
+  - `get_route_speed()` returns the minimum, mean, median, maximum and standard deviation of the trip speeds of each route.
+  - `get_route_geometry()` returns the distinct trip geometries of each route (e.g. each direction and short-turn service), with the number of trips that follow each.
+  - `get_shape_length()`, `get_shapes_geometry()` and `get_stops_geometry()` return the length of each shape and the shapes and stops as `sf` objects.
+  - `get_stops()` and `get_stop_distances()` return the stops visited by the given trips and/or routes and the great-circle distances between each pair of them.
+  - `get_dates()`, `get_active_services()` and `get_start_and_end_times()` return the dates with service, the services active on given dates, and the earliest departure and latest arrival times.
+  - `get_stop_timetable()` and `get_route_timetable()` return the timetables of stops and routes on given dates.
+  - `get_dwell_time()` returns how long vehicles stay at stops, optionally within a time of day.
+  - `get_calendar_overlap()` returns the number of trips each feed runs on each service day and whether all feeds have service on it (or, with `resolution = "periods"`, the periods in which all of them do), to pick a date on which several feeds can be analysed together. `plot = TRUE` plots the result (requires `{ggplot2}`). See the new vignette "Checking the calendar overlap of GTFS feeds" (#85). Thanks @higgicd for the suggestion and the original `check_gtfs_overlap()` code.
+- New functions to edit feeds:
+  - `set_route_frequency()` sets the headway of routes within a time of day, replacing their trips in it with a frequency-based template trip. Departures outside the time of day don't change.
+  - `set_route_speed()` sets the average speed of all trips of the given routes, as `set_trip_speed()` does for trips.
+  - `set_dwell_time()`, `set_min_dwell_time()` and `set_max_speed()` set dwell times, raise dwell times at intermediate stops to a minimum and cap trip speeds, shifting the later times of each trip accordingly. The dwell times can be set within a time of day, and speeds capped only between two stops or for trips departing within a time of day, as in `set_trip_speed()`. Like `set_trip_speed()` and `set_route_speed()`, they and `set_route_frequency()` can be restricted to some transport modes with `route_type`.
+  - `interpolate_stop_times()` fills blank arrival and departure times, assuming a constant speed between stops with known times.
+  - `interpolate_shape_dist_traveled()` (re)calculates `shape_dist_traveled` in `stop_times` and `shapes`, in meters.
+  - `stop_times_to_frequencies()`, the counterpart of `frequencies_to_stop_times()`, approximates scheduled trips by frequency-based ones (#69).
+  - `convert_stops_to_shapes()` creates straight-line shapes between consecutive stops for trips without a usable shape.
+  - `combine_nearby_stops()` combines the stops within a given distance of each other (after merging platforms into their stations), updating every file that refers to them. Entrances, generic nodes, boarding areas and `pathways` are removed.
+  - `crop_gtfs()` crops a feed to a spatial extent. Unlike `filter_by_spatial_extent()`, which keeps entire trips, it cuts the trips that leave the extent (interpolating blank times at their new ends and shifting their `frequencies`) and, by default, trims their shapes (#44). Thanks @luukvdmeer for the proposal and discussion.
+  - `remove_unused_ids()` removes unused ids from all files (#55).
+  - `fix_gtfs()` cleans a feed in one call: it removes duplicated rows and unused ids, interpolates blank stop times, recalculates `shape_dist_traveled` in feeds with shapes, and optionally caps trip speeds and sets a minimum dwell time.
+- New function `build_graph()`, which builds a frequency-based transit network from the trips departing within a time of day, as General Modeling Network Specification (GMNS) tables or as an `{igraph}` or `{tidygraph}` graph, with in-vehicle, boarding, alighting and walking transfer links. See the new vignette "Building transit network graphs".
+- New functions `filter_by_date()` and `filter_by_period()`, which keep the services that run on given dates or in a period. By default (`trim = TRUE`), `filter_by_period()` trims the calendars to the period.
+- New function `convert_seconds_to_time()`, the counterpart of `convert_time_to_seconds()`.
+- New function `list_validator_versions()`. PR contribution by @baarthur.
+- `get_trip_length()` and `get_trip_speed()` gain the `by` argument, to calculate lengths and speeds between consecutive stops. They and `get_trip_geometry()` gain the `method` argument, to measure along shapes or along straight lines between stops, and, without shapes, now fall back to straight lines with a warning instead of an error.
+- `set_trip_speed()` gains `first_stop`, `last_stop`, `from` and `to`, to change speeds only between two stops and for trips departing within a time of day (#89), and `route_type`, so `trip_id` is now optional.
+- `get_trip_speed()` and `set_trip_speed()` accept `unit = "mph"`.
+- `get_trip_speed()`, `get_route_speed()`, `get_trip_duration()`, `get_trip_length()` and `get_trip_segment_duration()` gain `from` and `to`, as in `get_dwell_time()`, to include only the trips (or segments) that depart within a time of day.
+- `frequencies_to_stop_times()` gains `strategy`, to shift departures by half the headway or by a random offset (#56).
+- `write_gtfs()` gains `compression_level`. Its default, 6 (previously always 9), makes writing about 2 to 3 times faster, with files of very similar size.
+- The `path` argument of `download_validator()` now defaults to `tempdir()`.
+- New vignettes "Editing GTFS feeds", "Querying GTFS feeds" and "Mapping GTFS feeds".
 
 ## Bug fixes
 
-- Fixed a bug in `merge_gtfs()` that, when the GTFS objects were passed with names (e.g. `merge_gtfs(a = gtfs1, b = gtfs2, prefix = TRUE)`), prefixed the ids with `"NA_"` instead of the given prefixes.
-- `download_validator()` and `list_validator_versions()` now fail gracefully on network problems, as CRAN requires: they retry transient failures and, if GitHub still can't be reached, inform that with a message (class `gtfstools_validator_download_failure`) and invisibly return `NULL`, instead of raising an error. Previously, `download_validator()` reported any network problem as a misleading "invalid URL" error. A version that doesn't exist still raises an error, now with its own class (`gtfstools_invalid_validator_version`).
-- `download_validator()` now downloads the validator only once, instead of twice. When an explicit `version` was already downloaded to `path`, it no longer goes online at all. With `quiet = FALSE`, it now shows a progress bar.
-- `get_trip_duration()`, `get_trip_segment_duration()` and `filter_by_time_of_day()` no longer add temporary columns to the `stop_times` table (and, in `filter_by_time_of_day()`, the `frequencies` table) of the given GTFS object, which could be left behind if an error happened during the calculation.
+- `merge_gtfs()`:
+  - no longer prefixes ids with `"NA_"` when the GTFS objects are passed with names (e.g. `merge_gtfs(a = gtfs1, b = gtfs2, prefix = TRUE)`);
+  - no longer prefixes the `field_value` and `record_sub_id` columns of `translations`, no longer errors with character columns of unknown type, and keeps parent station ids. PR contributions by @gmatosferreira and @haneroglu.
+- `merge_gtfs()` and `remove_duplicates()` no longer corrupt elements that are not tables, such as the `locations` of GTFS-Flex feeds (`merge_gtfs()` leaves them out, with a warning).
+- `download_validator()` and `list_validator_versions()` now fail gracefully on network problems, as CRAN requires: they retry transient failures and then inform with a message (class `gtfstools_validator_download_failure`) and invisibly return `NULL`, instead of raising an error (`download_validator()` used to raise a misleading "invalid URL" one). A version that doesn't exist raises an error of class `gtfstools_invalid_validator_version`.
+- `download_validator()` downloads the validator once instead of twice, doesn't go online when an explicit `version` is already in `path`, and shows a progress bar with `quiet = FALSE`. `list_validator_versions()` returns its result visibly.
+- `get_trip_duration()`, `get_trip_segment_duration()`, `filter_by_time_of_day()`, `filter_by_stop_id()` and `frequencies_to_stop_times()` no longer add temporary columns to the tables of the given feed.
 - The `filter_by_*()` functions no longer drop:
   - rows whose blank keys mean "applies to all": zone `fare_rules` without `route_id`, `transfers` without `from_stop_id`/`to_stop_id` and `attributions` without `agency_id`;
   - the `agency` of single-agency feeds whose `routes.agency_id` is blank or absent;
-  - the station entrances, generic nodes and boarding areas of kept stations and platforms, with their pathways and levels.
-- `filter_by_trip_id()`, `filter_by_service_id()` and `filter_by_shape_id()`, and the functions built on them (such as `filter_by_date()`, `filter_by_period()`, `filter_by_weekday()` and `filter_by_spatial_extent()`), no longer keep `fare_attributes` (and their agencies) whose `fare_rules` were all dropped by zone.
+  - the station entrances, generic nodes and boarding areas of kept stations and platforms, with their pathways and levels;
+  - every `fare_attributes` entry of feeds without `fare_rules`. In multi-agency feeds, they keep the fares of the agencies whose routes were kept, and those without an agency.
+- `filter_by_agency_id()` now keeps the `fare_attributes` without an `agency_id`.
+- `filter_by_trip_id()`, `filter_by_service_id()`, `filter_by_shape_id()` and the functions built on them no longer keep `fare_attributes` (and their agencies) whose `fare_rules` were all dropped by zone.
 - `filter_by_route_id()` and `filter_by_route_type()` filtered `fare_rules` by `level_id` instead of `route_id`.
 - `filter_by_time_of_day()`:
-  - with `keep = TRUE`, now sets the `end_time` of `frequencies` entries that cross `to` to one second after `to`, so that a departure at `to` is no longer lost by `frequencies_to_stop_times()`;
-  - updates the `start_time` of `frequencies` entries with a blank `exact_times`;
-  - no longer returns frequency-based trips whose `frequencies` entries were all filtered out;
+  - with `keep = TRUE`, sets the `end_time` of `frequencies` entries that cross `to` to one second after it, so `frequencies_to_stop_times()` no longer loses a departure at `to`;
+  - keeps `frequencies` entries that start exactly at `to` (this also affects `get_summary()`);
+  - with `keep = FALSE`, drops a departure at `to`, and removes entries left without departures;
+  - updates the `start_time` of `frequencies` entries with a blank `exact_times`, and no longer returns frequency-based trips whose entries were all filtered out;
   - with `keep = FALSE` and `full_trips = TRUE`, no longer drops every trip with an untimed stop;
-  - rejects `from`/`to` values with minutes or seconds of 60 or more;
-  - keeps `frequencies` entries that start exactly at `to`, whose first departure is within the time of day (this also affects `get_summary()` with `from` and `to`);
-  - with `keep = FALSE`, drops a departure at `to`: entries crossing `to` now start one second after it, or at the next departure with `exact_times = 1`. Entries left without any departure are removed;
+  - rejects `from`/`to` with minutes or seconds of 60 or more;
   - no longer modifies the `frequencies` table of the given feed when all of its entries are selected.
-- `filter_by_spatial_extent()` no longer errors when stops have missing coordinates, and with `keep = FALSE` drops every selected trip. It now filters the feed only once, so shapes not used by any trip are no longer kept and duplicated rows are no longer removed.
-- Fixed a bug in `filter_by_spatial_extent()` in which a `bbox` passed to `geom` was converted to a slightly larger polygon with curved edges, so shapes and trips near its edges could be wrongly kept or dropped. A `bbox` is now treated as a rectangle in longitude and latitude.
-- `filter_by_stop_id()` no longer adds a `.flagged` column to the `fare_rules` table of the given feed.
-- `frequencies_to_stop_times()` treats `end_time` as exclusive, as required by the GTFS specification: an entry from 08:00 to 09:00 with a 30-minute headway now yields trips at 08:00 and 08:30 only.
-- Functions that convert times to seconds now convert malformed times (e.g. `"5:30"`, `"12:60:00"`) to `NA` with a warning, instead of silently returning wrong values. Non-ASCII strings marked as `"bytes"` also become `NA` with a warning, instead of raising an error. `convert_time_to_seconds()` also no longer skips `arrival_time` and `end_time` when only one column of a pair is present.
-- `get_stop_times_patterns()` no longer ignores stop timing for spatiotemporal patterns of trips with blank stop times, and no longer merges different stop sequences whose `stop_id`s contain `;` or `|`.
-- `set_trip_speed()` now identifies the first stop of each trip by `stop_sequence` instead of row position, and keeps existing `*_secs` columns in sync with the updated times.
+- `filter_by_spatial_extent()` no longer errors when stops have missing coordinates, drops every selected trip with `keep = FALSE`, no longer keeps unused shapes nor removes duplicated rows, and treats a `bbox` as a rectangle in longitude and latitude, instead of a slightly larger polygon with curved edges. It no longer accepts `sf::st_equals_exact()` and `sf::st_is_within_distance()` as `spatial_operation`, since they always failed.
+- `frequencies_to_stop_times()` treats `end_time` as exclusive, as the GTFS specification requires (from 08:00 to 09:00 every 30 minutes now yields 08:00 and 08:30 only), and sets arrivals that a dwell time at the first stop would put before 00:00:00 to 00:00:00, instead of raising an error.
+- Malformed times (e.g. `"5:30"`, `"12:60:00"`) and non-ASCII strings marked as `"bytes"` are converted to `NA` with a warning, instead of wrong values or an error. `convert_time_to_seconds()` no longer skips `arrival_time` and `end_time` when only one column of a pair is present.
+- `get_stop_times_patterns()` no longer ignores stop timing in the spatiotemporal patterns of trips with blank stop times, and no longer merges different stop sequences whose `stop_id`s contain `;` or `|`.
+- `set_trip_speed()` identifies the first stop of each trip by `stop_sequence` instead of row position, keeps existing `*_secs` columns in sync, and raises an error when `speed` is zero, negative or infinite, or when a trip is given different speeds.
+- `get_trip_duration()` returns `NA` with a warning (also raised by `get_trip_speed()`) for trips without any arrival or departure time, instead of `-Inf` or an error.
+- Functions that measure trips along shapes raise an informative error when a used shape has a blank `shape_id`. `get_trip_length()`, `get_trip_speed()` and `get_trip_geometry()` ignore `stop_times` entries with a missing or blank `trip_id`, which used to shift the segments of other trips with `by = "segment"`.
 - `get_children_stops()` no longer returns `NA` rows for stops without a `parent_station`.
-- `read_gtfs()` no longer keeps doubled quotes inside quoted text fields, and `write_gtfs()` always writes text as UTF-8, also when the feed was read with `encoding = "Latin-1"`.
+- `read_gtfs()` no longer keeps doubled quotes inside quoted text fields, and `write_gtfs()` always writes UTF-8, also for feeds read with `encoding = "Latin-1"`.
 - `as_dt_gtfs()` no longer turns `Date` fields into `NA`, and converts the date fields of lists to `Date`.
-- `merge_gtfs()` no longer prefixes the `field_value` and `record_sub_id` columns of `translations`, no longer errors with character columns of unknown type, and keeps parent station ids. PR contributions by @gmatosferreira and @haneroglu.
-- The `filter_by_*()` functions no longer drop every `fare_attributes` entry of feeds without a `fare_rules` table, whose fares apply to all routes of their agency. In multi-agency feeds, they keep the fares of the agencies whose routes were kept, and the fares without an agency.
-- `set_trip_speed()` now raises an error when `speed` is zero or negative, instead of setting invalid times.
-- `get_trip_duration()` now returns `NA`, with a warning, for trips without any arrival time or without any departure time, instead of `-Inf` (or an error) with base R warnings. `get_trip_speed()` raises the same warning.
-- Functions that measure trips along their shapes (such as `get_trip_length()`, `get_trip_geometry()`, `get_trip_speed()` and `set_trip_speed()`) now raise an informative error when a used shape has a blank `shape_id`, instead of an obscure one.
-- `list_validator_versions()` now returns its result visibly.
-- `filter_by_spatial_extent()` no longer accepts `sf::st_equals_exact()` and `sf::st_is_within_distance()` as `spatial_operation`, since they always failed for lack of their additional arguments.
-- `remove_duplicates()` no longer corrupts elements that are not tables, such as the `locations` of GTFS-Flex feeds.
-- `merge_gtfs()` no longer corrupts elements that are not tables, such as the `locations` of GTFS-Flex feeds: they are left out of the merged feed, with a warning.
-- `get_trip_length()`, `get_trip_speed()` and `get_trip_geometry()` now ignore `stop_times` entries with a missing or blank `trip_id`, which used to shift the segments of every other trip with `by = "segment"`.
-- `frequencies_to_stop_times()` no longer errors when a dwell time at the first stop makes an arrival fall before 00:00:00; such arrivals are set to 00:00:00.
-- `filter_by_agency_id()` now keeps the `fare_attributes` without an `agency_id`.
-- `set_trip_speed()` now also raises an error when `speed` is infinite, or when the same trip is given different speeds.
-- Documentation: `filter_by_stop_id()` now correctly describes that it keeps (or drops) the `stop_times` entries at the given stops, not entire trips.
+- The documentation of `filter_by_stop_id()` now says that it keeps (or drops) the `stop_times` entries at the given stops, not entire trips.
 
 ## Notes
 
-- `get_trip_length()`, `get_trip_geometry()` and the functions that use them (`get_trip_speed()`, `set_trip_speed()` and `interpolate_stop_times()`), as well as `get_shape_length()` and `get_stop_distances()`, now run their C++ code in parallel, using as many threads as `data.table::getDTthreads()` (change it with `data.table::setDTthreads()`). On a feed with 900,000 shape points and 2,200 trip patterns, with 6 threads, `get_trip_length()` and `get_trip_geometry()` are about 2 to 2.5 times faster, and `get_shape_length()` and `get_stop_distances()` about 2 times faster. Stops are also located along all shapes in a single call, which makes `get_trip_length()` about 15% faster even with a single thread. Results don't depend on the number of threads. On platforms whose compilers don't support OpenMP, the code runs on a single thread.
-- `get_stop_distances()` is about 1.5 times faster and allocates about 35% less memory than in earlier development versions (on a feed with 1.9 million pairs of stops), as the radians and the cosine of the latitude of each stop are calculated only once. Results are unchanged, up to floating-point rounding on some platforms.
-- `get_trip_length()` and the functions that use it (`get_trip_speed()`, `set_trip_speed()`, `interpolate_stop_times()`, `interpolate_shape_dist_traveled()` and `crop_gtfs()`) are about 1.3 times faster than in earlier development versions, and `get_trip_geometry()` about 1.05 to 1.25 times faster (on a feed with 900,000 shape points and 2,200 trip patterns and on smaller feeds, with 2 threads), as each stop is now compared only with the parts of its trip's shape near it, instead of with the whole shape. Results are unchanged.
-- gtfstools no longer depends on `{units}` (#84). `set_trip_speed()` now converts speeds given in m/s or mph with exact factors (1 m/s = 3.6 km/h, 1 mile = 1.609344 km), the same ones `set_max_speed()` uses, so in rare borderline cases the new times of a trip may be one second earlier than in version 1.4.0, which converted m/s through `{units}`.
-- `download_validator()` now automatically detects the latest validator version. PR contribution by @baarthur.
-- Invalid dates (e.g. `20240230`) are still converted to `NA` when reading or converting feeds, but now with a warning.
-- `frequencies_to_stop_times()` now raises informative errors for invalid `frequencies` entries and for trips without a `departure_time`.
-- Trip lengths are now always calculated on the `{s2}` sphere, regardless of `sf::sf_use_s2()`.
-- `get_trip_geometry()` is slower with the default `method = "shapes"`, as it locates stops along shapes: on a feed with 15,000 trips and 920,000 `stop_times` rows, about 0.8 seconds instead of 0.02 seconds for the entire shapes.
-- `get_stop_times_patterns()` is about 2 times faster on a feed with 1,700 `stop_times` rows, as trips are compared without building text keys from their stops and times. `get_trip_length()` and `get_trip_geometry()` also no longer build such keys when locating stops along shapes.
-- `get_children_stops()` is now much faster on large feeds (about 250x faster with 20,000 stops).
-- Converting date fields when reading and writing feeds (`read_gtfs()`, `write_gtfs()`, `as_dt_gtfs()`) is now much faster (about 200x faster for the date conversion itself), noticeably speeding up `read_gtfs()` on feeds with large `calendar_dates` tables.
-- Converting times between `"HH:MM:SS"` strings and seconds is now faster, as each distinct time is converted only once and parsed without being copied. This speeds up `convert_time_to_seconds()` (about 20 times faster on a feed with 900,000 `stop_times` rows), `filter_by_time_of_day()` (about 7 times faster on the same feed) and, to a lesser extent, the other functions that convert times.
-- `get_trip_segment_duration()` and `get_trip_duration()` are much faster when `unit` is not `"s"` (about 60 and 10 times faster, respectively, on a feed with 900,000 `stop_times` rows).
-- `frequencies_to_stop_times()` is much faster (about 13 times faster when converting a feed into 300,000 `stop_times` rows), as it creates all new trips at once instead of one at a time. It also no longer adds and then removes auxiliary columns from the tables of the given feed.
-- `filter_by_spatial_extent()` is much faster and uses much less memory (about 25 times faster on a feed with 900,000 `stop_times` rows), as it filters the feed only once and doesn't create geometries for trips already selected by their shapes.
-- `convert_sf_to_shapes()` is much faster (about 30 times faster with `calculate_distance = FALSE` and 70 times faster with `calculate_distance = TRUE` on a feed with 50,000 shape points), as it no longer casts the linestrings to points and calculates `shape_dist_traveled` with a vectorised haversine formula. Distances are calculated on the same sphere used by `{s2}`, so they match the previous results (with `sf::sf_use_s2(TRUE)`, the default) to within a micrometre. With `sf::sf_use_s2(FALSE)`, the previous version calculated ellipsoidal distances, which differ from the spherical ones by up to about 0.4%; distances are now always spherical.
-- `merge_gtfs()` with `prefix` is about 2.3 times faster on a feed with 1.15 million `stop_times` rows, as each distinct id is prefixed only once. `get_trip_segment_duration()`, `get_trip_geometry(method = "euclidean")` (which now builds the geometry of each distinct sequence of stops only once) and the functions that count the departures of scheduled trips, such as `get_route_frequency()`, are slightly faster. Results are unchanged.
-- The table below compares the speed of each exported function with the CRAN release (1.4.0), on the example feeds shipped with the package (each stacked twice with `merge_gtfs()`), with the default number of threads. Values are how many times faster each function is: values below 1 mean it is slower, and ~1 means a difference under about 1.2 times, within measurement noise. Functions marked with † now measure trips differently (see "Breaking changes"), so they do different work than before: `get_trip_geometry()`, for instance, is slower because it now cuts the shapes between the trips' first and last stops. `as_dt_gtfs()` is slower because it now converts integer dates (a fixed cost of about 1 to 1.5 milliseconds), and `convert_shapes_to_sf()` because it now always sorts the shape points by `shape_pt_sequence`. `get_trip_duration()` and `get_trip_segment_duration()` used `unit = "min"`, `filter_by_spatial_extent()` used the western half of each feed's extent, `filter_by_time_of_day()` kept the period from 07:00 to 09:00, and the other `filter_by_*()` functions kept half of the ids. The poa feed has no `frequencies` table, and neither feed has the `parent_station` column used by `get_children_stops()` and `get_parent_station()`. `validate_gtfs()` and `download_validator()` were not measured.
+- Many functions are faster. The table below shows how many times faster than in version 1.4.0 each function of that version is, on the example feeds `poa` and `spo` stacked twice with `merge_gtfs()` (up to 46,000 `stop_times` rows), with the default number of threads. Values below 1 mean slower, and ~1 a difference under 1.2 times (measurement noise); functions not listed are ~1 on both feeds, except `get_children_stops()` and `get_parent_station()` (the feeds have no `parent_station`), `validate_gtfs()` and `download_validator()`, which were not measured. `poa` has no `frequencies`. Functions marked with † now do different work (see "Breaking changes"): `merge_gtfs()` checks the ids shared by the GTFS objects (with `prefix = TRUE`, it is 1.2 to 1.8 times faster), and `get_trip_geometry()` cuts shapes at the trips' first and last stops. On these small feeds, fixed costs dominate: `as_dt_gtfs()` now converts integer dates (about 1 to 2 milliseconds), `filter_by_trip_id()` and `filter_by_weekday()` take about 7 milliseconds more, and the deprecated `convert_shapes_to_sf()` and `convert_stops_to_sf()` raise a warning, while their replacements, `get_shapes_geometry()` and `get_stops_geometry()`, are about as fast as they were.
 
   | function | n times faster on poa | n times faster on spo |
   |---|---|---|
-  | `convert_sf_to_shapes()` | 12 | 42 |
-  | `convert_time_to_seconds()` | 2.4 | ~1 |
-  | `filter_by_spatial_extent()` | 3.3 | 2.4 |
-  | `filter_by_stop_id()` | 5.3 | 4.6 |
-  | `filter_by_time_of_day()` | 1.4 | ~1 |
-  | `frequencies_to_stop_times()` | – | 5.2 |
-  | `get_stop_times_patterns()` | 1.6 | 1.5 |
-  | `get_trip_duration()` | 2.2 | ~1 |
-  | `get_trip_length()`† | 1.7 | ~1 |
-  | `get_trip_segment_duration()` | 27 | 2.7 |
-  | `get_trip_speed()`† | 1.2 | ~1 |
-  | `set_trip_speed()`† | 1.2 | 0.7 |
-  | `write_gtfs()` | 1.7 | 1.9 |
+  | `as_dt_gtfs()` | 0.3 | 0.7 |
+  | `convert_sf_to_shapes()` | 11 | 65 |
+  | `convert_shapes_to_sf()` | 0.1 | 0.4 |
+  | `convert_stops_to_sf()` | 0.2 | 0.4 |
+  | `convert_time_to_seconds()` | 3.1 | 1.7 |
+  | `filter_by_agency_id()` | ~1 | 1.3 |
+  | `filter_by_route_id()` | ~1 | 3.3 |
+  | `filter_by_route_type()` | ~1 | 2.5 |
+  | `filter_by_shape_id()` | 0.7 | 1.3 |
+  | `filter_by_spatial_extent()` | 2.5 | 3.1 |
+  | `filter_by_stop_id()` | 3.6 | 3.0 |
+  | `filter_by_time_of_day()` | 1.4 | 1.7 |
+  | `filter_by_trip_id()` | 0.6 | 0.6 |
+  | `filter_by_weekday()` | 0.7 | 0.7 |
+  | `frequencies_to_stop_times()` | – | 12 |
+  | `get_stop_times_patterns()` | 1.4 | ~1 |
+  | `get_trip_duration()` | 3.1 | ~1 |
+  | `get_trip_geometry()`† | 0.8 | ~1 |
+  | `get_trip_length()`† | 1.9 | ~1 |
+  | `get_trip_segment_duration()` | 64 | 7.9 |
+  | `get_trip_speed()`† | 1.4 | ~1 |
+  | `merge_gtfs()`† | 0.1 | 0.1 |
+  | `read_gtfs()` | 1.4 | 1.8 |
+  | `set_trip_speed()`† | 1.4 | ~1 |
+  | `write_gtfs()` | 1.2 | 2.4 |
 
-- The package documentation website moved to <https://ipea.github.io/gtfstools/> and the GitHub repository to <https://github.com/ipea/gtfstools>. All links were updated.
-- The warnings about `route_id`s, `trip_id`s and `stop_id`s not found in a feed (classes `gtfstools_invalid_route_id`, `gtfstools_invalid_trip_id` and `gtfstools_invalid_stop_id`) now list each missing id once. `get_route_frequency()`, `get_stop_frequency()`, `get_vkt()` and `set_route_frequency()` used to list an id that was given twice, twice.
+  Most gains grow with feed size: on a feed with 900,000 `stop_times` rows, `convert_time_to_seconds()` is about 20 times faster, `filter_by_spatial_extent()` 25 times, `filter_by_time_of_day()` 7 times, and `get_trip_segment_duration()` and `get_trip_duration()` (when `unit` isn't `"s"`) 60 and 10 times. `merge_gtfs()` with `prefix` is about 2.3 times faster with 1.15 million `stop_times` rows, `get_children_stops()` about 250 times faster with 20,000 stops, and `read_gtfs()` is much faster on feeds with large `calendar_dates` tables.
+- `get_trip_length()`, `get_trip_geometry()`, `get_shape_length()`, `get_stop_distances()` and the functions that use them run their C++ code in parallel, with `data.table::getDTthreads()` threads (set with `data.table::setDTthreads()`), or on a single thread where the compiler doesn't support OpenMP. Results don't depend on the number of threads.
+- Trip lengths are always calculated on the `{s2}` sphere, regardless of `sf::sf_use_s2()`. `convert_sf_to_shapes()` also calculates distances on that sphere: they match the previous ones within a micrometre with `sf::sf_use_s2(TRUE)` (the default), and differ by up to about 0.4% from the ellipsoidal ones previously calculated with `sf::sf_use_s2(FALSE)`.
+- gtfstools no longer depends on `{units}` (#84). `set_trip_speed()` now converts speeds in m/s or mph with exact factors, so in rare borderline cases a new time may be one second earlier than in version 1.4.0.
+- `download_validator()` detects the latest validator version automatically. PR contribution by @baarthur.
+- Invalid dates (e.g. `20240230`) are still converted to `NA`, but now with a warning.
+- `frequencies_to_stop_times()` raises informative errors for invalid `frequencies` entries and trips without a `departure_time`.
+- The warnings about `route_id`s, `trip_id`s and `stop_id`s not found in a feed (classes `gtfstools_invalid_route_id`, `gtfstools_invalid_trip_id` and `gtfstools_invalid_stop_id`) list each missing id once.
+- The documentation website moved to <https://ipea.github.io/gtfstools/> and the GitHub repository to <https://github.com/ipea/gtfstools>.
 
 # gtfstools 1.4.0
 
