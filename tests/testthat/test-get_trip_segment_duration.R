@@ -247,3 +247,16 @@ test_that("from and to handle stop_times entries without trip_id", {
   expect_identical(result, expected)
   expect_identical(names(na_gtfs$stop_times), stop_times_names)
 })
+
+test_that("returns a typed empty table when stop_times is empty", {
+  empty_gtfs <- read_gtfs(data_path)
+  empty_gtfs$stop_times <- empty_gtfs$stop_times[0]
+
+  result <- get_trip_segment_duration(empty_gtfs, unit = "s")
+  expect_identical(nrow(result), 0L)
+  expect_type(result$trip_id, "character")
+  expect_type(result$segment, "integer")
+  expect_type(result$duration, "integer")
+
+  expect_type(tester(empty_gtfs)$duration, "double")
+})

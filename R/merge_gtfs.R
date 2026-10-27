@@ -342,13 +342,26 @@ merge_gtfs <- function(..., files = NULL, prefix = FALSE) {
       id_cols <- names(dt)[grepl("_id$|parent_station", names(dt))]
       id_cols <- setdiff(id_cols, c("direction_id", "record_sub_id"))
 
-      # then add the prefix to the id value
+      # then add the prefix to the id value. ids repeat across many rows (e.g.
+      # trip_id in stop_times), so the prefixed id is pasted only once for
+      # each distinct pair of gtfs object and id
 
       for (col in id_cols) {
-        dt[
-          get(col) != "",
-          eval(col) := paste0(list_of_prefixes[origin_gtfs], "_", get(col))
-        ]
+        rows <- which(dt[[col]] != "")
+        if (length(rows) == 0L) next
+
+        ids <- dt[[col]][rows]
+        origin <- dt$origin_gtfs[rows]
+        id_group <- data.table::frankv(list(origin, ids), ties.method = "dense")
+        group_first <- which(!duplicated(id_group))
+
+        prefixed <- character(length(group_first))
+        prefixed[id_group[group_first]] <- paste0(
+          list_of_prefixes[origin[group_first]],
+          "_",
+          ids[group_first]
+        )
+        data.table::set(dt, i = rows, j = col, value = prefixed[id_group])
       }
     }
   }

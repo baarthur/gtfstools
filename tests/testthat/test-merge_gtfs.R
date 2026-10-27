@@ -422,3 +422,31 @@ test_that("elements that are not tables are not merged, with a warning", {
     regexp = "None of the GTFS to be merged contain the files"
   )
 })
+
+test_that("prefix leaves blank ids unchanged", {
+  blank_gtfs <- read_gtfs(spo_path)
+  blank_gtfs$trips <- data.table::copy(blank_gtfs$trips)
+  blank_gtfs$trips[, block_id := ""]
+
+  merged_gtfs <- merge_gtfs(blank_gtfs, blank_gtfs, prefix = TRUE)
+
+  expect_true(all(merged_gtfs$trips$block_id == ""))
+
+  # with blank and non-blank ids, only the non-blank ones get the prefix of
+  # their gtfs object
+
+  blank_gtfs$trips[, block_id := rep(c("", "b1"), length.out = .N)]
+  mixed_gtfs <- merge_gtfs(blank_gtfs, blank_gtfs, prefix = c("a", "b"))
+  expect_identical(
+    mixed_gtfs$trips$block_id,
+    c(
+      ifelse(blank_gtfs$trips$block_id == "", "", "a_b1"),
+      ifelse(blank_gtfs$trips$block_id == "", "", "b_b1")
+    )
+  )
+  prefixes <- rep(c("1_", "2_"), each = nrow(blank_gtfs$trips))
+  expect_identical(
+    merged_gtfs$trips$trip_id,
+    paste0(prefixes, blank_gtfs$trips$trip_id)
+  )
+})

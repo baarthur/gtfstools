@@ -131,21 +131,25 @@ get_trip_segment_duration <- function(gtfs,
   # sorting, so the last stop is the last row with its trip_id (NAs included)
 
   is_windowed <- any(is.finite(window))
+  is_last_stop <- !duplicated(durations$trip_id, fromLast = TRUE)
 
   if (is_windowed) {
-    is_last_stop <- !duplicated(durations$trip_id, fromLast = TRUE)
     segment_departure <- durations$departure_time_secs[!is_last_stop]
   }
 
-  # compute per trip, so rows of interleaved trips are never mixed up
-  durations <- durations[
-    ,
-    .(
-      segment = seq_len(max(.N - 1L, 0L)),
-      duration = arrival_time_secs[-1L] - departure_time_secs[-.N]
-    ),
-    by = trip_id
-  ]
+  # each segment's duration runs from the departure at its first stop to the
+  # arrival at the next row, which belongs to the same trip because the last
+  # stop of each trip starts no segment
+
+  starts_segment <- !is_last_stop
+  durations <- data.table::data.table(
+    trip_id = durations$trip_id[starts_segment],
+    segment = data.table::rowid(durations$trip_id)[starts_segment],
+    duration = (
+      data.table::shift(durations$arrival_time_secs, -1L) -
+        durations$departure_time_secs
+    )[starts_segment]
+  )
 
   # keep only the segments that depart from their first stop within the time
   # of day

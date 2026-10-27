@@ -200,22 +200,14 @@ get_trip_departures <- function(gtfs, trip_id) {
   # the other trips depart once, at their earliest departure time
 
   scheduled_trips <- relevant_trips[! relevant_trips %chin% frequency_trips]
-  scheduled_departures <- gtfs$stop_times[
+  st <- gtfs$stop_times[
     trip_id %chin% scheduled_trips,
-    .(trip_id, departure_secs = string_to_seconds(departure_time))
+    .(trip_id, departure_time)
   ]
-  scheduled_departures <- scheduled_departures[
-    ,
-    .(
-      departure_secs = if (all(is.na(departure_secs))) {
-        NA_integer_
-      } else {
-        min(departure_secs, na.rm = TRUE)
-      }
-    ),
-    by = trip_id
-  ]
-  scheduled_departures <- scheduled_departures[!is.na(departure_secs)]
+  scheduled_departures <- first_departure_per_trip(
+    st$trip_id,
+    string_to_seconds(st$departure_time)
+  )
 
   departures <- rbind(frequency_departures, scheduled_departures)
 

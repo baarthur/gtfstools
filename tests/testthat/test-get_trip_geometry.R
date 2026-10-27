@@ -578,3 +578,53 @@ test_that("results don't depend on the number of threads", {
 
   expect_identical(two_threads, one_thread)
 })
+
+test_that("euclidean trips with the same sequence of stops share a geometry", {
+  feed <- read_gtfs(data_path)
+  copied_trip <- feed$stop_times[trip_id == "CPTM L07-0"]
+  copied_trip[, trip_id := "copied_trip"]
+  feed$stop_times <- rbind(feed$stop_times, copied_trip)
+
+  trip_ids <- c("CPTM L07-0", "copied_trip", "2002-10-0")
+  result <- tester(feed, trip_ids, method = "euclidean")
+  geometry <- sf::st_geometry(result)[match(trip_ids, result$trip_id)]
+
+  expect_identical(geometry[[2]], geometry[[1]])
+  expect_false(identical(geometry[[3]], geometry[[1]]))
+  expect_identical(
+    geometry[[1]],
+    sf::st_geometry(tester(gtfs, "CPTM L07-0", method = "euclidean"))[[1]]
+  )
+
+  # a trip with the same stops in the reverse order has the same number of
+  # stops, but not the same geometry
+
+  reversed_trip <- data.table::copy(copied_trip)
+  reversed_trip[, `:=`(trip_id = "reversed_trip", stop_id = rev(stop_id))]
+  reversed_feed <- read_gtfs(data_path)
+  reversed_feed$stop_times <- rbind(reversed_feed$stop_times, reversed_trip)
+  reversed_ids <- c("CPTM L07-0", "reversed_trip")
+  result <- tester(reversed_feed, reversed_ids, method = "euclidean")
+  geometry <- sf::st_geometry(result)[match(reversed_ids, result$trip_id)]
+  expect_false(identical(geometry[[2]], geometry[[1]]))
+
+  # stops without coordinates are skipped before trips are compared, so a trip
+  # that visits such a stop gets the same geometry as a trip without it
+
+  short_trip <- copied_trip[-1]
+  short_trip[, trip_id := "short_trip"]
+  feed$stop_times <- rbind(feed$stop_times, short_trip)
+  feed$stops <- data.table::copy(feed$stops)
+  feed$stops[
+    stop_id == copied_trip$stop_id[1],
+    `:=`(stop_lat = NA_real_, stop_lon = NA_real_)
+  ]
+  result <- tester(feed, c(trip_ids[1:2], "short_trip"), method = "euclidean")
+
+  expect_identical(sf::st_geometry(result)[[2]], sf::st_geometry(result)[[1]])
+  expect_identical(sf::st_geometry(result)[[3]], sf::st_geometry(result)[[1]])
+  expect_identical(
+    nrow(sf::st_coordinates(sf::st_geometry(result)[[1]])),
+    nrow(copied_trip) - 1L
+  )
+})

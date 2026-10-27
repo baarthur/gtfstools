@@ -137,17 +137,36 @@ get_trip_geometry <- function(gtfs,
 
   if (method == "euclidean") {
     has_coords <- !is.na(st$stop_lat) & !is.na(st$stop_lon)
-    built_trip <- unique(trip_index[has_coords])
-    built_idx <- seq_along(built_trip)
 
-    # 'st' is a new table, so the trip index can be added to it by reference.
-    # it's only subset when some stops don't have coordinates (usually none)
+    # 'st' is a new table, so columns can be added to it by reference. it's
+    # only subset when some stops don't have coordinates (usually none)
 
-    data.table::set(st, j = "trip_index", value = trip_index)
     stop_points <- if (all(has_coords)) st else st[has_coords]
-    built <- build_linestrings(
+    point_trip <- trip_index[has_coords]
+    trip_start <- which(!duplicated(point_trip))
+    built_trip <- point_trip[trip_start]
+    n_stops <- diff(c(trip_start, length(point_trip) + 1L))
+
+    # the coordinates of each stop come from its stop_id, so trips that visit
+    # the same sequence of stops with coordinates (a pattern) share the same
+    # geometry, built only once. stops are described by integer codes, compared
+    # by cpp_sequence_pattern_id(), whose ids are numbered in order of first
+    # appearance, as build_linestrings() requires
+
+    stop_code <- data.table::chmatch(
+      stop_points$stop_id,
+      unique(stop_points$stop_id)
+    )
+    built_idx <- cpp_sequence_pattern_id(n_stops, list(stop_code))
+
+    data.table::set(
       stop_points,
-      "trip_index",
+      j = "pattern",
+      value = rep.int(built_idx, n_stops)
+    )
+    built <- build_linestrings(
+      stop_points[rep.int(!duplicated(built_idx), n_stops)],
+      "pattern",
       "stop_lon",
       "stop_lat"
     )
