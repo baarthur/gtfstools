@@ -68,29 +68,33 @@ by changing the \code{arrival_time} and \code{departure_time} columns in \code{s
 }
 \section{Details}{
 
-The duration of each trip's segment (from the departure at \code{first_stop} to
-the arrival at \code{last_stop}; by default the whole trip) is set to its length,
-as calculated by \code{\link[=get_trip_length]{get_trip_length()}} along the trip's shape (or as straight
-lines between stops, with a warning, if there are no shapes), divided by
-\code{speed}. The \code{stops} table is required. Trips whose length is \code{NA} (e.g.
-trips not linked to a shape) are left unchanged.
+The duration of each trip's segment, from the departure at \code{first_stop} to
+the arrival at \code{last_stop}, is set to its length divided by \code{speed}.
+Lengths are calculated by \code{\link[=get_trip_length]{get_trip_length()}} along the trip's shape, or as
+straight lines between stops, with a warning, if there are no shapes; the
+\code{stops} table is required. Trips whose length is \code{NA} (e.g. not linked to a
+shape) are left unchanged.
 
-The arrival and departure times at stops strictly inside the segment are set
-to \code{""}, which is written as \code{NA} by \code{\link[=write_gtfs]{write_gtfs()}}. Some routing software,
-such as \href{http://www.opentripplanner.org/}{OpenTripPlanner}, interpolates
-these times from the average speed.
+The times at stops strictly inside the segment are set to \code{""} (written as
+\code{NA} by \code{\link[=write_gtfs]{write_gtfs()}}). Times after \code{last_stop} are shifted by the change
+in the segment's duration. Dwell times at \code{first_stop} and \code{last_stop} are
+kept, except at the trip's first and last stops, whose dwell time becomes
+0. \code{first_stop} is matched at its first visit in \code{stop_sequence} order, and
+\code{last_stop} at its next visit after that (which may be the same stop).
+Blank times at \code{last_stop} are filled if it's the trip's last stop.
 
-\code{first_stop} is matched at its first visit in \code{stop_sequence} order, and
-\code{last_stop} at its next visit after that (which may be the same stop). Times
-after \code{last_stop} are shifted by the change in the segment's duration. Dwell
-times at \code{first_stop} and \code{last_stop} are kept, except at the trip's first
-and last stops. Trips that don't visit \code{first_stop} and then \code{last_stop}, or
-that have blank times there, are left unchanged, with a warning if they were
-given in \code{trip_id} (not if they were selected only by \code{route_type}). \code{from}
-and \code{to} are compared with the \code{departure_time} at \code{first_stop} as written in
-\code{stop_times}, so use times past \code{"24:00:00"} for departures after midnight.
-For trips listed in \code{frequencies}, these are template times, not actual
-departures. Trips whose departure there is blank are left unchanged.
+With \code{first_stop} or \code{last_stop}, trips that don't visit \code{first_stop} and
+then \code{last_stop}, or whose departure at \code{first_stop} is blank, or whose
+times at \code{last_stop} are both blank (unless it's the trip's last stop), are
+left unchanged, with a warning if they were given in \code{trip_id}. Without
+\code{first_stop}, \code{last_stop}, \code{from} and \code{to}, a blank departure at the trip's
+first stop leaves all the times of the trip blank, without a warning.
+
+\code{from} and \code{to} are compared with the \code{departure_time} at \code{first_stop} as
+written in \code{stop_times} (template times, for trips listed in
+\code{frequencies}), so use times past \code{"24:00:00"} for departures after
+midnight; trips whose departure there is blank are then left unchanged.
+Existing \verb{_secs} columns in \code{stop_times} are updated to match.
 }
 
 \examples{

@@ -47,36 +47,26 @@ agencies).
 }
 \section{Details}{
 
-A feed has service on a day if at least one of its services runs on it. A
-service runs on the days between the \code{start_date} and \code{end_date} of its
-\code{calendar} entry whose weekday is flagged, minus the days removed from it
-in \code{calendar_dates} (\code{exception_type} 2), plus the days added to it
-(\code{exception_type} 1). If a service is both added and removed on a day, the
-addition wins. Either table may be missing. If the feed has a \code{trips}
-table with a \code{service_id} field, services not used by any trip are ignored.
-\code{feed_info} dates are not used. A warning is raised for feeds without any
-service day, and a message when two or more feeds have no day with service
-in all of them.
+A feed has service on a day if at least one of its services runs on it,
+according to \code{calendar} and \code{calendar_dates} (either may be missing). A
+service both added and removed on a day in \code{calendar_dates} runs on it. If
+\code{trips} has a \code{service_id} field, services not used by any trip are
+ignored. \code{feed_info} dates are not used. A warning is raised for feeds
+without any service day, and a message when two or more feeds have no day
+with service in all of them.
 
-The number of trips on a day is the number of trips of the services that
-run on it. A trip listed in \code{frequencies} counts once per departure, every
-\code{headway_secs} from \code{start_time} until (but not including) \code{end_time} (an
-entry whose \code{start_time} and \code{end_time} are equal departs once), and
-the departures of overlapping entries of the same trip are added up
-(identical entries count once), unlike in \code{\link[=frequencies_to_stop_times]{frequencies_to_stop_times()}},
-which keeps only their unique departures. A trip with an invalid
-\code{frequencies} entry counts once, with a warning. Trips count on their
-service day, so departures after midnight (with times later than
-\code{"24:00:00"}) count on the previous day. If the feed
-has no \code{trips} table with a \code{service_id} field, \code{n_trips} is \code{NA}, and the
-daily plot shows no box for it.
+In \code{n_trips}, a trip listed in \code{frequencies} counts once per departure, as
+in \code{\link[=frequencies_to_stop_times]{frequencies_to_stop_times()}} with \code{strategy = "exact"}, except that the
+departures of overlapping entries of the same trip are added up (identical
+entries count once). A trip with an invalid \code{frequencies} entry counts once,
+with a warning. Departures after midnight (times past \code{"24:00:00"}) count on
+the previous day. Without a \code{trips} table with a \code{service_id} field,
+\code{n_trips} is \code{NA} and the daily plot shows no box for the feed.
 
-Feeds are named after their file names (without the extension) or after the
-list names. Unnamed feeds are named after their position (\code{"feed_1"},
-\code{"feed_2"}, etc.), and duplicated names are made unique. Plots of feeds
-spanning long periods can be zoomed in with \code{\link[ggplot2:coord_cartesian]{ggplot2::coord_cartesian()}}.
-The days on which all feeds have service are shaded in the plots only when
-two or more feeds are given.
+Feeds are named after their file names (without the extension) or list
+names; unnamed feeds are named \code{"feed_1"}, \code{"feed_2"}, etc., and duplicated
+names are made unique. Overlap periods are shaded only when two or more
+feeds are given.
 }
 
 \examples{

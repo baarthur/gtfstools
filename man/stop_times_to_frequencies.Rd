@@ -27,57 +27,37 @@ lossy approximation of the original schedule.
 }
 \section{Details}{
 
-Trips are grouped together when they share the same \code{route_id},
-\code{service_id}, \code{direction_id} and \code{shape_id} (these last two only when
-present in \code{trips}) and the same sequence of stops (their spatial pattern,
-as identified by \code{\link[=get_stop_times_patterns]{get_stop_times_patterns()}}). Each group is then split into
-one-hour slots of the clock, from \code{HH:00:00} (included) to the next
-\code{HH:00:00} (not included), according to the earliest \code{departure_time} of
-each trip in \code{stop_times}, regardless of \code{stop_sequence}. This is the
-departure from the trip's first stop in valid feeds, but not when later
-times are written incorrectly (e.g. times after midnight written as
-\code{"00:30:00"} instead of \code{"24:30:00"}). Slots after midnight are kept as such
-(e.g. from \code{"25:00:00"} to \code{"26:00:00"}).
+Trips are grouped by \code{route_id}, \code{service_id}, \code{direction_id} and
+\code{shape_id} (the last two only if present in \code{trips}) and by their sequence
+of stops, as identified by \code{\link[=get_stop_times_patterns]{get_stop_times_patterns()}}. Each group is split
+into one-hour slots of the clock, from \code{HH:00:00} (included) to the next
+\code{HH:00:00} (excluded), by the earliest \code{departure_time} of each trip in
+\code{stop_times}, regardless of \code{stop_sequence} (so times after midnight
+written as \code{"00:30:00"} instead of \code{"24:30:00"} misplace the trip). Slots
+after midnight are kept as such (e.g. \code{"25:00:00"} to \code{"26:00:00"}).
 
-In each slot with \code{n} trips:
-\itemize{
-\item the trip with the earliest departure (ties broken by \code{trip_id}) becomes the
-template. It keeps its \code{trip_id}, its \code{trips} entry and its \code{stop_times}
-entries, so travel times may differ from one hour to another. As in any
-frequency-based trip, only its times relative to its first departure
-matter;
-\item a \code{frequencies} entry is added for the template, from the start to the
-end of the slot, with \code{headway_secs = ceiling(3600 / n)} and
-\code{exact_times = 0} (frequency-based service);
-\item the other trips are removed from \code{trips}, \code{stop_times} and \code{transfers}.
-Their own departure times, travel times and other \code{trips} fields (e.g.
-\code{trip_headsign}, \code{block_id}) are lost. \code{transfers} entries that refer to
-the template now apply to all of its departures. Other tables that may
-refer to trips, such as \code{attributions} and \code{translations}, are not
-changed.
-}
+In each slot with \code{n} trips, the trip with the earliest departure (ties
+broken by \code{trip_id}) becomes the template and keeps its \code{trip_id} and its
+\code{trips} and \code{stop_times} entries. A \code{frequencies} entry is added for it,
+from the start to the end of the slot, with
+\code{headway_secs = ceiling(3600 / n)} and \code{exact_times = 0}. The other trips
+are removed from \code{trips}, \code{stop_times} and \code{transfers}; \code{transfers} entries
+of the template now apply to all of its departures. Other tables that may
+refer to trips, such as \code{attributions} and \code{translations}, are not changed.
 
-Slots with a single trip are also converted (with a headway of one hour), so
-that every converted trip becomes frequency-based. Only the trips in
-\code{trip_id} are grouped and converted: other trips are never removed, even if
-they share a group and a slot with converted ones. Trips already listed in
+Slots with a single trip are also converted. Only the trips in \code{trip_id}
+are grouped and converted; other trips are never removed, even if they
+share a group and a slot with converted ones. Trips already listed in
 \code{frequencies} (with a warning, if listed in \code{trip_id}), trips not listed in
 \code{trips} and trips without any \code{departure_time} are left unchanged.
 
-This conversion is useful for tools that treat frequency-based trips
-differently from scheduled ones, such as the \code{time_window} parameter of
-\code{{r5r}}, which draws departure times within the headways of frequency-based
-trips.
-
 Converting the result back with \code{\link[=frequencies_to_stop_times]{frequencies_to_stop_times()}} yields the
-same number of trips in each slot, as long as it has at most 60 trips (one
-departure per minute). Slots with more trips yield approximately the same
-number of trips. The departures of the new trips, however, are evenly
-spaced from the start of the slot.
+same number of trips in each slot with at most 60 trips (approximately the
+same otherwise), evenly spaced from the start of the slot.
 
 Existing \verb{_secs} columns in \code{stop_times} and \code{frequencies} (e.g. created
-with \code{\link[=convert_time_to_seconds]{convert_time_to_seconds()}}) are used as-is, not recalculated from the
-time strings, and are filled in for the new \code{frequencies} entries.
+with \code{\link[=convert_time_to_seconds]{convert_time_to_seconds()}}) are used as-is and filled in for the new
+\code{frequencies} entries.
 }
 
 \examples{

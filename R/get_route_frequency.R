@@ -22,36 +22,27 @@
 #'   within the time of day are not included.
 #'
 #' @section Details:
-#' The function counts trips, not stop visits: each trip is counted once, at
-#' its departure time, however many stops it visits within the time of day.
-#' Its results are therefore not comparable to those of functions that count
-#' the departures from each stop of a route, such as
-#' `tidytransit::get_route_frequency()`.
+#' Each departure of a trip is counted once, however many stops it visits
+#' within the time of day (unlike [get_stop_frequency()] and
+#' `tidytransit::get_route_frequency()`, which count stop departures).
+#' Scheduled trips depart at their earliest `departure_time` in `stop_times`
+#' (blank times are ignored); trips without any departure time are not
+#' counted. Trips listed in `frequencies` depart every `headway_secs` from
+#' `start_time` until (but not including) `end_time`, as in
+#' [frequencies_to_stop_times()], even if they are not listed in `stop_times`;
+#' their `stop_times` entries are templates and are not used. An error is
+#' raised if `frequencies` has invalid entries for the specified routes.
 #'
-#' The departure time of a trip is the earliest departure time listed for it in
-#' `stop_times` (blank times are ignored). Trips listed in the `frequencies`
-#' table depart every `headway_secs` from `start_time` until (but not
-#' including) `end_time`, as in [frequencies_to_stop_times()], so their
-#' `stop_times` entries, which are just templates, are not used (and these
-#' trips are counted even if they are not listed in `stop_times`). Trips not
-#' listed in `frequencies` use their `stop_times` departure times, and trips
-#' without any departure time are ignored. An error is raised if the
-#' `frequencies` table has invalid entries for the specified routes.
-#'
-#' A departure is counted when it happens at or after `from` and before `to`, so
-#' that consecutive time windows (e.g. "06:00:00"-"07:00:00" and
-#' "07:00:00"-"08:00:00") don't count the same departure twice. Please note
-#' that this differs from [filter_by_time_of_day()], which keeps entries whose
-#' times are equal to `to`. Departures after midnight are listed with times
-#' greater than "24:00:00" and belong to the previous service day, so a time
-#' of day such as "24:00:00"-"26:00:00" should be used to account for them.
+#' A departure is counted when it happens at or after `from` and before `to`
+#' (unlike in [filter_by_time_of_day()], which also keeps entries at `to`).
+#' Departures after midnight are listed with times past "24:00:00", so use a
+#' time of day such as "24:00:00"-"26:00:00" to count them.
 #'
 #' The mean headway is the length of the time of day divided by the number of
-#' departures. It is an average over the whole time of day, so it is larger
-#' than the actual headway when service starts or ends within it. When the
-#' `trips` table does not have a `direction_id` field, the departures of both
-#' directions are pooled together. Trips with an `NA` `direction_id` are
-#' grouped together.
+#' departures, so it overstates the actual headway when service starts or ends
+#' within the time of day. Without a `direction_id` field in `trips`, the
+#' departures of both directions are pooled; trips with an `NA` `direction_id`
+#' are grouped together.
 #'
 #' @examples
 #' \dontshow{

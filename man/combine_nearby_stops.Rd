@@ -23,51 +23,43 @@ platform.
 }
 \section{Details}{
 
-Stops with a \code{parent_station} are always merged into one stop with the
-\code{stop_id} of the parent station, regardless of the distance between them.
-This stop is named after the parent station if it's listed in \code{stops}, or
-else after its platforms. Then stops are merged by distance, so
-that every pair of stops merged together is at most \code{max_dist} apart. The
-closest pairs are merged first. Stops that were already merged by their
+Stops with a \code{parent_station} are first merged into one stop with the
+\code{stop_id} of the station, regardless of the distance between them, named
+after the station if it's listed in \code{stops} or else after its platforms.
+Stops are then merged by distance, closest pairs first, so that every pair
+of stops merged together is at most \code{max_dist} apart (great-circle
+distance, as in \code{\link[=get_stop_distances]{get_stop_distances()}}). Stops already merged by their
 parent station are compared by the mean of their coordinates, so their own
-platforms may be farther apart. Distances are great-circle distances, as in
-\code{\link[=get_stop_distances]{get_stop_distances()}}. Stops without coordinates are only merged by their
-parent station.
+platforms may be farther apart. Stops without coordinates are only merged
+by their parent station.
 
-A stop merged from several stops has a \code{stop_id} and a \code{stop_name} made of
-the ids and names of the merged stops, separated by \code{"-"} (repeated names
-are listed only once), and the mean of their coordinates. Its other fields,
-such as \code{zone_id} and \code{level_id}, are those of the merged stop whose
-\code{stop_id} comes first. If a \code{stop_id} is listed more than once in \code{stops},
-only its first entry is used.
+A merged stop has a \code{stop_id} and a \code{stop_name} made of the ids and names
+of the merged stops joined by \code{"-"} (repeated names listed once) and the
+mean of their coordinates; its other fields (e.g. \code{zone_id}, \code{level_id})
+are those of the merged stop whose \code{stop_id} comes first. Only the first
+entry of a \code{stop_id} listed more than once in \code{stops} is used. Merged
+\code{stop_id}s are ambiguous when the original \code{stop_id}s include \code{"-"}, and an
+error is raised if two resulting \code{stop_id}s are identical.
 
 The result has only plain stops (\code{location_type} 0) without
 \code{parent_station}: stations are replaced by the stop merged from their
 platforms, and stations without platforms, entrances, generic nodes,
 boarding areas and \code{pathways} are removed. The \code{stop_id}s of merged stops
 and stations are updated in \code{stop_times}, \code{transfers}, \code{stop_areas},
-\code{location_group_stops} and \code{fare_leg_join_rules}, but references to
-removed stops are left as they are. Transfers between stops that were
-merged together become transfers within the merged stop, and when several
-transfers end up with the same stops, routes and trips, only the first one
-is kept, even if their \code{transfer_type} or \code{min_transfer_time} differ. The
-other fields of transfers are not changed, so a \code{min_transfer_time}
-between platforms that were merged now applies within the merged stop, and
-may no longer be accurate. Since \code{transfers} is optional, it can be removed
-(\code{gtfs$transfers <- NULL}) when these rules are not needed. Duplicated
-rows of \code{stop_areas} and \code{location_group_stops} are removed. Translations
-of merged stops are not updated. References to
-removed stops and their translations can be removed with
-\code{\link[=remove_unused_ids]{remove_unused_ids()}}.
+\code{location_group_stops} and \code{fare_leg_join_rules}; references to removed
+stops are left as they are (they and their translations can be removed
+with \code{\link[=remove_unused_ids]{remove_unused_ids()}}). Transfers between stops merged together become
+transfers within the merged stop, and when several transfers end up with
+the same stops, routes and trips, only the first is kept, even if their
+\code{transfer_type} or \code{min_transfer_time} differ; the other fields of
+transfers are not changed. Duplicated rows of \code{stop_areas} and
+\code{location_group_stops} are removed. Translations of merged stops are not
+updated.
 
-An error is raised if \code{max_dist} is so large that all stops would be merged
-into a single one. Large values of \code{max_dist} in dense feeds compare many
-pairs of stops, which is slow and raises a warning when it may use a lot of
-memory, or an error when there are too many pairs to compare.
-
-Merged \code{stop_id}s can be long at large terminals, and are ambiguous when
-the original \code{stop_id}s include \code{"-"}. Feeds that cross the antimeridian
-are not supported.
+An error is raised if \code{max_dist} would merge all stops into a single one.
+Large values of \code{max_dist} in dense feeds raise a warning when comparing
+the pairs of stops may use a lot of memory, or an error when there are too
+many pairs. Feeds that cross the antimeridian are not supported.
 }
 
 \examples{

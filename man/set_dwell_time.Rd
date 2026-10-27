@@ -67,59 +67,45 @@ of the trips accordingly.
 }
 \section{Details}{
 
-The dwell time of a trip at a stop is the time difference between the
-\code{departure_time} and the \code{arrival_time} of that visit in \code{stop_times}, as
-returned by \code{\link[=get_dwell_time]{get_dwell_time()}}. The function sets it at the visits of every
-specified trip to every specified stop (not of pairs formed by their
-elements), within the time of day if \code{from} or \code{to} is given. At each of
-these visits, the arrival time is kept and the departure time is set to the
-arrival time plus \code{dwell_time}. All the later times of the trip, in
-\code{stop_sequence} order, are shifted by the change in the dwell time, so the
-travel times between stops are kept and the trip ends earlier or later.
-Changes at several visits of the same trip add up.
+The dwell time of a visit is its \code{departure_time} minus its \code{arrival_time}
+in \code{stop_times}, as returned by \code{\link[=get_dwell_time]{get_dwell_time()}}. It is set at the visits
+of every specified trip to every specified stop (not of pairs formed by
+their elements): the arrival time is kept and the departure time is set to
+the arrival time plus \code{dwell_time}. All the later times of the trip, in
+\code{stop_sequence} order, are shifted by the change, and changes at several
+visits of the same trip add up. At a trip's last stop, only the departure
+time changes. A stop visited more than once by the same trip has its dwell
+time set at each visit.
 
-Setting the dwell time at a trip's first stop shifts the rest of the trip.
-At its last stop, only the departure time changes. A stop visited more than
-once by the same trip (e.g. in a loop) has its dwell time set at each visit.
+Blank times are never filled. Selected visits with a blank arrival or
+departure time are not changed and don't shift the later times, with a
+warning when \code{stop_id} is given; fill them beforehand with
+\code{\link[=interpolate_stop_times]{interpolate_stop_times()}}. An error is raised if a shift would result in a
+negative time (times not in chronological order) or in a time later than
+\code{"9999:59:59"}. \code{stop_sequence} is assumed to be unique within each trip
+and not \code{NA}. When both \code{trip_id} and \code{stop_id} are given but none of the
+trips visits any of the stops, a warning is raised and the GTFS is returned
+unchanged.
 
-Blank stop times are never filled, and later blank times stay blank. Selected
-visits with a blank arrival or departure time have no dwell time to change,
-so their dwell time is not set and they don't shift the later times. When
-\code{stop_id} is given, this raises a warning. Use \code{\link[=interpolate_stop_times]{interpolate_stop_times()}}
-to fill blank times beforehand. The function raises an error if a shift
-would result in a negative time, which only happens when the times of a
-trip are not in chronological order, or in a time later than
-\code{"9999:59:59"}, the latest time that can be written. The visits of each trip
-are ordered by \code{stop_sequence}, which is assumed to be unique within each
-trip and not \code{NA}, as required by the GTFS specification. When both
-\code{trip_id} and \code{stop_id} are given, but none of the trips visits any of the
-stops, the function raises a warning and returns the GTFS unchanged.
+For trips listed in \code{frequencies}, the times in \code{stop_times} are a template
+(see \code{\link[=frequencies_to_stop_times]{frequencies_to_stop_times()}}), so setting the dwell time at the first
+stop only changes how long before each departure the vehicle arrives there,
+while changes at later stops lengthen or shorten every departure.
 
-For trips listed in \code{frequencies}, the times in \code{stop_times} are a template:
-the trips depart at the times listed in \code{frequencies}, starting from their
-first departure (see \code{\link[=frequencies_to_stop_times]{frequencies_to_stop_times()}}). Setting the dwell time
-at the first stop of such a trip therefore changes only how long before each
-departure the vehicle arrives there, while changes at later stops lengthen
-or shorten every departure of the trip.
+\code{from} and \code{to} are compared with the \code{arrival_time} of each visit as
+written in \code{stop_times} before any change (template times, for trips listed
+in \code{frequencies}), so use times past \code{"24:00:00"} for arrivals after
+midnight. A shift caused by an earlier visit may thus move a changed visit
+out of the time of day, or another visit into it. Visits with a blank
+arrival time are never selected when \code{from} or \code{to} is given. When the time
+of day contains no visit of the specified trips to the specified stops, the
+GTFS is returned unchanged.
 
-\code{from} and \code{to} are compared with the \code{arrival_time} of each visit, as
-written in \code{stop_times} before any change, so use times past \code{"24:00:00"}
-for arrivals after midnight. A shift caused by an earlier visit may thus
-move a changed visit out of the time of day, or another visit into it. For
-trips listed in \code{frequencies}, these are template times, not the times of
-each departure. Visits with a blank arrival time are never selected when
-\code{from} or \code{to} is given, so they don't raise the warning above. When the
-time of day contains no visit of the specified trips to the specified
-stops, the GTFS is returned unchanged.
-
-\code{stop_id}s are matched exactly against the \code{stop_id}s in \code{stop_times}, which
-are never stations. To set the dwell times at a station, use
-\code{\link[=get_children_stops]{get_children_stops()}} to list its children and pass those that appear in
-\code{stop_times}.
-
-Changed times are written in the "HH:MM:SS" format. Existing \verb{_secs} columns
-in \code{stop_times} (e.g. created with \code{\link[=convert_time_to_seconds]{convert_time_to_seconds()}}) are updated
-to match.
+\code{stop_id}s are matched against the \code{stop_id}s in \code{stop_times}, which are
+never stations: to set the dwell times at a station, pass its children that
+appear in \code{stop_times} (see \code{\link[=get_children_stops]{get_children_stops()}}). Existing \verb{_secs}
+columns in \code{stop_times} (e.g. created with \code{\link[=convert_time_to_seconds]{convert_time_to_seconds()}}) are
+updated to match.
 }
 
 \examples{

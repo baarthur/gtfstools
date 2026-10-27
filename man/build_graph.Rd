@@ -50,108 +50,87 @@ analyses, such as finding the shortest travel times between stops.
 }
 \section{Details}{
 
-The network has two types of nodes (\code{node_type}):
-\itemize{
-\item \code{"stop"} nodes, one for each stop visited by the trips, placed at the
-stop's coordinates.
-\item \code{"service"} nodes, one for each route and direction at each of its stops,
-placed at the coordinates of the stop (its \code{parent_node_id}).
-}
-
-And four types of links (\code{link_type}), all of them directed:
+Nodes (\code{node_type}) are \code{"stop"} nodes, one per stop visited by the trips,
+at the stop's coordinates, and \code{"service"} nodes, one per route and
+direction at each of its stops, at the coordinates of the stop (their
+\code{parent_node_id}). Links (\code{link_type}) are all directed:
 \itemize{
 \item \code{"in_vehicle"} links connect the service nodes of consecutive stops of
-the trips. Their \code{travel_time} is the mean time between the departure
-from a stop and the arrival at the next one, over the trips with a
-departure time at the stop and an arrival time at the next one (times
-that decrease are not used), weighted by the number of departures of
-each trip, so dwell times are not included. Their \code{departures} is the
-number of departures of the trips of the network (see below) that run
-through them. Their \code{length} is the great-circle distance between the
-stops, as in \code{\link[=get_stop_distances]{get_stop_distances()}}, and their \code{free_speed} is the length
-divided by the travel time (\code{NA} when the travel time is 0 or either is
-missing).
+the trips. \code{travel_time} is the mean time from the departure at a stop to
+the arrival at the next, over the trips with both times (decreasing times
+are not used), weighted by their departures. \code{departures} is the number
+of departures of the trips of the network that run through the link.
+\code{length} is the great-circle distance between the stops, as in
+\code{\link[=get_stop_distances]{get_stop_distances()}}, and \code{free_speed} the length divided by the travel
+time (\code{NA} when the travel time is 0 or either is missing).
 \item \code{"boarding"} links connect each stop to the service nodes from which
-trips depart. Their \code{departures} is the number of departures from the
-stop of the trips of the network, so it may include departures after
-\code{to} from stops far along their routes. Their \code{travel_time} is the mean
-waiting time: half of the mean headway, which is the length of the time
-of day divided by the number of \code{departures}. Frequency-based assignment
-models should use \code{departures} instead.
+trips depart. \code{departures} is the number of departures from the stop of
+the trips of the network, so it may include departures after \code{to} from
+stops far along their routes. \code{travel_time} is half the mean headway (the
+length of the time of day divided by \code{departures}).
 \item \code{"alighting"} links connect each service node back to its stop, with a
 \code{travel_time} of 0.
 \item \code{"transfer"} links connect, in both directions, the stops at most
-\code{max_walk_dist} apart. Their \code{travel_time} is their length divided by
+\code{max_walk_dist} apart. \code{travel_time} is the length divided by
 \code{walk_speed}, which is also their \code{free_speed}.
 }
 
 Lengths are in meters, travel times in minutes and speeds in km/h.
-Boarding and alighting links have a \code{length} of 0 and an \code{NA} \code{free_speed},
-and alighting and transfer links have \code{NA} \code{departures}. The \code{route_id},
-\code{direction_id} and \code{inferred_direction} of in-vehicle, boarding and
-alighting links are those of their service nodes, and are \code{NA} in transfer
-links.
+Boarding and alighting links have a \code{length} of 0 and an \code{NA} \code{free_speed};
+alighting and transfer links have \code{NA} \code{departures}. \code{route_id},
+\code{direction_id} and \code{inferred_direction} are those of the link's service
+node, and \code{NA} in transfer links.
 
-The network only includes the trips that depart from their first stop at
-or after \code{from} and before \code{to}, as in \code{\link[=get_route_frequency]{get_route_frequency()}}, so trips
-already running at \code{from} are not included. The trips listed in the
-\code{frequencies} table are included once for each departure generated from
-it within the time of day, and their \code{stop_times} entries are used as
-templates. Trips without \code{stop_times} entries are not included. The trips
-of every \code{service_id} are pooled together, so the feed should usually be
-filtered to the services of a single day first, with \code{\link[=filter_by_date]{filter_by_date()}} or
-\code{\link[=filter_by_weekday]{filter_by_weekday()}}. Departures after midnight are listed with times
-greater than "24:00:00" and belong to the previous service day, so a time
-of day such as "24:00:00"-"26:00:00" should be used to account for them.
+The network includes the trips that depart from their first stop at or
+after \code{from} and before \code{to}, as in \code{\link[=get_route_frequency]{get_route_frequency()}}, so trips
+already running at \code{from} are not included. Trips listed in \code{frequencies}
+are included once per departure generated within the time of day, with
+their \code{stop_times} entries as templates. Trips without \code{stop_times} entries
+are not included. The trips of every \code{service_id} are pooled, so the feed
+should usually be filtered to a single day first, with \code{\link[=filter_by_date]{filter_by_date()}}
+or \code{\link[=filter_by_weekday]{filter_by_weekday()}}. Departures after midnight have times past
+"24:00:00", so use a time of day such as "24:00:00"-"26:00:00" for them.
 Trips whose times wrongly go back to "00:00:00" after midnight are placed
 by their earliest time.
 
-Within each trip, consecutive \code{stop_times} entries at the same stop are
-merged into one visit, which arrives at the first known time of the
-entries and departs at the last one. A trip that visits a stop more than
-once uses a different service node at each visit (\code{visit} 1, 2, ...), so
-that the network doesn't skip the part of the trip between the visits.
+Within a trip, consecutive \code{stop_times} entries at the same stop are one
+visit, arriving at their first known time and departing at their last. A
+trip that visits a stop more than once uses a different service node at
+each visit (\code{visit} 1, 2, ...).
 
-The direction of the trips comes from the \code{direction_id} field of \code{trips}.
-The trips without it (or with a blank \code{direction_id}) are assigned an
-\code{inferred_direction} instead: the trips of a route that share a pair of
-consecutive stops, in the same order, are in the same direction, and so
-are trips that share pairs with them. So branches and short-turns of a
-route are in the same direction, while the trips that run in opposite
-directions are not. However, the opposite directions of routes that run
-through a one-way loop or street, in which they share a pair of stops in
-the same order, are inferred as a single direction. Trips with a blank
-\code{direction_id} are never assigned the direction of other trips of their
-route.
+Directions come from the \code{direction_id} field of \code{trips}. Trips without it
+(or with a blank \code{direction_id}) get an \code{inferred_direction} instead: trips
+of a route that share a pair of consecutive stops, in the same order, are
+in the same direction, and so are trips that share pairs with them. The
+opposite directions of routes that share a pair of stops in the same order
+(e.g. through a one-way loop or street) are thus inferred as a single
+direction. Trips with a blank \code{direction_id} are never assigned the
+direction of other trips of their route.
 
 In-vehicle links whose trips all have blank or decreasing times have an
-\code{NA} \code{travel_time}, which \code{igraph::distances()} doesn't accept as a
-weight. Blank times can be filled beforehand with
-\code{\link[=interpolate_stop_times]{interpolate_stop_times()}}.
-Alighting links, in-vehicle links between stops with the same times and
-transfer links between stops at the same coordinates have a travel time of
-0. \code{igraph::distances()} accepts it as a weight, but \code{igraph::closeness()}
-and \code{igraph::betweenness()} require positive weights, such as
-\code{pmax(igraph::E(graph)$travel_time, 1e-6)}.
+\code{NA} \code{travel_time}, with a warning; \code{igraph::distances()} doesn't accept it
+as a weight, and blank times can be filled beforehand with
+\code{\link[=interpolate_stop_times]{interpolate_stop_times()}}. Alighting links, in-vehicle links between stops
+with the same times and transfer links between stops at the same
+coordinates have a travel time of 0; \code{igraph::closeness()} and
+\code{igraph::betweenness()} require positive weights.
 
-Departures are counted at every visit but the last of each trip, even
-when its departure time is blank, unlike in \code{\link[=get_stop_frequency]{get_stop_frequency()}}. The
-\code{transfers} and \code{pathways} tables, \code{parent_station}s and the \code{pickup_type}
-and \code{drop_off_type} fields are not used. Large values of \code{max_walk_dist} in
-dense feeds compare many pairs of stops, which raises a warning when it may
-use a lot of memory, or an error when there are too many pairs to compare.
-Transfer links are not created across the antimeridian.
+Departures are counted at every visit but the last of each trip, even with
+a blank departure time, unlike in \code{\link[=get_stop_frequency]{get_stop_frequency()}}. The \code{transfers}
+and \code{pathways} tables, \code{parent_station}s and the \code{pickup_type} and
+\code{drop_off_type} fields are not used. Large values of \code{max_walk_dist} in
+dense feeds raise a warning when comparing the pairs of stops may use a lot
+of memory, or an error when there are too many pairs. Transfer links are
+not created across the antimeridian.
 
 In the GMNS format, \code{node_id}, \code{x_coord}, \code{y_coord}, \code{node_type},
 \code{parent_node_id}, \code{link_id}, \code{from_node_id}, \code{to_node_id}, \code{directed},
-\code{length} and \code{free_speed} are GMNS fields. The other columns are fields
-added by this function, as allowed by GMNS. The \code{config} table lists the
-units and the coordinate reference system (EPSG:4326) of the network, the
-version of GMNS (0.96) and the time of day. Stops that are not listed in
-\code{stops}, or that don't have coordinates, have \code{NA} coordinates. GMNS
-requires node coordinates, so a warning is raised. Free speeds may be
-higher than the maximum of 200 km/h checked by GMNS validators, for example
-in high-speed rail.
+\code{length} and \code{free_speed} are GMNS fields; the other columns are additional
+fields, as allowed by GMNS. \code{config} lists the units, the coordinate
+reference system (EPSG:4326), the GMNS version (0.96) and the time of day.
+Stops not listed in \code{stops} or without coordinates have \code{NA} coordinates,
+with a warning (GMNS requires them). Free speeds may exceed the 200 km/h
+maximum checked by GMNS validators.
 }
 
 \examples{

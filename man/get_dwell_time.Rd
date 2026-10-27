@@ -51,37 +51,27 @@ Returns the dwell time of each specified \code{trip_id} at each specified
 }
 \section{Details}{
 
-The dwell time of a trip at a stop is the time difference between the
-\code{departure_time} and the \code{arrival_time} of that visit in \code{stop_times}. When
-both \code{trip_id} and \code{stop_id} are given, the function returns the visits of
-every specified trip to every specified stop (not of pairs formed by their
-elements).
+The dwell time of a visit is its \code{departure_time} minus its \code{arrival_time}
+in \code{stop_times}. When both \code{trip_id} and \code{stop_id} are given, the visits of
+every specified trip to every specified stop are returned (not of pairs
+formed by their elements). The first and last stops of each trip are
+included. For trips listed in \code{frequencies}, one dwell time is returned per
+visit of the template, not per departure.
 
-The dwell time is \code{NA} when either time is blank, as is common at stops
-that are not timepoints. Use \code{\link[=interpolate_stop_times]{interpolate_stop_times()}} to fill these times
-beforehand. The first and last stops of each trip are included, usually
-with a dwell time of 0. Negative dwell times mean that the departure is
-earlier than the arrival, which usually indicates inconsistent times.
+Blank times (\code{NA} dwell times) can be filled beforehand with
+\code{\link[=interpolate_stop_times]{interpolate_stop_times()}}. Negative dwell times (departure earlier than
+arrival) are returned as they are.
 
-A stop visited more than once by the same trip (e.g. in a loop) has one row
-per visit, told apart by \code{stop_sequence}. For trips listed in
-\code{frequencies}, the times in \code{stop_times} are a template that applies to each
-of their departures, so one dwell time is returned per visit, not per
-departure.
+\code{from} and \code{to} are compared with the \code{arrival_time} of each visit as
+written in \code{stop_times} (template times, for trips listed in
+\code{frequencies}), so use times past \code{"24:00:00"} for arrivals after midnight.
+Visits with a blank arrival time are never included when \code{from} or \code{to} is
+given.
 
-\code{from} and \code{to} are compared with the \code{arrival_time} of each visit, as
-written in \code{stop_times}, so use times past \code{"24:00:00"} for arrivals after
-midnight. For trips listed in \code{frequencies}, these are template times, not
-the times of each departure. Visits with a blank arrival time are never
-included when \code{from} or \code{to} is given.
-
-\code{stop_id}s are matched exactly against the \code{stop_id}s in \code{stop_times}, which
-are never stations. To get the dwell times at a station, use
-\code{\link[=get_children_stops]{get_children_stops()}} to list its children and pass those that appear in
-\code{stop_times}.
-
-Times are read from the time strings: existing \verb{_secs} columns in
-\code{stop_times} (e.g. created with \code{\link[=convert_time_to_seconds]{convert_time_to_seconds()}}) are not used.
+\code{stop_id}s are matched against the \code{stop_id}s in \code{stop_times}, which are
+never stations: to get the dwell times at a station, pass its children that
+appear in \code{stop_times} (see \code{\link[=get_children_stops]{get_children_stops()}}). Existing \verb{_secs}
+columns in \code{stop_times} are not used; times are read from the time strings.
 }
 
 \examples{

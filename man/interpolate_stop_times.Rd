@@ -32,21 +32,16 @@ known times (timepoints).
 }
 \section{Details}{
 
-Within each trip, ordered by \code{stop_sequence}, a stop whose arrival and
+Within each trip, in \code{stop_sequence} order, a stop whose arrival and
 departure times are both blank gets a time interpolated linearly on the
 distance travelled from the preceding timepoint, as measured by
-\code{\link[=get_trip_length]{get_trip_length()}}. In other words, the vehicle travels between two
-timepoints at a constant speed: the distance between them divided by the
-time from the departure at the first to the arrival at the second.
-Interpolated stops get equal arrival and departure times (no dwell time),
-rounded to the nearest second. Times past \code{"24:00:00"} are supported. If
-the distance between two timepoints is 0, their times are spread evenly
-between the stops in between.
-
-A timepoint with only one of its two times blank gets the other time in
-both columns. If \code{stop_times} has a \code{timepoint} column, interpolated stops
-get \code{timepoint = 0} (approximate times). The column is not created if it
-doesn't exist.
+\code{\link[=get_trip_length]{get_trip_length()}} (if the distance between two timepoints is 0, their
+times are spread evenly between the stops in between). Interpolated stops
+get equal arrival and departure times, rounded to the nearest second.
+Times past \code{"24:00:00"} are supported. A timepoint with only one of its
+two times blank gets the other time in both columns. If \code{stop_times} has a
+\code{timepoint} column, interpolated stops get \code{timepoint = 0}; the column is
+not created otherwise.
 
 Some stops are left blank, with a warning:
 \itemize{
@@ -55,20 +50,18 @@ stop of trips with fewer than two timepoints;
 \item stops between timepoints whose distance can't be calculated, e.g. trips
 not linked to a shape or stops without coordinates;
 \item stops between timepoints in which the arrival is earlier than the
-previous departure. This usually happens when times after midnight are
-written as \code{"00:30:00"} instead of \code{"24:30:00"}.
+previous departure, usually times after midnight written as
+\code{"00:30:00"} instead of \code{"24:30:00"}.
 }
 
 Times are blank when they are \code{NA}, empty or whitespace-only strings, or
 \code{"NA"}. Malformed time strings are left unchanged, with a warning, and are
-not used as timepoints. Rows without a \code{trip_id} are left unchanged. Times
+not used as timepoints. Rows without a \code{trip_id} are left unchanged. For
+trips listed in \code{frequencies}, the template times are interpolated. Times
 are read from the time strings, and existing \verb{_secs} columns (e.g. created
-with \code{\link[=convert_time_to_seconds]{convert_time_to_seconds()}}) are updated to match. For trips listed in
-\code{frequencies}, the template times are interpolated.
+with \code{\link[=convert_time_to_seconds]{convert_time_to_seconds()}}) are updated to match.
 
-The \code{stops} table is required to interpolate times between timepoints, as
-well as the \code{shapes} table and the \code{shape_id} column in \code{trips} with
-\code{method = "shapes"} (see \code{\link[=get_trip_length]{get_trip_length()}}).
+Interpolating between timepoints requires the \code{stops} table.
 }
 
 \examples{

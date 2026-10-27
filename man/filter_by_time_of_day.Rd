@@ -40,76 +40,39 @@ The GTFS object passed to the \code{gtfs} parameter, after the filtering
 process.
 }
 \description{
-Filters a GTFS object by time of day, keeping (or dropping) the relevant
-entries in each file. Please see the details section for more information on
-how this function filters the \code{frequencies} and \code{stop_times} tables, as well
-as how it handles \code{stop_times} tables that contain trips with some empty
-departure and arrival times.
+Filters a GTFS object by time of day, keeping (or dropping) the
+\code{stop_times} and \code{frequencies} entries within it, and keeping the entries
+of the other tables related to the trips that remain.
 }
 \section{Details}{
 
-When filtering the \code{frequencies} table, \code{filter_by_time_of_day()} respects
-the \code{exact_times} field. This field indicates whether the service follows a
-fixed schedule throughout the day or not. If it's 0 (or if it's not
-present), the service does not follow a fixed schedule. Instead, the
-operators try to maintain the listed headways. In such cases, if
-\code{update_frequencies} is \code{TRUE} we just update \code{start_time} and \code{end_time} to
-the appropriate value of \code{from} or \code{to} (which of this value is used depends
-on \code{keep}). The time of day includes both \code{from} and \code{to}. As required by the
-GTFS specification, no trip departs at the \code{end_time} of an entry, so when
-\code{keep} is \code{TRUE}, \code{end_time} is set to one second after \code{to}, which keeps a
-departure that happens exactly at \code{to} (e.g. when converting the filtered
-feed with \code{\link[=frequencies_to_stop_times]{frequencies_to_stop_times()}}). When \code{keep} is \code{FALSE}, the
-entries that cross \code{to} start one second after it. Entries left without any
-departure are removed.
+The time of day includes both \code{from} and \code{to}.
 
-If \code{exact_times} is 1, however, operators try to strictly adhere to the start
-times and headway. As a result, when updating the \code{start_time} field we need
-to follow the listed headway. For example, take a trip that has its start
-time listed as 06:00:00, its end time listed as 08:00:00 and its headway
-listed as 300 secs (5 minutes). If you decide to filter the feed to keep the
-time of day between 06:32:00 and 08:00:00 while updating \code{frequencies}, the
-\code{start_time} field must be updated to 06:35:00 in order to preserve the
-correct departure times of this trips, instead of simply updating it to
-06:32:00.
+Trips listed in \code{frequencies} are filtered through their \code{frequencies}
+entries; their \code{stop_times} entries are templates and are kept whatever
+their times. With \code{keep = TRUE}, the entries that overlap the time of day
+are kept; with \code{keep = FALSE}, those entirely within it are dropped. With
+\code{update_frequencies = TRUE} and \code{keep = TRUE}, an entry that starts before
+\code{from} starts at \code{from} (or, if \code{exact_times} is 1, at its first departure
+at or after \code{from}), and an entry that ends after \code{to} ends one second
+after \code{to}, so that a departure exactly at \code{to} is kept. With
+\code{update_frequencies = TRUE} and \code{keep = FALSE}, an entry that crosses
+\code{from} ends at \code{from}, an entry that crosses \code{to} starts one second after
+\code{to} (or, if \code{exact_times} is 1, at its first departure after \code{to}), and an
+entry that spans the whole time of day is split in two. Entries left
+without any departure are removed, and trips left without any entry are
+dropped from the feed.
 
-Another things to keep an eye on when filtering the \code{frequencies} table is
-that the corresponding \code{stop_times} entries of trips listed in the
-\code{frequencies} table should not be filtered, even if their departure and
-arrival times fall outside the specified time of day. This is because the
-\code{stop_times} entries of \code{frequencies}' trips are just templates that describe
-how long a segment between two stops takes, so the departure and arrival
-times listed there do not actually represent the actual departure and
-arrival times seen in practice. Taking the same example listed above, the
-corresponding \code{stop_times} entries of that trip could describe a departure
-from the first stop at 12:00:00 and an arrival at the second stop at
-12:03:00. That doesn't mean the trip will actually leave and arrive at the
-stops at these times, but rather that it takes 3 minutes to get from the
-first to the second stop. So when the trip departs from the first stop at
-06:35:00, it will get to the second at 06:38:00.
-
-When filtering the \code{stop_times} table, a few other details should be
-observed. First, one could wish to filter a GTFS object in order to keep all
-trips that cross a given time of day, whereas others may want to keep only
-the specific entries that fall inside the specified time of day. For
-example, take a trip that leaves the first stop at 06:30:00, gets to the
-second at 06:35:00 and then gets to the third at 06:45:00. When filtering to
-keep entire trips that cross the time of day between 06:30:00 and 06:40:00,
-all three stops will have to be kept. If, however, you want to keep only the
-entries that fall within the specified time of day, only the first two
-should be kept. To control such behaviour you need to set the \code{full_trips}
-parameter. When it's \code{TRUE}, the function behaves like the first case, and
-when it's \code{FALSE}, like the second.
-
-When using \code{full_trips} in conjunction with \code{keep}, please note how their
-behaviour stack. When both are \code{TRUE}, trips are always fully kept. When
-\code{keep} is \code{FALSE}, however, trips are fully dropped, even if some of their
-stops are visited outside the specified time of day.
-
-Finally, please note that many GTFS feeds may contain \code{stop_times} entries
-with empty departure and arrival times. In such cases, filtering by time of
-day with \code{full_trips} as \code{FALSE} will drop the entries with empty times.
-Please set \code{full_trips} to \code{TRUE} to preserve these entries.
+The other trips are filtered through their \code{stop_times} entries, which are
+within the time of day when the visit, from \code{arrival_time} to
+\code{departure_time}, overlaps it (a blank time is ignored when the other is
+known). With \code{full_trips = FALSE}, each entry is kept or dropped on its own,
+and entries with both times blank (or, with \code{keep = FALSE}, either) are
+dropped. With \code{full_trips = TRUE}, a trip with any entry within the time of
+day is kept (\code{keep = TRUE}) or dropped (\code{keep = FALSE}) as a whole,
+including its blank entries. The other tables are then filtered to the
+trips left in \code{stop_times}, as in \code{\link[=filter_by_trip_id]{filter_by_trip_id()}}, with a warning if
+\code{stop_times} lists trips missing from \code{trips}.
 
 Existing \verb{_secs} columns in \code{stop_times} and \code{frequencies} (e.g. created
 with \code{\link[=convert_time_to_seconds]{convert_time_to_seconds()}}) are used as-is, not recalculated from the
