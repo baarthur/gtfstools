@@ -108,7 +108,7 @@ get_trip_speed <- function(
   )
   checkmate::assert(
     checkmate::check_string(unit),
-    checkmate::check_names(unit, subset.of = c("km/h", "m/s", "mph")),
+    checkmate::check_names(unit, subset.of = names(speed_unit_factors)),
     combine = "and"
   )
   window <- dwell_time_window(from, to)
@@ -185,10 +185,8 @@ get_trip_speed <- function(
   speeds[, speed := length / duration]
   speeds[!is.finite(duration) | duration <= 0, speed := NA_real_]
 
-  # 1 international mile = 1.609344 km
-
   if (unit == "mph") {
-    speeds[, speed := speed / 1.609344]
+    speeds[, speed := speed / km_per_mile]
   }
 
   speeds[, c("length", "duration") := NULL]

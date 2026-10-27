@@ -126,7 +126,7 @@ set_max_speed <- function(
   checkmate::assert_character(trip_id, null.ok = TRUE, any.missing = FALSE)
   checkmate::assert(
     checkmate::check_string(unit),
-    checkmate::check_names(unit, subset.of = c("km/h", "m/s", "mph")),
+    checkmate::check_names(unit, subset.of = names(speed_unit_factors)),
     combine = "and"
   )
   checkmate::assert_string(first_stop, min.chars = 1, null.ok = TRUE)
@@ -158,9 +158,9 @@ set_max_speed <- function(
     gtfsio::assert_field_class(gtfs, "stop_times", "stop_id", "character")
   }
 
-  # calculations use km/h. 1 international mile = 1.609344 km
+  # calculations use km/h
 
-  max_kmh <- max_speed * c("km/h" = 1, "m/s" = 3.6, "mph" = 1.609344)[[unit]]
+  max_kmh <- max_speed * speed_unit_factors[[unit]]
 
   # select the trips. ids is NULL only when both arguments are NULL, so that
   # trip_ids that don't exist don't result in all trips being changed

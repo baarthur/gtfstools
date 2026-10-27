@@ -402,13 +402,12 @@ get_summary <- function(
 
   trip_stats <- get_trip_length(feed, unit = "km")
 
-  # with unit = "mph", the trip and shape lengths are converted to miles (1
-  # international mile = 1.609344 km) as soon as they are calculated, so that
-  # the speeds, the vmt and every distance derived from them are in miles too.
-  # calculate_vkt() must therefore always be given these lengths: without
-  # them, it would calculate lengths in km
+  # with unit = "mph", the trip and shape lengths are converted to miles as
+  # soon as they are calculated, so that the speeds, the vmt and every
+  # distance derived from them are in miles too. calculate_vkt() must
+  # therefore always be given these lengths: without them, it would calculate
+  # lengths in km
 
-  km_per_mile <- 1.609344
   length_unit <- if (unit == "mph") "mi" else "km"
   if (unit == "mph") {
     trip_stats[, length := length / km_per_mile]

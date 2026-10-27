@@ -23,7 +23,10 @@ test_that("removes duplicates", {
   # remove duplicates from gtfs first, because otherwise the original gtfs would
   # have some duplicated entries and the unduplicated bigger wouldn't
   unique_gtfs <- remove_duplicates(gtfs)
-  bigger_gtfs <- merge_gtfs(unique_gtfs, unique_gtfs)
+  bigger_gtfs <- gtfsio::new_gtfs(
+    lapply(unique_gtfs, function(dt) rbind(dt, dt)),
+    "dt_gtfs"
+  )
   expect_identical(unique_gtfs, remove_duplicates(bigger_gtfs))
 })
 

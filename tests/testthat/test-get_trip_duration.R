@@ -121,6 +121,7 @@ test_that("calculates duration correctly", {
 
 test_that("outputs duration in the correct unit", {
   seconds_durations <- tester(trip_id = "CPTM L07-0", unit = "s")
+  expect_type(seconds_durations$duration, "integer")
   minutes_durations <- tester(trip_id = "CPTM L07-0", unit = "min")
   hours_durations   <- tester(trip_id = "CPTM L07-0", unit = "h")
   days_durations    <- tester(trip_id = "CPTM L07-0", unit = "d")

@@ -1,4 +1,4 @@
-# seconds in each unit accepted by get_dwell_time() and set_dwell_time()
+# seconds in each time unit accepted by the dwell-time and duration functions
 
 dwell_unit_factors <- c(s = 1, min = 60, h = 3600, d = 86400)
 
@@ -14,6 +14,19 @@ max_time_secs <- 9999L * 3600L + 59L * 60L + 59L
 # "HH:MM:SS" (hours may exceed 23), as checked by every time-of-day argument
 
 time_pattern <- "^\\d{2}:[0-5]\\d:[0-5]\\d$"
+
+
+
+# 1 international mile = 1.609344 km
+
+km_per_mile <- 1.609344
+
+
+
+# km/h in each speed unit accepted by the speed functions: the exact decimal
+# definitions (1 m/s = 3.6 km/h, 1 international mile = 1.609344 km)
+
+speed_unit_factors <- c("km/h" = 1, "m/s" = 3.6, "mph" = km_per_mile)
 
 
 

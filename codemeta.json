@@ -386,23 +386,10 @@
     },
     "14": {
       "@type": "SoftwareApplication",
-      "identifier": "units",
-      "name": "units",
-      "version": ">= 1.0-1",
-      "provider": {
-        "@id": "https://cran.r-project.org",
-        "@type": "Organization",
-        "name": "Comprehensive R Archive Network (CRAN)",
-        "url": "https://cran.r-project.org"
-      },
-      "sameAs": "https://CRAN.R-project.org/package=units"
-    },
-    "15": {
-      "@type": "SoftwareApplication",
       "identifier": "utils",
       "name": "utils"
     },
-    "16": {
+    "15": {
       "@type": "SoftwareApplication",
       "identifier": "zip",
       "name": "zip",
@@ -416,7 +403,7 @@
     },
     "SystemRequirements": null
   },
-  "fileSize": "10544.517KB",
+  "fileSize": "10172.484KB",
   "releaseNotes": "https://github.com/ipea/gtfstools/blob/main/NEWS.md",
   "readme": "https://github.com/ipea/gtfstools/blob/main/README.md",
   "contIntegration": ["https://github.com/ipea/gtfstools/actions?query=workflow%3Acheck", "https://app.codecov.io/gh/ipeaGIT/gtfstools?branch=main"],

@@ -186,7 +186,7 @@ set_trip_speed <- function(
   }
   checkmate::assert(
     checkmate::check_string(unit),
-    checkmate::check_names(unit, subset.of = c("km/h", "m/s", "mph")),
+    checkmate::check_names(unit, subset.of = names(speed_unit_factors)),
     combine = "and"
   )
   checkmate::assert_string(first_stop, min.chars = 1, null.ok = TRUE)
@@ -239,21 +239,12 @@ set_trip_speed <- function(
     unit = "km"
   )
 
-  # set speed adequate unit (use km/h for calculations)
+  # calculations use km/h
 
   if (length(speed) == 1) {
     speed <- rep(speed, length(trip_id))
   }
-
-  # issue #84 - only convert when needed, and never empty vectors (older
-  # {units} versions read out of bounds when converting zero-length input)
-
-  if (unit != "km/h" && length(speed) > 0) {
-    # udunits doesn't parse "mph" as miles per hour, hence "mi/h"
-
-    units(speed) <- ifelse(unit == "mph", "mi/h", unit)
-    speed <- as.numeric(units::set_units(speed, "km/h"))
-  }
+  speed <- speed * speed_unit_factors[[unit]]
   names(speed) <- trip_id
 
   # if by_reference is set to FALSE, make a copy of stop_times

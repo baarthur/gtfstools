@@ -19,10 +19,20 @@ not merged and are left out of the result, with a warning.}
 Whether to add a prefix to the value of id fields that identify from which
 GTFS object the value comes from. If \code{TRUE}, the prefixes will range from
 \code{"1"} to \code{n}, where \code{n} is the number of objects passed to the function. If a
-character vector, its elements will be used to identify the GTFS objects, and
-the length of the vector must equal the total amount of objects passed in
-\code{...} (the first element will identify the first GTFS, the second element the
-second GTFS, and so on).}
+character vector, its elements, which must be unique, will be used to
+identify the GTFS objects, and the length of the vector must equal the total
+amount of objects passed in \code{...} (the first element will identify the first
+GTFS, the second element the second GTFS, and so on). If \code{FALSE} and two or
+more GTFS objects are merged, rows that are identical in every column are
+kept only once (as in \code{\link[=remove_duplicates]{remove_duplicates()}}, also when they come from the
+same GTFS object; a column that a GTFS object lacks counts as empty), and
+the GTFS objects may share ids (e.g. the same stop in two feeds) only if
+their data are identical in all of them: rows are compared on all columns,
+including columns that only some GTFS objects have, and a trip, for example,
+must also have the same \code{stop_times} and \code{frequencies}. Otherwise an error is
+raised; use \code{prefix = TRUE} in that case. This happens with versions of the
+same feed, but also with unrelated feeds that use simple ids (e.g. both have
+an \code{agency_id} \code{"1"}).}
 }
 \value{
 A GTFS object in which each table is a combination (by row) of the

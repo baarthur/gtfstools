@@ -87,7 +87,7 @@ get_trip_segment_duration <- function(gtfs,
   checkmate::assert_character(trip_id, null.ok = TRUE, any.missing = FALSE)
   checkmate::assert(
     checkmate::check_string(unit),
-    checkmate::check_names(unit, subset.of = c("s", "min", "h", "d")),
+    checkmate::check_names(unit, subset.of = names(dwell_unit_factors)),
     combine = "and"
   )
   window <- dwell_time_window(from, to)
@@ -157,14 +157,13 @@ get_trip_segment_duration <- function(gtfs,
     durations <- durations[in_window]
   }
 
-  # {units} converts element by element, which is slow on long vectors, so we
-  # get the conversion factor from a single value and multiply by it
+  # multiplying by the reciprocal keeps the results identical to those of
+  # earlier versions, bit for bit; dividing by the factor differs in the last
+  # bit for some durations. for "s" the column keeps its class (integer,
+  # unless the feed has double _secs columns)
 
   if (unit != "s") {
-    unit_factor <- as.numeric(
-      units::set_units(units::as_units(1, "s"), unit, mode = "standard")
-    )
-    durations[, duration := duration * unit_factor]
+    durations[, duration := duration * (1 / dwell_unit_factors[[unit]])]
   }
 
   return(durations[])

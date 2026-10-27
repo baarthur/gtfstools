@@ -60,8 +60,6 @@ get_vmt <- function(
 
   # convert kilometres to international miles
 
-  km_per_mile <- 1.609344
-
   vmt <- data.table::data.table(
     route_id = vkt$route_id,
     n_days = vkt$n_days,
