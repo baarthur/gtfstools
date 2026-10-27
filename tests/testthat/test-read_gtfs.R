@@ -4,6 +4,9 @@ if (requireNamespace("zip", quietly = TRUE)) {
 # setup -------------------------------------------------------------------
 
 
+# bypass the fixture cache in setup-read_gtfs.R to test the real reader
+read_gtfs <- gtfstools::read_gtfs
+
 data_path <- system.file("extdata/spo_gtfs.zip", package = "gtfstools")
 gtfs_url  <- "https://github.com/ipeaGIT/gtfstools/raw/main/inst/extdata/spo_gtfs.zip"
 

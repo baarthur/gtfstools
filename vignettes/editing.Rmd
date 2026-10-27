@@ -198,7 +198,7 @@ fixed_gtfs <- fix_gtfs(
 With `fix_gtfs()`, the feed goes through the following steps, in this order:
 
 1. `remove_duplicates()` removes duplicated entries from every table;
-2. `remove_unused_ids()` removes the trips without stop times and the entries of every table that no remaining trip uses (e.g. stods that are not used in any trip);
+2. `remove_unused_ids()` removes the trips without stop times and the entries of every table that no remaining trip uses (e.g. stops that are not used in any trip);
 3. `set_max_speed()`, only if `max_speed` is given, slows down the parts of trips that are faster than `max_speed`;
 4. `interpolate_stop_times()` fills blank stop times. Since this runs after the speed cap, the filled times follow the capped ones;
 5. `set_min_dwell_time()` forces every vehicle to remain stopped at each intermediate stop for at least `min_dwell_time` for passengers to board and alight;

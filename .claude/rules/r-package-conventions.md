@@ -202,6 +202,9 @@ filter_by_something <- function(gtfs, something, keep = TRUE) {
 
 - One file per function: `tests/testthat/test-<function>.R`. Load fixtures with
   `system.file("extdata/<x>_gtfs.zip", package = "gtfstools")`.
+- In tests, `read_gtfs()` on an `inst/extdata` fixture returns a copy of a
+  cached read (`setup-read_gtfs.R`); to test the real reader or read-time
+  warnings/messages, put `read_gtfs <- gtfstools::read_gtfs` at the file's top.
 - Common structure: fixtures, then a `tester()` wrapper with default arguments
   (most files; about a third have none), then `test_that()` blocks. About half
   the files have a `# tests ---` header before the blocks; match the file.
