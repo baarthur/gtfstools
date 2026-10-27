@@ -235,62 +235,72 @@ merge_gtfs <- function(..., files = NULL, prefix = FALSE) {
 
     # count in how many gtfs objects each distinct row appears. identical rows
     # get the same dense rank, which is faster than grouping by every column
-    # and also tells which rows to keep at the end
+    # and also tells which rows to keep at the end. the counts are kept apart
+    # from the tables, so that they can't clash with a column of the feeds
 
     # empty files are read as tables without columns, which have nothing to
-    # deduplicate. the count column has a reserved name so that it can't
-    # overwrite a column of the feeds
+    # deduplicate. their entries stay NULL: they are left out of the conflict
+    # check and keep all of their rows
 
-    count_col <- ".gtfstools_n_origins"
+    n_origins <- vector("list", length(merged_gtfs))
+    first_rows <- vector("list", length(merged_gtfs))
 
-    first_rows <- lapply(
-      merged_gtfs,
-      function(dt) {
-        data_cols <- setdiff(names(dt), "origin_gtfs")
-        if (length(data_cols) == 0) {
-          return(rep(TRUE, nrow(dt)))
-        }
+    for (i in seq_along(merged_gtfs)) {
+      dt <- merged_gtfs[[i]]
+      data_cols <- setdiff(names(dt), "origin_gtfs")
+      if (length(data_cols) == 0) next
 
-        row_group <- data.table::frankv(
-          dt,
-          cols = data_cols,
-          ties.method = "dense",
-          na.last = TRUE
-        )
-        in_origin <- !duplicated(
-          data.table::data.table(dt$origin_gtfs, row_group)
-        )
-        n_origins <- tabulate(row_group[in_origin])[row_group]
-        data.table::set(dt, j = count_col, value = n_origins)
-        return(!duplicated(row_group))
-      }
-    )
+      row_group <- data.table::frankv(
+        dt,
+        cols = data_cols,
+        ties.method = "dense",
+        na.last = TRUE
+      )
+      in_origin <- !duplicated(
+        data.table::data.table(dt$origin_gtfs, row_group)
+      )
+      n_origins[[i]] <- tabulate(row_group[in_origin], nrow(dt))[row_group]
+      first_rows[[i]] <- !duplicated(row_group)
+    }
 
     is_conflicting <- vapply(
       names(key_tables),
       function(field) {
-        tables <- merged_gtfs[match(key_tables[[field]], files_to_merge, 0)]
-        cols <- c("origin_gtfs", field, count_col)
-        ids <- lapply(
-          tables,
-          function(dt) {
-            if (!field %chin% names(dt)) {
-              return(NULL)
-            }
-            dt[, cols, with = FALSE]
-          }
-        )
-        ids <- data.table::rbindlist(ids, use.names = FALSE)
-        if (nrow(ids) == 0) {
+        tables <- match(key_tables[[field]], files_to_merge, 0)
+        tables <- tables[tables > 0]
+        tables <- tables[
+          vapply(
+            tables,
+            function(i) {
+              !is.null(n_origins[[i]]) && field %chin% names(merged_gtfs[[i]])
+            },
+            logical(1)
+          )
+        ]
+        if (length(tables) == 0) {
           return(FALSE)
         }
 
-        data.table::setnames(ids, c("origin", "id", "n_origins"))
-        data.table::set(ids, j = "id", value = as.character(ids$id))
-        ids <- ids[!is.na(ids$id) & ids$id != ""]
+        # the id columns are bound before being converted to character, so
+        # that ids stored as different types in different tables (e.g. integer
+        # and double) are converted alike
 
-        n_id <- unique(ids, by = c("origin", "id"))[, .N, by = "id"]
-        any(ids$n_origins < n_id$N[data.table::chmatch(ids$id, n_id$id)])
+        id <- data.table::rbindlist(
+          lapply(tables, function(i) list(merged_gtfs[[i]][[field]]))
+        )[[1]]
+        id <- as.character(id)
+        origin <- unlist(
+          lapply(tables, function(i) merged_gtfs[[i]]$origin_gtfs)
+        )
+        n <- unlist(n_origins[tables])
+
+        valid <- which(!is.na(id) & id != "")
+        id <- id[valid]
+        id_code <- data.table::chmatch(id, id)
+        in_origin <- !duplicated(data.table::data.table(origin[valid], id_code))
+        n_id <- tabulate(id_code[in_origin], length(id))
+
+        any(n[valid] < n_id[id_code])
       },
       logical(1)
     )
@@ -314,16 +324,16 @@ merge_gtfs <- function(..., files = NULL, prefix = FALSE) {
       )
     }
 
-    merged_gtfs <- mapply(
-      function(dt, is_first) {
-        dt <- dt[is_first]
-        if (count_col %chin% names(dt)) dt[, (count_col) := NULL]
-        return(dt)
-      },
-      merged_gtfs,
-      first_rows,
-      SIMPLIFY = FALSE
-    )
+    # the rows to keep are computed outside the brackets: inside them,
+    # data.table would look for names such as 'first_rows' among the columns
+    # of the feeds first
+
+    for (i in seq_along(merged_gtfs)) {
+      if (!all(first_rows[[i]])) {
+        keep <- which(first_rows[[i]])
+        merged_gtfs[[i]] <- merged_gtfs[[i]][keep]
+      }
+    }
   }
 
   # if prefix is TRUE or a list of prefixes, then add the prefixes to the ids.

@@ -226,16 +226,39 @@ test_that("removes identical rows when prefix = FALSE", {
     )
   }
 
+  # the same holds for more than two objects, also when the objects that share
+  # the rows are not consecutive
+
+  expect_identical(
+    merge_gtfs(spo_gtfs, spo_gtfs, spo_gtfs),
+    merge_gtfs(spo_gtfs, spo_gtfs)
+  )
+  expect_identical(
+    merge_gtfs(spo_gtfs, ggl_gtfs, spo_gtfs),
+    merge_gtfs(spo_gtfs, ggl_gtfs)
+  )
+
   # empty files (read as tables without columns) and columns named like the
-  # internal count don't get in the way
+  # variables used internally don't get in the way
 
   empty_gtfs <- read_gtfs(spo_path)
   empty_gtfs$feed_info <- data.table::data.table()
   empty_gtfs$stops <- data.table::copy(empty_gtfs$stops)
-  empty_gtfs$stops[, n_origins := 7L]
+  empty_gtfs$stops[
+    ,
+    `:=`(n_origins = 7L, file = "a", first_rows = FALSE, keep = 0L)
+  ]
   merged_gtfs <- merge_gtfs(empty_gtfs, empty_gtfs)
   expect_identical(nrow(merged_gtfs$feed_info), 0L)
-  expect_identical(merged_gtfs$stops$n_origins, empty_gtfs$stops$n_origins)
+  expect_equal(merged_gtfs$stops, empty_gtfs$stops, ignore_attr = TRUE)
+
+  # tables with columns but no rows stay empty
+
+  no_stops_gtfs <- read_gtfs(spo_path)
+  no_stops_gtfs$stops <- no_stops_gtfs$stops[0]
+  merged_gtfs <- merge_gtfs(no_stops_gtfs, no_stops_gtfs)
+  expect_identical(nrow(merged_gtfs$stops), 0L)
+  expect_identical(names(merged_gtfs$stops), names(spo_gtfs$stops))
 
   # with prefixes, rows are not removed
 
@@ -287,6 +310,41 @@ test_that("errors when GTFS objects share ids with different data", {
   )
   expect_error(
     merge_gtfs(truncated_gtfs, spo_gtfs),
+    class = "gtfstools_duplicated_ids_error",
+    regexp = "trip_id"
+  )
+
+  # also when only one of several objects that share the trip differs
+
+  expect_error(
+    merge_gtfs(spo_gtfs, spo_gtfs, truncated_gtfs),
+    class = "gtfstools_duplicated_ids_error",
+    regexp = "trip_id"
+  )
+  expect_error(
+    merge_gtfs(spo_gtfs, truncated_gtfs, spo_gtfs),
+    class = "gtfstools_duplicated_ids_error",
+    regexp = "trip_id"
+  )
+
+  # ids stored as different types in different tables are compared alike
+
+  numeric_gtfs <- gtfsio::new_gtfs(
+    list(
+      trips = data.table::data.table(trip_id = c(1e5, 2)),
+      stop_times = data.table::data.table(trip_id = c(100000L, 2L))
+    ),
+    "dt_gtfs"
+  )
+  short_gtfs <- gtfsio::new_gtfs(
+    list(
+      trips = data.table::data.table(trip_id = c(1e5, 2)),
+      stop_times = data.table::data.table(trip_id = 2L)
+    ),
+    "dt_gtfs"
+  )
+  expect_error(
+    merge_gtfs(numeric_gtfs, short_gtfs),
     class = "gtfstools_duplicated_ids_error",
     regexp = "trip_id"
   )
