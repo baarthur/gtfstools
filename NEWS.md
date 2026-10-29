@@ -13,7 +13,6 @@
 - `get_trip_length()` now measures each trip from its first to its last stop, instead of along its entire shape, so lengths are usually shorter, and the speeds of `get_trip_speed()` and `set_trip_speed()` slightly lower. Likewise, `get_trip_geometry()` now returns, by default, the part of the shape between the first and last stops. These functions now require the `stops` table (and `get_trip_length()` and `get_trip_geometry()` also `stop_times`). Use the new `get_shape_length()` and `get_shapes_geometry()` for entire shapes.
 - `get_trip_geometry()`, `get_trip_length()` and `get_trip_speed()` now return one result per trip, without the `origin_file` column. Their new `method` argument (and `by`, in the last two) comes right after `trip_id`, so `unit` and `file` must be passed by name. `get_trip_speed()` also returns `route_id` as its first column, and so requires the `trips` table.
 - The `by_reference` argument of `set_trip_speed()` must now be passed by name (#89).
-- `convert_shapes_to_sf()`, `get_trip_geometry()`, `get_trip_length()`, `get_trip_speed()`, `get_trip_segment_duration()` and `get_stop_times_patterns()` now always order `shapes` and `stop_times` by `shape_pt_sequence`/`stop_sequence`, which are therefore required. Results only change for feeds not ordered by these columns, which were previously wrong. Their `sort_sequence` argument is deprecated: `TRUE` raises a warning and `FALSE` an error (#94).
 
 ## Feature deprecation
 
@@ -95,6 +94,7 @@
 - `read_gtfs()` no longer keeps doubled quotes inside quoted text fields, and `write_gtfs()` always writes UTF-8, also for feeds read with `encoding = "Latin-1"`.
 - `as_dt_gtfs()` no longer turns `Date` fields into `NA`, and converts the date fields of lists to `Date`.
 - The documentation of `filter_by_stop_id()` now says that it keeps (or drops) the `stop_times` entries at the given stops, not entire trips.
+- `convert_shapes_to_sf()`, `get_trip_geometry()`, `get_trip_length()`, `get_trip_speed()`, `get_trip_segment_duration()` and `get_stop_times_patterns()` now always order `shapes` and `stop_times` by `shape_pt_sequence`/`stop_sequence`, which are therefore required. Results only change for feeds not ordered by these columns, which were previously wrong. Their `sort_sequence` argument is deprecated: `TRUE` raises a warning and `FALSE` an error (#94).
 
 ## Notes
 
