@@ -100,10 +100,6 @@ interpolate_stop_times <- function(gtfs, trip_id = NULL, method = "shapes") {
   )
 
   stop_times <- gtfs$stop_times
-  is_dt <- inherits(stop_times, "data.table")
-  if(!is_dt) {
-    data.table::setDT(stop_times)
-  }
 
   if (!is.null(trip_id)) {
     warn_missing_ids(trip_id, stop_times$trip_id, "stop_times", "trip_id")
